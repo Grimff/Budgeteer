@@ -96,14 +96,18 @@ works (and `npm test` passes) after every step.
   Bank (To review, Filed, Move panel `MvPanel`, double counts). Budget → This month (`ThisMonth`: summary bar, Needs a
   look, Getting set up, monthly review, extra money, budget lines, purchases); the money-flow chart / Compare inside
   it is still drawn by sankey() (flow.js, compare.js) into #sk after the React draw, and alert buttons come from
-  alertsNow() as HTML. To do: Budget → Build budget (renderBuild, with its drag handles) and Forecast
-  (renderForecast/fcBody/fcLanes/fcChart); `renderBudget`'s React version hands those two views to the old functions.
+  alertsNow() as HTML. Forecast (`Forecast` frame + `FcBody` into #fcb, both swapped in by name, so the what-if
+  sliders and range/month buttons redraw only the body; the chart's month click keeps its marker on that month, which
+  the old fcChart meant to do but threw on). The schedule editor is `schedule.jsx` (`AlForm`, `AlList`, `AlAdds`;
+  loan names in descriptions are now escaped text). To do: Budget → Build budget (renderBuild, with its drag
+  handles); `renderBudget`'s React version hands that view to the old function.
 - **Parity check** (`app/src/parity.js`, part of the self-test, run on the sample as loaded and again at the end):
   every converted screen is drawn by the old function (kept in `LEGACY` until phase 1 is done) and by React for many
   cases (every month, each range/view setting, an empty household) and must match: same elements, attributes (style
   and class compared parsed), input values, text, and the text the browser shows (catches a lost space between inline
   elements). Add cases to `main.jsx` for every view switch a screen has. Planted mistakes are caught; whitespace only
   counts where it renders (a grid/flex row ignores it, so that isn't a difference).
+  A screen's `also: ['fcBody']` makes the old screen call the old helpers it calls by name.
   `addPiece` compares one component against its old string function in a scratch tab, for parts no screen case
   reaches (the phone-alerts card is hidden in sample mode).
   JSX notes: a `<table>` needs an explicit `<tbody>` (the HTML parser added one to the old markup), SVG attributes camelCase (`strokeWidth`), keep attribute strings exact (`fillOpacity=".35"`), lengths

@@ -9,11 +9,16 @@ import { Loans } from './screens/Loans.jsx';
 import { Settings, NtCard } from './screens/Settings.jsx';
 import { Bank } from './screens/Bank.jsx';
 import { ThisMonth, RcList } from './screens/Budget.jsx';
+import { Forecast, FcBody } from './screens/Forecast.jsx';
 
 replaceScreen('renderHistory', () => draw($('#T-history'), <History />));
 // Budget: This month is React; Build budget and Forecast are still drawn by renderBuild / renderForecast. The
 // money-flow chart is drawn into #sk by sankey() afterwards, as before.
 replaceScreen('renderBudget', () => { if (BUDV === 'build') return renderBuild(); if (BUDV === 'fc') return renderForecast(); draw($('#T-budget'), <ThisMonth />); sankey(); });
+// Forecast: the frame, then the body into #fcb (the what-if sliders, range and month buttons redraw only the body);
+// FSC: scroll the open schedule editor or the month detail into view after adding/opening.
+replaceScreen('fcBody', () => { const el = $('#fcb'); if (!el) return; draw(el, <FcBody />); if (FSC) { FSC = false; const t = $('.fcle') || ($('.fcd') && FDK ? $('.fcd') : null); if (t) t.scrollIntoView({ block: 'nearest', behavior: RM ? 'auto' : 'smooth' }); } });
+replaceScreen('renderForecast', () => { draw($('#T-budget'), <Forecast />); fcBody(); });
 // bankBadge (the count on the Bank tab) ran at the end of the old renderBank once the bank was set up.
 replaceScreen('renderBank', () => { const el = $('#T-bank'); if (!el) return; draw(el, <Bank />); if (SRV && BK.st && BK.st.configured) bankBadge(); });
 replaceScreen('renderSettings', () => { const el = $('#T-settings'); if (el) draw(el, <Settings />); });
@@ -224,6 +229,32 @@ addPiece({
   name: 'Purchases list', html: () => rcList({ rc: [{ id: 'a', store: 'Shop & <co>', amt: 12.5, item: (allItems(S.cur)[0] || { i: {} }).i.id, date: S.cur + '-03' }, { id: 'b', amt: 4, item: 'gone', bank: true, txid: 'p1' }, { id: 'c', store: 'X', amt: 1, bank: true, txid: 'p2', date: S.cur + '-09' }] }),
   node: () => <RcList m={{ rc: [{ id: 'a', store: 'Shop & <co>', amt: 12.5, item: (allItems(S.cur)[0] || { i: {} }).i.id, date: S.cur + '-03' }, { id: 'b', amt: 4, item: 'gone', bank: true, txid: 'p1' }, { id: 'c', store: 'X', amt: 1, bank: true, txid: 'p2', date: S.cur + '-09' }] }} />,
   cases: () => [{ label: 'closed' }, { label: 'open, one pending', set: () => { OPEN.add('rcl'); PSET.add('p1'); return () => { OPEN.delete('rcl'); PSET.delete('p1'); }; } }],
+});
+const fr = setVar(() => FR, v => { FR = v; }), wfs = setVar(() => WFS, v => { WFS = v; }), ale = setVar(() => ALE, v => { ALE = v; }), fdk = setVar(() => FDK, v => { FDK = v; });
+// A schedule with every kind of item: set amounts, left-over shares, a snowball on some loans, kept, a stop month.
+const sched = tweak(s => { const g = s.goals, l = s.loans.filter(x => !loanGone(x, TK)); s.al = [
+  ...g.map((x, i) => ({ id: 'sg' + i, to: 'g:' + x.id, src: 'plan', mode: '$', v: 150 + i * 50, from: TK, until: i ? addM(TK, 9) : '', loans: [] })),
+  ...l.map((x, i) => ({ id: 'sl' + i, to: 'l:' + x.id, src: i % 2 ? 'extra' : 'plan', mode: i % 2 ? '%' : '$', v: i % 2 ? 25 : 80, from: addM(TK, i), until: '', loans: [] })),
+  ...g.slice(0, 1).map(x => ({ id: 'sd', to: 'g:' + x.id, src: 'extra', mode: '$', v: 60, from: addM(TK, 1), until: '', loans: [] })),
+  { id: 'ss', to: 'snow', src: 'plan', mode: '$', v: 300, how: 'bal', roll: false, loans: l.slice(0, 1).map(x => x.id), from: addM(TK, 2), until: addM(TK, 30) },
+  { id: 'sx', to: 'snow', src: 'extra', mode: '%', v: 40, how: 'rate', roll: true, loans: [], from: TK, until: '' },
+  { id: 'sk', to: 'keep', src: 'extra', mode: '%', v: 100, from: TK, until: '' }]; g.forEach((x, i) => { x.by = addM(TK, i ? 6 : 48); }); });
+addParity({
+  name: 'Budget (Forecast)', fn: 'renderForecast', also: ['fcBody'], el: '#T-budget', cases: () => {
+    const c = [];
+    for (const r of ['12', '24', '60', 'all']) { c.push({ label: 'range ' + r, set: fr(r) }); c.push({ label: 'range ' + r + ', full schedule', set: () => both(fr(r)(), sched()) }); }
+    for (const w of [{ inc: -800, cost: 0, extra: 0 }, { inc: 500, cost: 300, extra: 0 }, { inc: 0, cost: 0, extra: 700 }, { inc: -3000, cost: 3000, extra: 0 }]) c.push({ label: 'what if ' + JSON.stringify(w), set: () => both(wfs(w)(), sched()) });
+    for (const id of ['sg0', 'sl0', 'sl1', 'ss', 'sx', 'sk']) c.push({ label: 'editing ' + id, set: () => both(sched(), ale(id)(), fr('all')()) });
+    c.push({ label: 'month picked', set: () => both(sched(), fdk(addM(TK, 5))()) });
+    c.push({ label: 'month picked outside range', set: () => both(fdk(addM(TK, 400))(), fr('12')()) });
+    c.push({ label: 'one-time items', set: () => both(fdk(addM(TK, 1))(), tweak(s => { const k = addM(TK, 1), m = s.months[k] || (s.months[k] = { act: {}, pay: {}, dep: {} }); m.extra = [{ id: 'o1', kind: 'inc', name: 'Bonus & tip', amt: 400 }, { id: 'o2', kind: 'item', gid: (plan(k).groups[0] || {}).id, name: 'Repair', amt: 900 }]; })()) });
+    c.push({ label: 'over budget', set: tweak(s => { Object.values(s.plans).forEach(p => p.income.forEach(i => { i.amt = 100; })); }) });
+    c.push({ label: 'no schedule', set: tweak(s => { s.al = []; }) });
+    c.push({ label: 'no loans', set: tweak(s => { s.loans = []; s.al = (s.al || []).filter(a => !a.to.startsWith('l:') && a.to !== 'snow'); }) });
+    c.push({ label: 'no goal targets', set: tweak(s => { s.goals.forEach(g => { g.target = 0; delete g.by; }); }) });
+    c.push({ label: 'empty household', set: () => withS(emptyHousehold()) });
+    return c;
+  },
 });
 window.reactParity = runParity;
 if (DEMO) window.LEGACY_SCREENS = LEGACY;   // sample mode only: the old draw functions, for comparing by hand

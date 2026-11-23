@@ -7,7 +7,7 @@
 import { LEGACY, draw } from './bridge.js';
 
 const SCREENS = [];
-// screen: {name, fn: 'renderX', el: '#T-x', cases(): [{label, set?(): undo?}]}
+// screen: {name, fn: 'renderX', el: '#T-x', also?: ['renderY'], cases(): [{label, set?(): undo?}]}
 export const addParity = s => SCREENS.push(s);
 
 function attrsOf(n) {
@@ -111,7 +111,10 @@ export function runParity() {
         const el = document.querySelector(sc.el);
         // count-ups (cu) remember what they showed last; both draws start from the same memory
         const pv = { ...PV }, back = () => { for (const k of Object.keys(PV)) delete PV[k]; Object.assign(PV, pv); };
-        fresh(); LEGACY[sc.fn](); const A = snap(el);
+        // also: old functions the old screen calls by name (renderForecast → fcBody) are the old ones while it draws
+        const sw = (sc.also || []).map(n => [n, window[n]]); sw.forEach(([n]) => { window[n] = LEGACY[n]; });
+        try { fresh(); LEGACY[sc.fn](); } finally { sw.forEach(([n, f]) => { window[n] = f; }); }
+        const A = snap(el);
         back(); fresh(); window[sc.fn](); const B = snap(el);
         n++;
         const d = diff(A, B);
