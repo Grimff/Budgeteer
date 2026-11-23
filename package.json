@@ -4,9 +4,12 @@
   "private": true,
   "description": "Self-hosted household budget with Plaid bank sync. No dependencies.",
   "license": "UNLICENSED",
-  "engines": { "node": ">=18" },
+  "engines": {
+    "node": ">=18"
+  },
   "scripts": {
     "start": "node app/server.js",
+    "test": "node tools/test.js",
     "check": "node tools/check.js",
     "realtest": "node tools/realtest.js",
     "livetest": "node tools/livetest.js"
