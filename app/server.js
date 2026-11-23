@@ -5,6 +5,7 @@ const http = require('http');
 const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
+const zlib = require('zlib');
 
 // Settings and Plaid keys can come from a .env file (KEY=value per line) in the project folder or the
 // folder you start the server from. Real environment variables (e.g. from docker compose) always win.
@@ -32,10 +33,19 @@ fs.mkdirSync(BACKUP_DIR, { recursive: true });
 
 const log = (...a) => console.log(new Date().toISOString(), ...a);
 
-function readData() {
-  try { return JSON.parse(fs.readFileSync(FILE, 'utf8')); }
-  catch (e) { if (e.code === 'ENOENT') return null; throw e; }
+// Parsed JSON files are cached until the file changes on disk (size or modified time), so the 10-second
+// revision check and repeated bank reads don't re-read and re-parse whole files. Only for read-only use:
+// never change an object returned from here (code that edits a file reads it fresh with readJ).
+const JC = new Map();
+function readCached(f) {
+  let st; try { st = fs.statSync(f); } catch (e) { if (e.code === 'ENOENT') { JC.delete(f); return null; } throw e; }
+  const c = JC.get(f);
+  if (c && c.m === st.mtimeMs && c.s === st.size) return c.v;
+  const v = JSON.parse(fs.readFileSync(f, 'utf8'));
+  JC.set(f, { m: st.mtimeMs, s: st.size, v });
+  return v;
 }
+function readData() { return readCached(FILE); }
 function revOf(j) {
   if (!j) return 0;
   if (j.rev) return j.rev;
@@ -46,6 +56,7 @@ function writeAtomic(obj) {
   const tmp = FILE + '.tmp-' + process.pid;
   fs.writeFileSync(tmp, JSON.stringify(obj));
   fs.renameSync(tmp, FILE);
+  const st = fs.statSync(FILE); JC.set(FILE, { m: st.mtimeMs, s: st.size, v: obj });
 }
 function dailyBackup() {
   if (!fs.existsSync(FILE)) return;
@@ -81,13 +92,22 @@ const LOAN_FILE = path.join(DATA_DIR, 'bank-loans.json');          // balances b
 const INV_FILE = path.join(DATA_DIR, 'bank-investments.json');     // holdings + money moved in/out of investment accounts
 const SET_FILE = path.join(DATA_DIR, 'bank-settings.json');       // refresh choices from Settings → Connections
 const SYNC_CHOICES = [0, 1, 2, 3, 6, 12, 24];                       // hours between automatic checks; 0 = only Sync now
+// Loan details (Liabilities) and investment holdings/activity change slowly, so automatic syncs refresh them only
+// this often. Sync now, a new connection and a reconnect always refresh them.
+const DETAIL_HOURS = Number(process.env.BANK_DETAIL_HOURS) || 24;
 const bankOn = () => !!(PLAID_ID && PLAID_SECRET);
 const readJ = (f, d) => { try { return JSON.parse(fs.readFileSync(f, 'utf8')); } catch (_) { return d; } };
-const writeJ = (f, o) => { const t = f + '.tmp-' + process.pid; fs.writeFileSync(t, JSON.stringify(o)); fs.renameSync(t, f); try { fs.chmodSync(f, 0o600); } catch (_) {} };
+const writeJ = (f, o) => { const t = f + '.tmp-' + process.pid; fs.writeFileSync(t, JSON.stringify(o)); fs.renameSync(t, f); JC.delete(f); try { fs.chmodSync(f, 0o600); } catch (_) {} };
 const loadBank = () => readJ(BANK_FILE, { items: [] });
 const loadTx = () => readJ(TX_FILE, { tx: {} });
 const loadLoans = () => readJ(LOAN_FILE, { acct: {} });
 const loadInv = () => readJ(INV_FILE, { acct: {}, flows: {} });
+// Read-only copies for GET requests (cached, see readCached). Don't edit what these return.
+const readC = (f, d) => { try { return readCached(f) || d; } catch (_) { return d; } };
+const viewBank = () => readC(BANK_FILE, { items: [] });
+const viewTx = () => readC(TX_FILE, { tx: {} });
+const viewLoans = () => readC(LOAN_FILE, { acct: {} });
+const viewInv = () => readC(INV_FILE, { acct: {}, flows: {} });
 const today = () => { const d = new Date(); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); };
 const isDebt = a => a.type === 'loan' || a.type === 'credit';
 async function plaid(endpoint, body) {
@@ -202,7 +222,7 @@ function snapshotBalances(it, loans) {
 // One row per loan or credit account: live balance, month-end balances, payments seen on the account, lender details.
 // Every connected account with its balance history; investment accounts also get holdings and deposits/withdrawals.
 function allAccounts() {
-  const bank = loadBank(), loans = loadLoans(), inv = loadInv(), out = [];
+  const bank = viewBank(), loans = viewLoans(), inv = viewInv(), out = [];
   const flows = Object.values(inv.flows || {});
   for (const it of bank.items) for (const a of it.accounts || []) {
     const e = loans.acct[a.id] || { days: {} }, days = Object.keys(e.days).sort(), months = {};
@@ -221,13 +241,15 @@ function allAccounts() {
   return out;
 }
 function loanAccounts() {
-  const bank = loadBank(), loans = loadLoans(), tx = Object.values(loadTx().tx), out = [];
+  const bank = viewBank(), loans = viewLoans(), out = [];
+  // On a loan account Plaid shows payments as money in (negative amounts). Grouped by account in one pass.
+  const byAcct = {};
+  for (const t of Object.values(viewTx().tx)) if (!t.pending && t.amount < 0) (byAcct[t.account] || (byAcct[t.account] = [])).push(t);
   for (const it of bank.items) for (const a of it.accounts || []) {
     if (!isDebt(a)) continue;
     const e = loans.acct[a.id] || { days: {} }, months = {}, pays = {}, payList = [];
     Object.keys(e.days).sort().forEach(d => { months[d.slice(0, 7)] = e.days[d]; });
-    // On a loan account Plaid shows payments as money in (negative amounts).
-    tx.filter(t => t.account === a.id && !t.pending && t.amount < 0).forEach(t => {
+    (byAcct[a.id] || []).forEach(t => {
       const k = t.date.slice(0, 7); pays[k] = Math.round(((pays[k] || 0) - t.amount) * 100) / 100; payList.push({ id: t.id, date: t.date, amt: -t.amount, name: t.name });
     });
     out.push({ id: a.id, item: it.item_id, institution: it.institution.name, name: a.name, official: a.official, mask: a.mask, type: a.type, subtype: a.subtype,
@@ -236,9 +258,15 @@ function loanAccounts() {
   }
   return out;
 }
-function syncAll() {
+// full: also refresh loan details and investments now (Sync now, new connection, reconnect). Otherwise they
+// refresh when DETAIL_HOURS have passed since the last time (or they were never fetched for this connection).
+let fullNext = null;   // a full sync waiting for the running (automatic) one to finish
+function syncAll(full) {
   if (!bankOn()) return Promise.resolve({ added: 0 });
-  if (syncing) return syncing;
+  if (syncing) {
+    if (!full || syncing.full) return syncing;
+    return fullNext || (fullNext = syncing.catch(() => {}).then(() => { fullNext = null; return syncAll(true); }));
+  }
   syncing = (async () => {
     const bank = loadBank(), store = loadTx(), loans = loadLoans(), inv = loadInv(); let added = 0;
     for (const it of bank.items) {
@@ -247,8 +275,11 @@ function syncAll() {
         snapshotBalances(it, loans);
         if (it.kind !== 'invest') added += await syncItem(it, store);
         it.error = null; it.lastSync = new Date().toISOString();
-        await refreshLiabilities(it, loans);
-        await refreshInvestments(it, inv);
+        if (full || !it.detailAt || Date.now() - Date.parse(it.detailAt) >= DETAIL_HOURS * 3600000 || it.liab === '' || it.inv === '') {
+          await refreshLiabilities(it, loans);
+          await refreshInvestments(it, inv);
+          it.detailAt = new Date().toISOString();
+        }
       } catch (e) { it.error = { code: e.code || 'ERROR', message: e.display || e.message }; log('Bank sync error', it.institution && it.institution.name, e.code, e.message); }
       it.count = Object.values(store.tx).filter(t => t.item === it.item_id).length;
     }
@@ -256,6 +287,7 @@ function syncAll() {
     lastAll = Date.now();
     return { added };
   })().finally(() => { syncing = null; });
+  syncing.full = !!full;
   return syncing;
 }
 // A one-minute tick checks whether the chosen refresh time has passed, so a new choice applies right away.
@@ -264,7 +296,7 @@ function syncTick() { const h = syncSet().hours; if (!h || syncing) return; if (
 if (bankOn()) { lastAll = loadBank().items.reduce((m, it) => Math.max(m, Date.parse(it.lastSync || '') || 0), 0); setTimeout(syncTick, 15000); setInterval(syncTick, 60000); }
 async function bankRoute(p, req, res, url) {
   if (p === '/api/bank/status' && req.method === 'GET')
-    return send(res, 200, { configured: bankOn(), env: PLAID_ENV, syncing: !!syncing, refresh: syncInfo(), items: loadBank().items.map(publicItem) });
+    return send(res, 200, { configured: bankOn(), env: PLAID_ENV, syncing: !!syncing, refresh: syncInfo(), items: viewBank().items.map(publicItem) });
   if (p === '/api/bank/settings' && req.method === 'PUT') {
     let b = {}; try { b = JSON.parse(await readBody(req) || '{}'); } catch (_) { return send(res, 400, { error: 'bad json' }); }
     const cur = syncSet(), h = b.hours != null ? Number(b.hours) : cur.hours;
@@ -311,25 +343,25 @@ async function bankRoute(p, req, res, url) {
     bank.items = bank.items.filter(x => x.item_id !== it.item_id).concat(it);
     try { await refreshAccounts(it); } catch (_) {}
     writeJ(BANK_FILE, bank);
-    syncAll().catch(() => {});
+    syncAll(true).catch(() => {});
     return send(res, 200, { ok: true, item: publicItem(it) });
   }
   if (p === '/api/bank/reconnected' && req.method === 'POST') {
     const b = JSON.parse(await readBody(req)); const bank = loadBank(); const it = bank.items.find(x => x.item_id === b.item_id); if (it) { it.error = null; if (it.liab !== 'ok') it.liab = ''; if (it.inv !== 'ok') it.inv = ''; writeJ(BANK_FILE, bank); }
-    syncAll().catch(() => {}); return send(res, 200, { ok: true });
+    syncAll(true).catch(() => {}); return send(res, 200, { ok: true });
   }
   if (p === '/api/bank/sync' && req.method === 'POST') {
     // {auto:true} comes from opening the app: skip it when a sync just ran. Sync now (no body) always runs.
     let b = {}; try { b = JSON.parse(await readBody(req) || '{}'); } catch (_) {}
-    if (b.auto && !syncing && (!syncSet().open || Date.now() - lastAll < OPEN_SYNC_MIN * 60000)) return send(res, 200, { ok: true, added: 0, skipped: true, items: loadBank().items.map(publicItem) });
-    const r = await syncAll(); return send(res, 200, { ok: true, added: r.added, items: loadBank().items.map(publicItem) });
+    if (b.auto && !syncing && (!syncSet().open || Date.now() - lastAll < OPEN_SYNC_MIN * 60000)) return send(res, 200, { ok: true, added: 0, skipped: true, items: viewBank().items.map(publicItem) });
+    const r = await syncAll(!b.auto); return send(res, 200, { ok: true, added: r.added, items: viewBank().items.map(publicItem) });
   }
   if (p === '/api/bank/loans' && req.method === 'GET') return send(res, 200, { accounts: loanAccounts() });
   if (p === '/api/bank/accounts' && req.method === 'GET') return send(res, 200, { accounts: allAccounts() });
   if (p === '/api/bank/transactions' && req.method === 'GET') {
     const from = url.searchParams.get('from') || '0000';
-    const names = {}; loadBank().items.forEach(it => (it.accounts || []).forEach(a => { names[a.id] = `${it.institution.name} ${a.name}${a.mask ? ' ••' + a.mask : ''}`; }));
-    const tx = Object.values(loadTx().tx).filter(t => t.date >= from).map(t => ({ ...t, accountName: names[t.account] || '' })).sort((a, b) => b.date.localeCompare(a.date));
+    const names = {}; viewBank().items.forEach(it => (it.accounts || []).forEach(a => { names[a.id] = `${it.institution.name} ${a.name}${a.mask ? ' ••' + a.mask : ''}`; }));
+    const tx = Object.values(viewTx().tx).filter(t => t.date >= from).map(t => ({ ...t, accountName: names[t.account] || '' })).sort((a, b) => b.date.localeCompare(a.date));
     return send(res, 200, { tx });
   }
   const dm = p.match(/^\/api\/bank\/items\/([A-Za-z0-9_-]+)$/);
@@ -346,15 +378,32 @@ async function bankRoute(p, req, res, url) {
   return send(res, 404, { error: 'not found' });
 }
 
+// Responses over 1 KB are gzipped when the browser accepts it (res.gz, set per request). Bank transactions
+// and the app page shrink to a fraction of their size.
 function send(res, code, body, headers = {}) {
   const isObj = typeof body === 'object' && !Buffer.isBuffer(body);
-  res.writeHead(code, {
+  let out = isObj ? JSON.stringify(body) : body;
+  const h = {
     'Content-Type': isObj ? 'application/json; charset=utf-8' : (headers['Content-Type'] || 'text/plain; charset=utf-8'),
     'Cache-Control': 'no-store',
     'X-Content-Type-Options': 'nosniff',
     ...headers,
-  });
-  res.end(isObj ? JSON.stringify(body) : body);
+  };
+  if (res.gz && !h['Content-Encoding'] && out && out.length > 1024) { out = zlib.gzipSync(out, { level: 5 }); h['Content-Encoding'] = 'gzip'; }
+  if (res.gz !== undefined) h['Vary'] = 'Accept-Encoding';
+  res.writeHead(code, h);
+  res.end(out);
+}
+// The app page, kept in memory with a gzipped copy and an ETag until the file changes, so editing index.html
+// still takes effect on the next reload (no restart), and browsers re-download it only when it changed.
+let PAGE = null;
+function page() {
+  const st = fs.statSync(INDEX);
+  if (!PAGE || PAGE.m !== st.mtimeMs || PAGE.s !== st.size) {
+    const raw = fs.readFileSync(INDEX);
+    PAGE = { m: st.mtimeMs, s: st.size, raw, gz: zlib.gzipSync(raw, { level: 9 }), etag: '"' + crypto.createHash('sha1').update(raw).digest('base64url').slice(0, 20) + '"' };
+  }
+  return PAGE;
 }
 function authorized(req) {
   if (!AUTH) return true;
@@ -376,6 +425,7 @@ function readBody(req) {
 const server = http.createServer(async (req, res) => {
   try {
     if (!authorized(req)) return send(res, 401, 'Password required', { 'WWW-Authenticate': 'Basic realm="Budgeteer", charset="UTF-8"' });
+    res.gz = /\bgzip\b/.test(req.headers['accept-encoding'] || '');
     const url = new URL(req.url, 'http://x');
     const p = url.pathname.replace(/\/+$/, '') || '/';
 
@@ -410,8 +460,11 @@ const server = http.createServer(async (req, res) => {
     }
 
     if ((p === '/' || p === '/index.html') && (req.method === 'GET' || req.method === 'HEAD')) {
-      const html = fs.readFileSync(INDEX);
-      return send(res, 200, req.method === 'HEAD' ? '' : html, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-cache' });
+      const pg = page(), h = { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-cache', ETag: pg.etag, 'Vary': 'Accept-Encoding', 'X-Content-Type-Options': 'nosniff' };
+      if (req.headers['if-none-match'] === pg.etag) { res.writeHead(304, h); return res.end(); }
+      const body = res.gz ? pg.gz : pg.raw; if (res.gz) h['Content-Encoding'] = 'gzip';
+      h['Content-Length'] = body.length; res.writeHead(200, h);
+      return res.end(req.method === 'HEAD' ? undefined : body);
     }
     return send(res, 404, 'Not found');
   } catch (e) {

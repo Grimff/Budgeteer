@@ -1149,9 +1149,12 @@ function confetti(){if(RM)return;const cv=$('#fx'),x=cv.getContext('2d'),dpr=dev
  const t0=performance.now();(function f(t){x.clearRect(0,0,innerWidth,innerHeight);const age=t-t0;P.forEach(p=>{p.vy+=.38;p.vx*=.99;p.x+=p.vx;p.y+=p.vy;p.r+=p.vr;x.save();x.globalAlpha=Math.max(0,1-age/2200);x.translate(p.x,p.y);x.rotate(p.r);x.fillStyle=p.c;x.fillRect(-p.w/2,-p.h/2,p.w,p.h);x.restore()});if(age<2200)requestAnimationFrame(f);else x.clearRect(0,0,innerWidth,innerHeight)})(t0)}
 
 /* ---------- render all ---------- */
+const TABR={budget:()=>renderBudget(),loans:()=>renderLoans(),goals:()=>renderGoals(),wealth:()=>renderWealth(),history:()=>renderHistory(),bank:()=>renderBank(),settings:()=>renderSettings()};
 function renderAll(enter){LP={};GP={};XS=null;PC={};alMigrate();TXI=null;ALC={};loanSync();migrateAlloc();const lm=lab(S.cur);$('#mlab').textContent=lm;$('#mp').value=S.cur;$('#tbtn').hidden=S.cur===TK;
- renderBudget();renderLoans();renderGoals();renderWealth();renderHistory();renderBank();renderSettings();brandSet();
+ // Only the visible tab is drawn; the others are redrawn when switched to (every tab switch goes through commit → renderAll).
+ // Shown before it's drawn, so charts that size themselves to the tab (History) measure its real width.
  $$('.tabs button').forEach(b=>b.classList.toggle('on',b.dataset.t===S.tab));document.body.className='tab-'+S.tab;$$('.tab').forEach(t=>{t.hidden=t.dataset.tab!==S.tab;t.classList.remove('enter')});
+   (TABR[S.tab]||renderBudget)();brandSet();
  if(enter){const t=$('#T-'+S.tab);void t.offsetWidth;t.classList.add('enter')}moveInd();fmtAll()}
 function moveInd(){const b=$(`.tabs [data-t="${S.tab}"]`),i=$('.ind');if(!b)return;i.style.width=b.offsetWidth+'px';i.style.transform=`translateX(${b.offsetLeft-i.offsetLeft}px)`;const T=b.parentElement;if(T.scrollWidth>T.clientWidth+2){const x=b.offsetLeft-(T.clientWidth-b.offsetWidth)/2;T.scrollTo({left:Math.max(0,x),behavior:RM?'auto':'smooth'})}}
 function commit(enter){if(INB&&SRV){INB=false;if(autoFile()){LP={}}}save();rerender(enter);checkBadges()}

@@ -74,6 +74,8 @@ If two people edit at the same moment, the app keeps the server's copy and re-ap
 | `TZ` | Your time zone, like `America/New_York`. |
 | `BACKUPS_KEEP` | Days of daily backups kept in `data/backups/` (default 90). |
 | `BANK_SYNC_HOURS` | Hours between bank syncs until you pick one in Settings (default 1). |
+| `BANK_DETAIL_HOURS` | Hours between refreshes of loan details and investment holdings on automatic syncs (default 24). **Sync now** always refreshes them. |
+| `BANK_HISTORY_DAYS` | Days of history pulled when you connect a new bank (default 365). |
 | `PLAID_COUNTRIES`, `PLAID_REDIRECT_URI` | Optional Plaid settings. |
 
 ## Bank sync (Plaid)

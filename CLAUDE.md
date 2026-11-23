@@ -67,6 +67,13 @@ server against a real `data/` folder while testing; use `tools/realtest.js`.
 
 - `GET /api/health`, `GET /api/rev`, `GET/PUT /api/data` (PUT with `baseRev` → 409 on conflict;
   atomic write; daily backup). Optional `BASIC_AUTH=user:pass`.
+- **Efficiency:** GET routes read JSON through `readCached` (`viewBank/viewTx/viewLoans/viewInv`, cached until the
+  file's size or mtime changes; never mutate what they return). Code that edits a file uses `loadX()` (fresh read)
+  and `writeJ`/`writeAtomic`, which update/clear the cache. Responses over 1 KB are gzipped when accepted (`res.gz`);
+  the page is cached in memory with a gzipped copy and an ETag (304 on repeat visits; edits still apply on reload).
+  Liabilities and Investments refresh only every `BANK_DETAIL_HOURS` (default 24, `item.detailAt`) on automatic
+  syncs; `syncAll(true)` (Sync now, exchange, reconnected) always refreshes them, and a Sync now during an
+  automatic sync waits for it, then runs once in full (`fullNext`).
 - Bank: `/api/bank/status|link-token|exchange|reconnected|sync|transactions?from=|loans|accounts`, `PUT /api/bank/settings`,
   `DELETE /api/bank/items/:id`. Env `PLAID_CLIENT_ID`, `PLAID_SECRET`, `PLAID_ENV`, optional
   `PLAID_REDIRECT_URI`, `PLAID_BASE` (mock), `BANK_SYNC_HOURS` (default 1, used until a refresh time is
@@ -210,6 +217,9 @@ server against a real `data/` folder while testing; use `tools/realtest.js`.
 
 ## Screens
 
+- **Only the visible tab is drawn:** `renderAll` shows the tab, then calls `TABR[S.tab]`; hidden tabs keep stale HTML
+  until switched to. Every tab switch must go through `commit()`/`renderAll` (all `S.tab=` sites do). Calling one
+  tab's `renderX()` directly is fine. Tab draw functions must stay free of side effects (no saves or data changes).
 - **Budget → This month** is read-only (no inputs): header with the This month / Build budget
   switch, summary bar, money-flow card, then **Budget lines**: a `.ledger` (CSS columns, so cards
   pack without gaps) of one card per section (income, each bill group, each spending group, loans,
@@ -332,7 +342,7 @@ after typing started. Amounts (`input.in[inputmode="decimal"]`) get thousands se
 ## Design
 
 - **Logo** (`brand/logo.svg`, source; `brand/icon-32|180|512.png` rendered from it): rounded tile cut into
-  pink/butter/lime/aqua/lilac wedges, dark center with a white "P". It's built into `index.html`: the
+  pink/butter/lime/aqua/lilac wedges, dark center with a white "B". It's built into `index.html`: the
   `<head>` has the SVG favicon, a 32px PNG fallback, the 180px `apple-touch-icon` and `theme-color`, and
   the header `.mark` holds the same SVG inline (clip id `lgclip`). If the logo changes, update all four.
 
