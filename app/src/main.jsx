@@ -7,8 +7,11 @@ import { Wealth } from './screens/Wealth.jsx';
 import { Goals } from './screens/Goals.jsx';
 import { Loans } from './screens/Loans.jsx';
 import { Settings, NtCard } from './screens/Settings.jsx';
+import { Bank } from './screens/Bank.jsx';
 
 replaceScreen('renderHistory', () => draw($('#T-history'), <History />));
+// bankBadge (the count on the Bank tab) ran at the end of the old renderBank once the bank was set up.
+replaceScreen('renderBank', () => { const el = $('#T-bank'); if (!el) return; draw(el, <Bank />); if (SRV && BK.st && BK.st.configured) bankBadge(); });
 replaceScreen('renderSettings', () => { const el = $('#T-settings'); if (el) draw(el, <Settings />); });
 replaceScreen('renderLoans', () => draw($('#T-loans'), <Loans />));
 replaceScreen('renderGoals', () => draw($('#T-goals'), <Goals />));
@@ -154,6 +157,33 @@ addParity({
 addPiece({
   name: 'Phone alerts card', html: () => (0, eval)('(function(DEMO){return (' + ntCard.toString() + ')()})')(false), node: () => <NtCard demo={false} />,
   cases: () => [null, { configured: false }, { configured: true, target: 'ntfy.sh/our-topic & <x>' }, { configured: true }].map(n => ({ label: JSON.stringify(n), set: nt(n) })),
+});
+const bv = setVar(() => BV, v => { BV = v; }), flf = setVar(() => FLF, v => { FLF = v; }), flq = setVar(() => FLQ, v => { FLQ = v; }), fln = setVar(() => FLN, v => { FLN = v; });
+// Some transactions back in To review (unfiled), some pending, some moved to another month.
+const unfile = n => tweak(s => { Object.keys(s.txd || {}).filter(id => !s.txd[id].sp && s.txd[id].v !== 'split').slice(0, n).forEach(id => delete s.txd[id]); });
+addParity({
+  name: 'Bank', fn: 'renderBank', el: '#T-bank', cases: () => {
+    const c = [];
+    for (const k of monthsToTry()) for (const v of ['review', 'filed', null]) c.push({ label: `${k} ${v}`, set: () => both(bv(v)(), at(k)) });
+    for (const f of FLKIND.map(x => x[0])) c.push({ label: 'filter ' + f, set: () => both(bv('filed')(), flf(f)()) });
+    for (const q of ['gro', 'zzz', 'Rent']) c.push({ label: 'search ' + q, set: () => both(bv('filed')(), flq(q)()) });
+    c.push({ label: 'first 3 only', set: () => both(bv('filed')(), fln(3)()) });
+    c.push({ label: 'filed: pending, moved, split, odd names', set: () => both(bv('filed')(), tweak(s => { const E = Object.entries(s.txd || {}).filter(([, r]) => r.k === TK); E.slice(0, 2).forEach(([id, r]) => { r.d = addM(TK, -1) + '-28'; }); if (E[2]) { E[2][1].n += ' & <co>\uFFFD'; } if (E[3]) { const [id, r] = E[3]; s.txd[id + '~0'] = { ...r, sp: id, amt: r.amt / 2 }; s.txd[id] = { ...r, v: 'split', parts: [id + '~0'], amt: 0 }; } if (E[4]) E[4][1].amt = -Math.abs(E[4][1].amt); })(), (() => { const ids = Object.keys(S.txd || {}).slice(0, 4); ids.forEach(i => PSET.add(i)); return () => ids.forEach(i => PSET.delete(i)); })()) });
+    c.push({ label: 'to review', set: () => both(bv('review')(), unfile(12)()) });
+    c.push({ label: 'to review, show 5, pending, how open', set: () => both(bv('review')(), unfile(12)(), swap(BK, 'show', 5), (() => { BK.tx.slice(0, 6).forEach(t => PSET.add(t.id)); OPEN.add('bhow'); return () => { BK.tx.slice(0, 6).forEach(t => PSET.delete(t.id)); OPEN.delete('bhow'); }; })()) });
+    c.push({ label: 'to review, catch-all off', set: () => both(bv('review')(), tweak(s => { s.catchAll = 'review'; })()) });
+    c.push({ label: 'double counts', set: () => both(bv('review')(), tweak(s => { const it = plan().groups.flatMap(g => g.items)[0], P = txPairs(); [...P.keys()].slice(0, 3).forEach(id => { if (s.txd[id]) { s.txd[id].v = 'i:' + (it ? it.id : 'x'); delete s.txd[id].auto; } }); })()) });
+    c.push({ label: 'sandbox, syncing, errors', set: () => both(swap(BK, 'busy', true), swap(BK, 'st', { ...BK.st, env: 'sandbox', items: (BK.st.items || []).map((it, i) => i ? it : { ...it, error: { code: 'X' } }) })) });
+    c.push({ label: 'two errors, never synced', set: () => swap(BK, 'st', { ...BK.st, syncing: true, items: (BK.st.items || []).map(it => ({ ...it, error: { code: 'X' }, lastSync: null })) }) });
+    c.push({ label: 'no rules', set: tweak(s => { s.rules = []; }) });
+    c.push({ label: 'no banks', set: () => swap(BK, 'st', { ...BK.st, items: [] }) });
+    c.push({ label: 'no keys', set: () => swap(BK, 'st', { ...BK.st, configured: false }) });
+    c.push({ label: 'loading', set: () => swap(BK, 'st', null) });
+    c.push({ label: 'bank error', set: () => both(swap(BK, 'st', null), swap(BK, 'err', 'Couldn’t reach the bank service on the server.')) });
+    c.push({ label: 'server unreachable', set: () => { const o = SRV; SRV = false; return () => { SRV = o; }; } });
+    c.push({ label: 'empty household', set: () => withS(emptyHousehold()) });
+    return c;
+  },
 });
 window.reactParity = runParity;
 if (DEMO) window.LEGACY_SCREENS = LEGACY;   // sample mode only: the old draw functions, for comparing by hand

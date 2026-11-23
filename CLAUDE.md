@@ -93,8 +93,8 @@ works (and `npm test` passes) after every step.
   components with hover state; Settings (all four views, CSV import, phone alerts). The px/wi live inputs still patch
   #pxr/#wp-… with the old string helpers, and the rules search still runs rulesFilter while typing, until phase 3.
   Health-check messages are still HTML strings from healthChecks (inserted by `Html`) until it returns data.
-  To do: Bank, Budget
-  (This month, Build, Forecast, flow, compare).
+  Bank (To review, Filed, Move panel `MvPanel`, double counts). To do: Budget (This month, Build, Forecast, flow,
+  compare).
 - **Parity check** (`app/src/parity.js`, part of the self-test, run on the sample as loaded and again at the end):
   every converted screen is drawn by the old function (kept in `LEGACY` until phase 1 is done) and by React for many
   cases (every month, each range/view setting, an empty household) and must match: same elements, attributes (style
