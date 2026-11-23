@@ -48,7 +48,7 @@ document.addEventListener('input',e=>{if(e.target.id==='rulesq'){RQ=e.target.val
 // Health check (Settings → Data & math): proves the tabs agree and points at data that would make the budget wrong.
 // Each check: {lv:'ok'|'warn'|'bad', t:title, d:detail, a:optional button}.
 // Each check: {lv: ok|warn|bad, t: title, d: message, a?: buttons}. d is text or a list of text and {b: bold text}; a
-// is a list of {act, label, ...data-* values} (hcHtml/hcText turn them into markup or plain text).
+// is a list of {act, label, ...data-* values} (rtHtml/rtText turn them into markup or plain text).
 function healthChecks(){const H=[],add=(lv,t,d,a)=>H.push(a&&a.length?{lv,t,d,a}:{lv,t,d}),near=(a,b)=>Math.abs(a-b)<0.51,MS=histMonths().filter(k=>k<=TK).slice(-7);
  // 1. Budget, History and the money flow use the same totals
  const bad1=MS.filter(k=>{const T=totals(k),M=monthSum(k);return !near(M.ac,T.fixedA+T.flexA+T.loansA+T.saveA)||!near(M.pl,T.fixed+T.flexP+T.loans+T.save)||!near(M.inc,T.incA)});
@@ -85,14 +85,11 @@ function healthChecks(){const H=[],add=(lv,t,d,a)=>H.push(a&&a.length?{lv,t,d,a}
  // 9. Goal accounts split sensibly
  const over=Object.entries(S.alloc||{}).filter(([,e])=>e.mode==='split'&&Object.values(e.pct||{}).reduce((a,b)=>a+(+b||0),0)>100.01);if(Object.keys(S.alloc||{}).length)add(over.length?'bad':'ok','Savings accounts shared between goals',over.length?`${over.length} account${over.length===1?' splits':'s split'} more than 100% between goals`:'Every account’s split adds up to 100% or less');
  return H}
-const hcParts=d=>Array.isArray(d)?d:[d];
-const hcText=d=>hcParts(d).map(p=>typeof p==='string'?p:p.b).join('');
-const hcHtml=d=>hcParts(d).map(p=>typeof p==='string'?esc(p):`<b>${esc(p.b)}</b>`).join('');
 // A check's buttons: data-* from every field but label, in the order given.
 const hcBtns=a=>a.map(b=>`<button class="btn g sm" data-act="${b.act}"${Object.entries(b).filter(([k])=>k!=='act'&&k!=='label').map(([k,v])=>` data-${k}="${esc(v)}"`).join('')}>${esc(b.label)}</button>`).join(' ');
 function healthCard(){const H=healthChecks(),n={ok:0,warn:0,bad:0};H.forEach(h=>n[h.lv]++);const ic={ok:'✓',warn:'!',bad:'×'};
  return `<section class="card hc" style="margin-bottom:16px"><div class="bh"><div><h2>Health check</h2><p>${n.bad+n.warn?`${n.bad+n.warn} thing${n.bad+n.warn===1?'':'s'} to look at · ${n.ok} passed`:`All ${n.ok} checks passed`}. These run every time you open this page.</p></div>${DEMO?'':`<div class="phact"><a class="btn g sm" href="?demo" target="_blank" rel="noopener">Try sample data</a><a class="btn g sm" href="?selftest" target="_blank" rel="noopener">Run self-test</a></div>`}</div>
- <div class="hcl">${H.sort((a,b)=>({bad:0,warn:1,ok:2})[a.lv]-({bad:0,warn:1,ok:2})[b.lv]).map(h=>`<div class="hci ${h.lv}"><i>${ic[h.lv]}</i><div><b>${esc(h.t)}</b><p>${hcHtml(h.d)}</p>${h.a?`<div class="hca">${hcBtns(h.a)}</div>`:''}</div></div>`).join('')}</div></section>`}
+ <div class="hcl">${H.sort((a,b)=>({bad:0,warn:1,ok:2})[a.lv]-({bad:0,warn:1,ok:2})[b.lv]).map(h=>`<div class="hci ${h.lv}"><i>${ic[h.lv]}</i><div><b>${esc(h.t)}</b><p>${rtHtml(h.d)}</p>${h.a?`<div class="hca">${hcBtns(h.a)}</div>`:''}</div></div>`).join('')}</div></section>`}
 // Settings -> Data & math: each total the app shows, broken into the numbers it adds up, plus what's stored.
 // Everything here calls the same functions the tabs use, so the numbers always match them.
 function dataView(){const k=S.cur,T=totals(k),live=k>=TK,lm=mon(k),spentA=T.fixedA+T.flexA+T.loansA+T.saveA,planOut=T.fixed+T.flexP+T.loans+T.save,so=soFarOf(k,T);

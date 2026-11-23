@@ -1,8 +1,8 @@
 // Loans tab (was renderLoans, loanCard, pxCard/pxText, wiText, debtChart in js/loans.js, bankLoansPanel in
 // js/linked-loans.js, loanLinkLine in js/flow.js). The math (lp, row, savedL, pxSim, …) stays in those files.
-// The live inputs (data-live px / wi) still update #pxr, #wo-…, #wp-… from events.js with the old string helpers.
+// While typing / dragging, the live inputs (data-live px / wi) redraw only #pxr and #wp-… (pxLiveR, wiLiveR).
 import { Fragment, useLayoutEffect, useRef, useState } from 'react';
-import { tx } from '../bridge.js';
+import { draw, tx } from '../bridge.js';
 import { Gear, CountUp, Clh } from '../ui.jsx';
 
 // Read-only fields filled in by the lender (was RO/FL).
@@ -49,7 +49,7 @@ function DebtChart() {
   </svg></div><div className="dread" id="dread"><div><small>{lab(ks[i])}</small><b style={{ color: 'var(--pink)' }}>{f0(A[i])}</b></div><div><small>Minimums only</small><b className="mut">{f0(B[i])}</b></div><div><small>Interest saved{ks[i] > TK ? ' (with plans)' : ''}</small><b style={{ color: 'var(--lime)' }}>{f0(L.reduce((a, l) => a + savedL(l, ks[i]), 0))}</b></div></div></>;
 }
 
-// What the plan does (was pxText; the px input still redraws #pxr with the old pxText while typing).
+// What the plan does (was pxText).
 function PxText() {
   const X = Math.max(0, PX ?? pxNow()), a = pxSim(0, pxHow(), true), b = pxSim(X, pxHow());
   if (!b.L.length) return <p className="mut">No loans left to pay off.</p>;
@@ -67,7 +67,7 @@ function PxCard() {
     <div className="pxa">{snowR() && PX == null && !PS ? <><span className="pill ok">In your schedule</span><button className="lnk" data-act="pxClear">Stop the plan</button></> : <button className="btn sm" data-act="pxApply">Use this plan</button>}<small className="dim">Adds a planned snowball to your schedule from {labS(m0)}; set a stop month or pick loans in Forecast → Your plan over time{how === 'rate' ? ' (highest rate first saves the most interest)' : ' (quicker wins, a little more interest)'}. It goes in the budget.{hand ? ' Months you set by hand in Build budget keep their amounts.' : ''}</small></div></section>;
 }
 
-// The what-if sentence (was wiText; the slider still redraws #wp-… with the old wiText while dragging).
+// The what-if sentence (was wiText).
 function WiText({ l, w }) {
   if (!w) return 'Drag to see what a bigger monthly payment would do.';
   const a = lp(l).a, x = path(l, 'a', w, S.cur < l.start ? l.start : S.cur), s = sumI(a) - sumI(x), n = a.length - x.length;
@@ -132,6 +132,9 @@ function BankLoansPanel() {
     {free.map(a => { const y = a.liab; return <div className="bki" key={a.id}><div className="nm"><b>{tx(a.institution)} · {tx(a.official || a.name)}{a.mask ? ' ••' + tx(a.mask) : ''}</b><small>{tx(subLab(a.subtype))}{a.bal != null ? ' · balance ' + f2(a.bal) : ''}{y && +y.apr > 0 ? ' · ' + (+y.apr) + '% APR' : ''}{y && +y.min > 0 ? ' · minimum ' + f2(+y.min) : ''}</small></div>{man.length ? <select className="in" data-lsel={tx(a.id)} aria-label={`Track ${tx(a.official || a.name)} as`}><option value="">As a new loan</option>{man.map(l => <option key={l.id} value={l.id}>{'Link to ' + tx(l.name)}</option>)}</select> : null}<button className="btn sm" data-act="lnkAdd" data-id={tx(a.id)}>Track</button></div>; })}
     {dup.length ? <p className="dim" style={{ fontSize: '13px', marginTop: '10px' }}>Left out: {dup.map(a => tx(a.institution) + ' · ' + tx(a.official || a.name)).join(', ')} {dup.length === 1 ? 'looks like the same loan as one' : 'look like the same loans as ones'} you already track (same lender, type and balance), connected a second time.</p> : null}</section>;
 }
+
+export const pxLiveR = () => draw($('#pxr'), <PxText />);
+export const wiLiveR = (l, w) => draw($('#wp-' + l.id), <WiText l={l} w={w} />);
 
 export function Loans() {
   const L = S.loans, lm = mon(S.cur), saved = L.reduce((a, l) => a + savedL(l), 0), extra = L.reduce((a, l) => a + extraPaid(l), 0);

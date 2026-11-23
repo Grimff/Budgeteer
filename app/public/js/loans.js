@@ -76,6 +76,9 @@ function pxCard(){const m0=xStart(),X=PX??pxNow(),hand=Object.keys(S.months).som
  <div id="pxr">${pxText()}</div>
  <div class="pxa">${snowR()&&PX==null&&!PS?`<span class="pill ok">In your schedule</span><button class="lnk" data-act="pxClear">Stop the plan</button>`:`<button class="btn sm" data-act="pxApply">Use this plan</button>`}<small class="dim">Adds a planned snowball to your schedule from ${labS(m0)}; set a stop month or pick loans in Forecast → Your plan over time${pxHow()==='rate'?' (highest rate first saves the most interest)':' (quicker wins, a little more interest)'}. It goes in the budget.${hand?' Months you set by hand in Build budget keep their amounts.':''}</small></div></section>`}
 function wiCap(){const T=totals();return Math.max(0,T.left+T.save)}
+// While typing the plan's amount / dragging a what-if slider, only its sentence is redrawn (events.js).
+function pxLive(){$('#pxr').innerHTML=pxText()}
+function wiLive(l,w){$('#wp-'+l.id).innerHTML=wiText(l,w)}
 function wiText(l,w){if(!w)return 'Drag to see what a bigger monthly payment would do.';const a=lp(l).a,x=path(l,'a',w,S.cur<l.start?l.start:S.cur),s=sumI(a)-sumI(x),n=a.length-x.length;return `Saves <b>${f0(s)}</b> more interest and finishes in ${labS(lastK(x))}, <b>${mo(n)}</b> sooner.`}
 // Debt chart range: 1M/3M/YTD/1Y look back from the viewed month (like Wealth); All = whole history plus the projection.
 let LR=(()=>{try{return localStorage.getItem('pfb_lr')||'all'}catch(_){return 'all'}})();

@@ -21,8 +21,8 @@ document.addEventListener('input',e=>{const t=e.target,d=t.dataset;INB=!!(t.clos
  if(d.filt){FLQ=t.value;FLN=50;const a=document.activeElement,ss=[a.selectionStart,a.selectionEnd];renderBank();const e2=document.querySelector('[data-key="flq"]');if(e2){RESTORING=true;try{e2.focus()}finally{RESTORING=false}try{e2.setSelectionRange(ss[0],ss[1])}catch(_){}}return}
  if(d.live==='sp'){const box=t.closest('.spf');if(box)spLeft(box);return}
  if(d.live==='wf'){WFS[d.f]=+t.value;const o=$('#wfo-'+d.f);if(o)o.textContent=(WFS[d.f]<0?'−':d.f==='inc'&&WFS[d.f]>0?'+':'')+f0(Math.abs(WFS[d.f]));clearTimeout(inT);inT=setTimeout(fcBody,250);return}
- if(d.live==='px'){PX=num(t.value);$('#pxr').innerHTML=pxText();return}
- if(d.live==='wi'){const l=S.loans.find(x=>x.id===d.id);WI[l.id]=+t.value;$('#wo-'+l.id).textContent=f0(+t.value);$('#wp-'+l.id).innerHTML=wiText(l,+t.value);return}
+ if(d.live==='px'){PX=num(t.value);pxLive();return}
+ if(d.live==='wi'){const l=S.loans.find(x=>x.id===d.id);WI[l.id]=+t.value;$('#wo-'+l.id).textContent=f0(+t.value);wiLive(l,+t.value);return}
  if(!d.k)return;const v=t.value,n=num(v);
  if(d.k==='inc')editPlan(p=>{const i=p.income.find(x=>x.id===d.id);if(i)i[d.f]=d.f==='name'?v:n});
  else if(d.k==='item')editPlan(p=>{const g=p.groups.find(x=>x.id===d.g),i=g&&g.items.find(x=>x.id===d.id);if(i)i[d.f]=d.f==='name'?v:d.f==='due'?Math.min(31,Math.round(n)):n});

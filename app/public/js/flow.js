@@ -89,8 +89,9 @@ addEventListener('pointerup',()=>{if(PN){SKD=PN.mv;PN.el.classList.remove('grab'
 let DLG=null;
 function openD(o){DLG=o;$('#dt').textContent=o.title;$('#ds').textContent=o.sub||'';$('#dsel').innerHTML=o.sel?`<label class="f" style="margin-bottom:12px">${esc(o.selLab||'Choose')}<select class="in" id="dsl2">${o.sel.map(x=>`<option value="${x.v}"${x.v===o.selV?' selected':''}>${esc(x.l)}</option>`).join('')}</select></label>`:'';
  $('#da').value=o.amt!=null?fmtAmt(r2(o.amt)):'';$('#dc').innerHTML=(o.chips||[]).map(c=>`<button type="button" data-v="${c.v}">${esc(c.l)}</button>`).join('');$('#ddel').hidden=!o.del;$('#dok').textContent=o.ok||'Save';dprev();$('#dlg').showModal();setTimeout(()=>{$('#da').focus();$('#da').select()},30)}
-function dprev(){const e=$('#dp');e.innerHTML=DLG&&DLG.prev?DLG.prev(num($('#da').value),$('#dsl2')?.value):''}
-$('#da').addEventListener('input',dprev);
+// DLG.prev returns the line under the amount as text or a list of text and {b: bold text}, like a health check's message.
+function dprev(){const e=$('#dp');e.innerHTML=DLG&&DLG.prev?rtHtml(DLG.prev(num($('#da').value),$('#dsl2')?.value)):''}
+$('#da').addEventListener('input',()=>dprev());
 $('#dc').addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;$('#da').value=b.dataset.v;dprev();$('#da').focus()});
 $('#dsel').addEventListener('change',()=>{if(DLG&&DLG.onSel)DLG.onSel($('#dsl2').value);else dprev()});
 $('#dform').addEventListener('submit',e=>{e.preventDefault();if(!DLG)return;const v=$('#da').value.trim();if(v===''){$('#da').focus();return}DLG.save(num(v),$('#dsl2')?.value);$('#dlg').close();commit()});
@@ -104,13 +105,13 @@ function payDialog(id,extraLeft){const l=S.loans.find(x=>x.id===id)||S.loans[0];
  const chips=[{l:'Minimum',v:r2(mn)},{l:'+$100',v:r2(mn+100)},{l:'+$250',v:r2(mn+250)},{l:'+$500',v:r2(mn+500)},{l:'Round up',v:Math.ceil((mn+1)/100)*100}];if(left>1)chips.push({l:`+ left over (${f0(left)})`,v:r2(mn+left)});chips.push({l:'Pay it off',v:r2(r.open+r.int)});
  const fb=Object.values(S.txd||{}).filter(x=>x.v==='l:'+l.id&&x.k===k).reduce((a,x)=>a+x.amt,0);openD({title:`Log ${l.name} payment`,sub:`${lab(k)} · minimum ${f2(mn)} · balance ${f2(r.open)}${fb>0.004?` · includes ${f2(fb)} from your bank; enter the month’s total`:''}`,sel:S.loans.filter(x=>row(x,k)).map(x=>({v:x.id,l:`${x.name} (${x.apr}%)`})),selV:l.id,selLab:'Loan',onSel:v=>{$('#dlg').close();payDialog(v,extraLeft)},
   amt:extraLeft?r2(mn+extraLeft):cur,chips,ok:'Log payment',del:r.lg?()=>{delete MOW(k).pay[l.id]}:null,
-  prev:a=>{if(!a)return 'Enter the amount you paid.';if(a<mn-0.005)return `That’s ${f2(mn-a)} under the minimum.`;const e=payEffect(l,k,a);return e.saved>0.005?`Paying ${f2(a-mn)} extra saves <b>${f2(e.saved)}</b> in interest${e.months>0?` and finishes <b>${mo(e.months)}</b> sooner`:''}.`:'Paying the minimum keeps you on schedule.'},
+  prev:a=>{if(!a)return 'Enter the amount you paid.';if(a<mn-0.005)return `That’s ${f2(mn-a)} under the minimum.`;const e=payEffect(l,k,a);return e.saved>0.005?[`Paying ${f2(a-mn)} extra saves `,{b:f2(e.saved)},' in interest',...(e.months>0?[' and finishes ',{b:mo(e.months)},' sooner']:[]),'.']:'Paying the minimum keeps you on schedule.'},
   save:a=>{MOW(k).pay[l.id]=r2(Math.min(a,r.open+r.int));const e=payEffect(l,k,a);toast(e.saved>0.5?`Logged. That saves ${f0(e.saved)} in interest.`:'Payment logged')}})}
 function depDialog(id,amt){const g=S.goals.find(x=>x.id===id)||S.goals[0];if(!g)return;const k=S.cur,d=MO(k).dep[g.id],t=target(g),base=goalSaved(g)-(+d||0),left=totals().left;
  const gm=goalPlan(g,k),chips=[];if(gm>0)chips.push({l:`Planned (${f0(gm)})`,v:gm});[100,250,500,1000].forEach(v=>chips.push({l:f0(v),v}));if(left>1)chips.push({l:`Left over (${f0(left)})`,v:r2(left)});
  openD({title:`Save toward ${g.name}`,sub:`${lab(k)} · ${f0(base)} saved${t?' of '+f0(t):''}${gLinked(g)?' · for money outside the linked accounts':''}`,sel:S.goals.map(x=>({v:x.id,l:x.name})),selV:g.id,selLab:'Goal',onSel:v=>{$('#dlg').close();depDialog(v,amt)},
   amt:amt!=null?amt:(d!=null?d:gm||''),chips,ok:'Save deposit',del:d!=null?()=>{delete MOW(k).dep[g.id]}:null,
-  prev:a=>{if(!t)return '';const s=base+a,p=Math.min(100,Math.round(s/t*100));const rem=t-s;return rem<=0?'<b>That completes the goal!</b>':`That brings you to <b>${p}%</b>, ${f0(rem)} to go.${goalMon(g,k)>0?` At ${f0(goalMon(g,k))}/month you’d finish around ${labS(addM(k,Math.ceil(rem/goalMon(g,k))))}.`:''}`},
+  prev:a=>{if(!t)return '';const s=base+a,p=Math.min(100,Math.round(s/t*100));const rem=t-s;return rem<=0?[{b:'That completes the goal!'}]:['That brings you to ',{b:p+'%'},`, ${f0(rem)} to go.${goalMon(g,k)>0?` At ${f0(goalMon(g,k))}/month you’d finish around ${labS(addM(k,Math.ceil(rem/goalMon(g,k))))}.`:''}`]},
   save:a=>{MOW(k).dep[g.id]=r2(a);toast(`Saved ${f0(a)} toward ${g.name}`)}})}
 
 /* ---------- confetti ---------- */

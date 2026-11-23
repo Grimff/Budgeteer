@@ -130,11 +130,12 @@ works (and `npm test` passes) after every step.
   `flow/Card.jsx`: #zb, #skt, #skc; skPos/skPlace still place them), and the chart itself (`sankeyR` in `flow/Sankey.jsx`;
   the layout code is the old one; hl/zset still set classes and the viewBox on the drawn svg). `fsUI` moved from
   server-sync.js to linked-loans.js (before the bundle) with a `demo` parameter; it and bankBadge are `chrome.jsx`
-  (#sync, #spill, #saved, #tbank). Still HTML strings, until their logic returns data in phase 3: health-check
-  messages (healthChecks), alert buttons (alertsNow), the amount dialog's #dp line (DLG.prev), and the px/what-if
-  live text patched while typing (events.js). The old draw functions stay in LEGACY only for the parity check. The self-test now
+  (#sync, #spill, #saved, #tbank). The old draw functions stay in LEGACY only for the parity check. The self-test now
   takes about 40 s (parity runs twice); tools/test.js allows 90 s.
-- **Phase 3:** state and events into React (handlers on elements instead of `data-act` switches, `S` in a store with
+- **Phase 3 (in progress).** Step 1 (done): no logic builds HTML any more. Rich text is data (`rtParts`/`rtText`/
+  `rtHtml` in core.js, `Rich` in ui.jsx): a string or a list of strings and `{b}`; buttons are `{act, label, ...data}`
+  (`hcBtns` / `ActBtn`). healthChecks (`d`, `a[]`), alertsNow (`a`), DLG.prev (#dp, `dprevR`). The live sentences
+  while typing / dragging are `pxLive` / `wiLive` (loans.js, React `pxLiveR`/`wiLiveR`). Then: state and events into React (handlers on elements instead of `data-act` switches, `S` in a store with
   a hook, real re-renders instead of remounts); then the math into ES modules; then remove the old draw functions
   and the classic-script globals.
 

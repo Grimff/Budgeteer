@@ -24,6 +24,10 @@ const mo=n=>n+' month'+(n===1?'':'s');
 const C={pink:'#ffb6d9',lime:'#d2f46b',butter:'#ffe08a',coral:'#ff8b6e',lilac:'#c6b2ff',aqua:'#82ead8',sky:'#8fc9ff'};
 const PAL=[C.butter,C.aqua,C.lilac,C.lime,C.coral,C.sky,C.pink];
 const clone=o=>JSON.parse(JSON.stringify(o));
+// Rich text as data (health checks, alerts, the amount dialog's line): a string, or a list of strings and {b: bold text}.
+const rtParts=d=>Array.isArray(d)?d:[d];
+const rtText=d=>rtParts(d).map(p=>typeof p==='string'?p:p.b).join('');
+const rtHtml=d=>rtParts(d).map(p=>typeof p==='string'?esc(p):`<b>${esc(p.b)}</b>`).join('');
 
 /* ---------- data ---------- */
 const it=(name,amt,due=0)=>({id:uid(),name,amt,due});

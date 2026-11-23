@@ -27,6 +27,9 @@ export function Clh({ k, shut, title, sum, tag: T = 'h2' }) {
 // "Bank · Account ••1234" (was nmA() in wealth.js).
 export const NmA = ({ a }) => <>{tx(a.institution)} · {tx(a.official || a.name)}{a.mask ? ' ••' + tx(a.mask) : ''}</>;
 
+// Rich text as data (rtParts in core.js): strings, and {b} drawn bold.
+export const Rich = ({ d }) => rtParts(d).map((p, j) => typeof p === 'string' ? tx(p) : <b key={j}>{tx(p.b)}</b>);
+
 // A button described as data ({act, label, ...data-* values}; health checks and alerts): data-act and the rest as
 // data-* attributes, in the order given.
 export const ActBtn = ({ b }) => <button className="btn g sm" {...Object.fromEntries(Object.entries(b).filter(([k]) => k !== 'label').map(([k, v]) => ['data-' + k, v]))}>{tx(b.label)}</button>;

@@ -5,7 +5,7 @@ import { addParity, addPiece, runParity, monthsToTry, emptyHousehold, withS, at 
 import { History } from './screens/History.jsx';
 import { Wealth } from './screens/Wealth.jsx';
 import { Goals } from './screens/Goals.jsx';
-import { Loans } from './screens/Loans.jsx';
+import { Loans, pxLiveR, wiLiveR } from './screens/Loans.jsx';
 import { Settings, NtCard } from './screens/Settings.jsx';
 import { Bank } from './screens/Bank.jsx';
 import { ThisMonth, RcList } from './screens/Budget.jsx';
@@ -13,7 +13,7 @@ import { Forecast, FcBody } from './screens/Forecast.jsx';
 import { Build } from './screens/Build.jsx';
 import { catRenderR, flowRenderR } from './popups/Category.jsx';
 import { lnkListR, lnkRuleR } from './popups/Link.jsx';
-import { openDR } from './popups/Amount.jsx';
+import { openDR, dprevR } from './popups/Amount.jsx';
 import { spFormR, spAddPartR } from './popups/Split.jsx';
 import { compareViewR } from './flow/Compare.jsx';
 import { zbarR, skTipR, skCardR } from './flow/Card.jsx';
@@ -33,6 +33,7 @@ replaceScreen('flowRender', flowRenderR);
 replaceScreen('lnkList', lnkListR);
 replaceScreen('lnkRule', lnkRuleR);
 replaceScreen('openD', openDR);
+replaceScreen('dprev', dprevR);
 replaceScreen('spForm', spFormR);
 replaceScreen('spAddPart', spAddPartR);
 replaceScreen('compareView', compareViewR);
@@ -48,6 +49,8 @@ replaceScreen('renderForecast', () => { draw($('#T-budget'), <Forecast />); fcBo
 replaceScreen('renderBank', () => { const el = $('#T-bank'); if (!el) return; draw(el, <Bank />); if (SRV && BK.st && BK.st.configured) bankBadge(); });
 replaceScreen('renderSettings', () => { const el = $('#T-settings'); if (el) draw(el, <Settings />); });
 replaceScreen('renderLoans', () => draw($('#T-loans'), <Loans />));
+replaceScreen('pxLive', pxLiveR);
+replaceScreen('wiLive', wiLiveR);
 replaceScreen('renderGoals', () => draw($('#T-goals'), <Goals />));
 replaceScreen('renderWealth', () => { const el = $('#T-wealth'); if (el) draw(el, <Wealth />); });
 
@@ -387,13 +390,14 @@ addParity({
 // suggested amount, an amount already logged, other months, odd names, a typed amount, and one with no choices.
 const noModal = () => { const d = $('#dlg'); d.showModal = () => {}; return () => { delete d.showModal; }; };
 addParity({
-  name: 'Amount dialog', fn: 'openD', el: '#dform', dialog: '#dlg', cases: () => {
+  name: 'Amount dialog', fn: 'openD', also: ['dprev'], el: '#dform', dialog: '#dlg', cases: () => {
     const c = [], add = (label, call, ...set) => c.push({ label, call, set: () => both(noModal(), ...set.map(f => f())) });
     for (const l of S.loans) {
       add('pay ' + l.id, () => payDialog(l.id));
       add('pay ' + l.id + ' + left over', () => payDialog(l.id, 321.5));
       add('pay ' + l.id + ' logged', () => payDialog(l.id), tweak(s => { const m = s.months[TK] || (s.months[TK] = { act: {}, pay: {}, dep: {} }); (m.pay || (m.pay = {}))[l.id] = 777; }));
       add('pay ' + l.id + ' typed', () => { payDialog(l.id); $('#da').value = '1,234.5'; dprev(); });
+      for (const v of ['', '5']) add(`pay ${l.id} typed "${v}"`, () => { payDialog(l.id); $('#da').value = v; dprev(); });
       for (const k of [addM(TK, -2), addM(TK, 3)]) add(`pay ${l.id} ${k}`, () => payDialog(l.id), () => at(k));
     }
     for (const g of S.goals) {
@@ -507,5 +511,16 @@ const fsCases = () => {
   return c;
 };
 for (const [n, el] of [['banner', '#sync'], ['footer', '#saved'], ['header pill', '#spill']]) addParity({ name: 'Save status ' + n, fn: 'fsUI', el, cases: fsCases });
+// The Loans tab's live sentences while typing the plan's amount (pxLive) or dragging a what-if slider (wiLive).
+const loansTab = () => { const o = S.tab; S.tab = 'loans'; renderAll(); return () => { S.tab = o; }; };
+addParity({
+  name: 'Loans live text', fn: 'pxLive', also: ['wiLive'], el: '#T-loans', cases: () => {
+    const c = [], pv = (x, s) => () => { const o = [PX, PS]; PX = x; PS = s; return () => { PX = o[0]; PS = o[1]; }; };
+    for (const x of [0, 25, 300, 5000, null]) for (const s of ['rate', 'bal']) c.push({ label: `plan ${x} ${s}`, set: () => both(loansTab(), pv(x, s)()), call: () => pxLive() });
+    for (const l of S.loans) for (const w of [0, 5, 250, 4000]) c.push({ label: `what-if ${l.id} ${w}`, set: loansTab, call: () => wiLive(l, w) });
+    c.push({ label: 'odd loan name', set: () => both(tweak(s => { s.loans.forEach(l => { l.name += ' & <x>'; }); })(), loansTab()), call: () => { pxLive(); S.loans.forEach(l => wiLive(l, 100)); } });
+    return c;
+  },
+});
 window.reactParity = runParity;
 if (DEMO) window.LEGACY_SCREENS = LEGACY;   // sample mode only: the old draw functions, for comparing by hand
