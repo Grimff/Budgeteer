@@ -215,6 +215,8 @@ document.addEventListener('click',e=>{const nd=e.target.closest('#sk .nd'),lk=nd
  case'wiPlan':{const l=S.loans.find(x=>x.id===d.id),w=l?Math.round(WI[l.id]||0):0;if(!l)return;if(!w)return toast('Drag the slider to an amount first');const m=xStart(),v=loanUsual(l,m)+w;setUsual(l,m,v);WI[l.id]=0;toast(`${l.name}: ${f0(v)} extra a month from ${labS(m)}`);return commit()}
  case'export':{const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([JSON.stringify(S,null,1)],{type:'application/json'}));a.download='budgeteer-backup-'+new Date().toISOString().slice(0,10)+'.json';a.click();return}
  case'import':return $('#file').click();
+ case'bkList':return bkList();
+ case'bkRestore':return bkRestore(d.id);
  case'fsRetry':return FS.loaded?fsFlush(true):fsInit();
  case'syncInfo':return $('footer').scrollIntoView({behavior:RM?'auto':'smooth'})}});
 function commitFocus(sel){commit();const e=$(sel);if(e){e.focus();e.select?.()}}

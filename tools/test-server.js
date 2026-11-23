@@ -52,6 +52,17 @@ const det = () => (calls['/liabilities/get'] || 0) + '/' + (calls['/investments/
   const c = await req('PUT', '/api/data', { baseRev: r1 - 5, data: { plans: {}, loans: [] } }); ok(c.code === 409, 'stale save → 409');
   const f = path.join(DIR, 'budgeteer-data.json'), j = JSON.parse(fs.readFileSync(f)); j.rev = r1 + 1000; j.data.n = 2; fs.writeFileSync(f, JSON.stringify(j));
   ok(JSON.parse((await req('GET', '/api/rev')).body).rev === r1 + 1000 && JSON.parse((await req('GET', '/api/data')).body).data.n === 2, 'a file edited outside the app is picked up (cache follows the file)');
+  // daily copies: a save on a day with a budget file makes one; restoring it brings that budget back and keeps an undo copy
+  const pre = JSON.parse((await req('GET', '/api/data')).body);
+  await req('PUT', '/api/data', { baseRev: pre.rev, data: { plans: {}, loans: [], n: 3 } });
+  const list = JSON.parse((await req('GET', '/api/backups')).body).backups;
+  ok(list.length === 1 && list[0].kind === 'daily', `a daily copy is listed (${list.map(x => x.id).join(', ')})`);
+  const rs = await req('POST', '/api/backups/restore', { id: list[0].id }), after = JSON.parse((await req('GET', '/api/data')).body);
+  ok(rs.code === 200 && after.data.n === 2 && after.rev > pre.rev, 'restoring brings back that day’s budget with a new revision');
+  const list2 = JSON.parse((await req('GET', '/api/backups')).body).backups;
+  ok(list2.some(x => x.kind === 'restore'), 'the budget from before the restore is kept as a copy');
+  const sneaky = await Promise.all(['../budgeteer-data.json', '../bank-connections.json', 'nope.json'].map(id => req('POST', '/api/backups/restore', { id })));
+  ok(sneaky.every(x => x.code === 404), 'only listed copies can be restored (' + sneaky.map(x => x.code).join(',') + ')');
   // sync: opening the app (auto) with details fresh → no detail calls; Sync now → detail calls
   let s = await req('POST', '/api/bank/sync', { auto: true });
   ok(s.code === 200 && det() === '0/0' && calls['/transactions/sync'] === 1, `automatic sync with fresh details skips loan/investment calls (${det()})`);

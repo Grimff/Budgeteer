@@ -60,7 +60,7 @@ function writeAtomic(obj) {
 }
 function dailyBackup() {
   if (!fs.existsSync(FILE)) return;
-  const day = new Date().toISOString().slice(0, 10);
+  const day = today();   // the server's local date (TZ), so a copy is named for the day it was made where you are
   const dest = path.join(BACKUP_DIR, `budgeteer-${day}.json`);
   if (!fs.existsSync(dest)) {
     fs.copyFileSync(FILE, dest);
@@ -75,6 +75,20 @@ function dailyBackup() {
     const old = fs.readdirSync(BACKUP_DIR).filter(f => /^bank-loans-\d{4}-\d{2}-\d{2}\.json$/.test(f)).sort();
     while (old.length > BACKUPS_KEEP) fs.unlinkSync(path.join(BACKUP_DIR, old.shift()));
   }
+}
+
+// Budget copies in backups/: budgeteer-YYYY-MM-DD.json (made before the first save of that day, so it holds the budget
+// as it was when the day began) and budgeteer-before-restore-<time>.json (what was there before a restore).
+function listBackups() {
+  let files = []; try { files = fs.readdirSync(BACKUP_DIR); } catch (_) {}
+  return files.map(f => {
+    let m = f.match(/^budgeteer-(\d{4}-\d{2}-\d{2})\.json$/), kind = 'daily', at;
+    if (m) at = m[1];
+    else if ((m = f.match(/^budgeteer-before-restore-(\d{4}-\d{2}-\d{2})T(\d{2})-(\d{2})-(\d{2})-\d+Z\.json$/))) { kind = 'restore'; at = `${m[1]}T${m[2]}:${m[3]}:${m[4]}Z`; }
+    else return null;
+    let size = 0; try { size = fs.statSync(path.join(BACKUP_DIR, f)).size; } catch (_) {}
+    return { id: f, kind, at, size };
+  }).filter(Boolean).sort((a, b) => b.at.localeCompare(a.at));
 }
 
 // ---------- bank sync through Plaid ----------
@@ -447,6 +461,26 @@ const server = http.createServer(async (req, res) => {
     }
 
     if (p === '/api/rev' && req.method === 'GET') return send(res, 200, { rev: revOf(readData()) });
+
+    // Daily copies of the budget, newest first, plus the copies saved just before a restore (so a restore can be undone).
+    if (p === '/api/backups' && req.method === 'GET') return send(res, 200, { backups: listBackups() });
+    if (p === '/api/backups/restore' && req.method === 'POST') {
+      let b; try { b = JSON.parse(await readBody(req) || '{}'); } catch (_) { return send(res, 400, { error: 'bad json' }); }
+      const bk = listBackups().find(x => x.id === b.id);
+      if (!bk) return send(res, 404, { error: 'That copy no longer exists.' });
+      let j; try { j = JSON.parse(fs.readFileSync(path.join(BACKUP_DIR, bk.id), 'utf8')); } catch (_) { return send(res, 400, { error: 'That copy can’t be read.' }); }
+      if (!j || !j.data || !j.data.plans || !j.data.loans) return send(res, 400, { error: 'That copy isn’t budget data.' });
+      const cur = readData(), curRev = revOf(cur);
+      if (cur) {   // keep what's there now, so this restore can be undone
+        fs.writeFileSync(path.join(BACKUP_DIR, `budgeteer-before-restore-${new Date().toISOString().replace(/[:.]/g, '-')}.json`), JSON.stringify(cur));
+        const old = fs.readdirSync(BACKUP_DIR).filter(f => /^budgeteer-before-restore-/.test(f)).sort();
+        while (old.length > 10) fs.unlinkSync(path.join(BACKUP_DIR, old.shift()));
+      }
+      const rev = Math.max(Date.now(), curRev + 2);
+      writeAtomic({ app: 'budgeteer', version: 2, savedAt: new Date().toISOString(), rev, restoredFrom: bk.id, data: j.data });
+      log('restored', bk.id);
+      return send(res, 200, { ok: true, rev });
+    }
 
     if (p === '/api/data' && req.method === 'GET') {
       const j = readData();

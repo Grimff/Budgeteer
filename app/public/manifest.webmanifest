@@ -1,0 +1,15 @@
+{
+  "name": "Budgeteer",
+  "short_name": "Budgeteer",
+  "description": "Household budget with bank sync",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#120b16",
+  "theme_color": "#120b16",
+  "icons": [
+    { "src": "icons/icon-180.png", "sizes": "180x180", "type": "image/png" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "icons/logo.svg", "sizes": "any", "type": "image/svg+xml" }
+  ]
+}
