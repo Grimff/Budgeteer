@@ -3,7 +3,7 @@
 //  2. tools/test-server.js  the server against a fake Plaid (twice: normal, and day-old loan details)
 //  3. the in-app self-test (?selftest) in headless Chrome/Chromium/Edge, if one is installed: a sample household
 //     is loaded in the page and the budget math, filing, loans, goals and every screen are checked.
-// No npm packages needed. Set CHROME=/path/to/chrome if it isn't found on its own.
+// Needs `npm install` once (to build the React screens). Set CHROME=/path/to/chrome if it isn't found on its own.
 'use strict';
 const { spawnSync, spawn } = require('child_process'), fs = require('fs'), path = require('path'), os = require('os'), http = require('http');
 const ROOT = path.join(__dirname, '..');
@@ -15,6 +15,7 @@ const run = (name, args, env = {}) => {
   console.log(out.map(l => '  ' + l).join('\n'));
   if (r.status !== 0) failed++;
 };
+run('Build the React screens', ['tools/build.js']);
 run('Static checks', ['tools/check.js']);
 run('Server', ['tools/test-server.js']);
 run('Server: day-old loan details', ['tools/test-server.js'], { TEST_MODE: 'stale' });

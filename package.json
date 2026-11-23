@@ -2,16 +2,24 @@
   "name": "budgeteer",
   "version": "1.0.0",
   "private": true,
-  "description": "Self-hosted household budget with Plaid bank sync. No dependencies.",
+  "description": "Self-hosted household budget with Plaid bank sync. The server has no dependencies; the screens are React, built with esbuild.",
   "license": "UNLICENSED",
   "engines": {
     "node": ">=18"
   },
   "scripts": {
+    "build": "node tools/build.js",
+    "watch": "node tools/build.js --watch",
+    "prestart": "node tools/build.js",
     "start": "node app/server.js",
     "test": "node tools/test.js",
     "check": "node tools/check.js",
-    "realtest": "node tools/realtest.js",
-    "livetest": "node tools/livetest.js"
+    "realtest": "node tools/build.js && node tools/realtest.js",
+    "livetest": "node tools/build.js && node tools/livetest.js"
+  },
+  "devDependencies": {
+    "esbuild": "^0.25.12",
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1"
   }
 }

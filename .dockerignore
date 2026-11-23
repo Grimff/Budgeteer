@@ -1,4 +1,8 @@
-# Only app/ goes into the image.
+# Only the app and what builds its React screens go into the image.
 *
 !app/
 !Dockerfile
+!package.json
+!package-lock.json
+!tools/build.js
+app/public/dist/

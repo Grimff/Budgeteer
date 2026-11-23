@@ -4,6 +4,8 @@ data/
 .env.*
 !.env.example
 node_modules/
+# Built from app/src by tools/build.js (npm run build; Docker builds it in the image).
+app/public/dist/
 *.log
 .DS_Store
 Thumbs.db

@@ -92,7 +92,9 @@ async function demoFetch(u,o={}){const url=new URL(String(u),location.href);if(!
 async function selfTest(){const T=[],ok=(c,name,detail='')=>T.push({ok:!!c,name,detail:String(detail)}),errs=[],onErr=e=>errs.push(String(e.message||e.reason||e));
  addEventListener('error',onErr);addEventListener('unhandledrejection',onErr);
  const D=DEMOD,past=addM(TK,-1),near=(a,b)=>Math.abs(a-b)<0.01,sumTx=(k,re,acct)=>r2(D.tx.filter(t=>t.date.startsWith(k)&&re.test(t.name)&&(!acct||t.account===acct)).reduce((a,t)=>a+t.amount,0));
- try{
+ // The React screens must draw what the old screens drew (app/src/parity.js): checked on the sample as loaded and again at the end.
+ const parity=when=>{if(window.reactParity)reactParity().forEach(r=>ok(r.ok,r.name+' · '+when,r.detail));else ok(false,'React screens loaded')};
+ try{parity('sample as loaded');
   ok(BK.tx.length===D.tx.length&&BK.accts.length===5,'Sample bank data loaded',`${BK.tx.length} transactions, ${BK.accts.length} accounts`);
   ok(inbox().length===0,'Every sample transaction is filed',`${inbox().length} left to review`);
   // Income, a fixed bill, groceries and dining for last month, straight from the transactions.
@@ -182,6 +184,7 @@ async function selfTest(){const T=[],ok=(c,name,detail='')=>T.push({ok:!!c,name,
   const clickAll=sel=>[...document.querySelectorAll(sel)].filter(b=>b.offsetParent).forEach(b=>b.click());
   for(const t of['budget','loans','goals','wealth','history','bank','settings']){document.querySelector(`.tabs button[data-t="${t}"]`).click();const el=document.querySelector('#T-'+t);ok(!el.hidden&&el.innerHTML.length>200,`${t[0].toUpperCase()+t.slice(1)} tab draws`,`${el.innerHTML.length} characters`);
    ['budv','sview','bview','hrng','bfilt'].forEach(a=>clickAll(`#T-${t} [data-act="${a}"]`))}
+  parity('after the other checks');
   ok(!errs.length,'No errors while drawing',errs.slice(0,3).join(' · '))}
  catch(e){ok(false,'Self-test crashed',e.stack||e.message)}
  removeEventListener('error',onErr);removeEventListener('unhandledrejection',onErr);

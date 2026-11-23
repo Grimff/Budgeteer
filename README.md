@@ -4,13 +4,15 @@ A self-hosted household budget that runs as a web page on your own computer or s
 on your network sees the same budget, every change is saved to a JSON file you control, and bank
 transactions come in automatically through [Plaid](https://plaid.com).
 
-- One HTML file for the app, one small Node server, **no npm dependencies, no build step**.
+- A web app whose screens are React, and one small Node server with **no npm dependencies**. The screens are built
+  once with esbuild (`npm install` then `npm start` does it; Docker does it inside the image).
 - Your budget and bank data never leave your machine. The only outside connection is Plaid.
 
 ```
 budgeteer/
 ├── app/
 │   ├── server.js               tiny server (Node 18+), reads settings from .env
+│   ├── src/                    the React screens (built into public/dist/ by tools/build.js)
 │   └── public/                 the app: index.html, css/, js/ (one file per area), fonts/, icons/
 ├── brand/                      logo and icons
 ├── tools/                      npm test, checks and local test servers (see CLAUDE.md)
@@ -38,7 +40,8 @@ budgeteer/
 **With Node** (18 or newer):
 
 ```sh
-npm start          # or: node app/server.js
+npm install        # once: the tools that build the screens (nothing is installed on the server itself)
+npm start          # builds the screens, then starts the server
 ```
 
 Open <http://localhost:8095>. Data is saved in `./data`.
@@ -153,8 +156,9 @@ full-screen with its own icon.
 
 ## Updating
 
-Edit files in `app/public/` and reload the page; no restart needed. If you change `server.js`,
-restart (`npm start` again, or `docker compose up -d --build`). Run `npm test` after every change.
+Edit files in `app/public/` and reload the page; no restart needed. After changing a screen in `app/src/`, run
+`npm run build` (or keep `npm run watch` running) and reload. If you change `server.js`, restart (`npm start` again,
+or `docker compose up -d --build`). Run `npm test` after every change.
 
 ## Trying things out and checking the math
 

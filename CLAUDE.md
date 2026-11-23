@@ -13,11 +13,17 @@ Docker (`docker compose up -d --build`) on port 8095. Bank data comes from Plaid
   were split from. Function declarations are only hoisted within their own file, so code that runs at load must
   not call a function from a later file; calls inside functions and handlers are fine. `server-sync.js` is last
   and starts the app (`renderAll` + `fsInit`). A new js file must be added to index.html (check.js fails otherwise).
+- **React screens** (`app/src/`, the move to React in progress): JSX built by `tools/build.js` (esbuild; `npm install`
+  once; `npm run build`/`watch`; `npm start`, `npm test`, realtest and livetest build first) into
+  `app/public/dist/app.js` (git-ignored), which index.html loads as one more classic script after csv-import.js and
+  before sample.js (check.js enforces the place). The bundle reads the shared globals by name like every other file.
+  See "Moving to React" below.
 - `app/server.js` – Node 18+, no npm dependencies. Reads `.env` (project folder or cwd) at start;
   real environment variables win. Relative `DATA_DIR` is resolved from the project folder.
 - **Settings and secrets:** `.env` (git-ignored; template `.env.example`) holds `PLAID_CLIENT_ID`, `PLAID_SECRET`,
   `PLAID_ENV`, `BASIC_AUTH` and the rest. `data/` is git-ignored and never committed.
-- **Docker:** `docker-compose.yml` builds the `Dockerfile` (node:22-alpine + `app/`), loads `.env` with `env_file`,
+- **Docker:** `docker-compose.yml` builds the `Dockerfile` (stage 1 runs `npm ci` + `tools/build.js`; stage 2 is
+  node:22-alpine + `app/` without `src/` + the built `dist/`; `.dockerignore` lets in only those files), loads `.env` with `env_file`,
   forces `DATA_DIR=/data`, `PORT=8080`, and mounts `${DATA_PATH:-./data}:/data`. `DATA_REQUIRED=1` makes the server exit at
   start when there's no budget file (a NAS share not mounted yet), so Docker's restart policy retries until it is.
 - **Release:** run `node tools/check.js` (must say OK), bump the footer "Version N" in index.html (`fsUI`) and the
@@ -71,6 +77,33 @@ server against a real `data/` folder while testing; use `tools/realtest.js`.
 - **Change handler order:** the `change` listener returns at `if(!d.c)return;`. Any handler keyed on another
   data attribute (`d.al`, `d.mm`, `d.mv`, rules…) must come before that line, or it silently never runs (v5's
   schedule dropdowns/months/checkboxes did nothing until v6 moved `if(d.al)` up).
+
+## Moving to React
+
+Goal: the whole front end in React with no feature added, removed or changed. Done screen by screen so the app
+works (and `npm test` passes) after every step.
+- **Phase 1 (in progress): the tab screens.** Each `renderX` that built a tab with an HTML string becomes a component
+  in `app/src/screens/`; `main.jsx` swaps it in by name (`replaceScreen('renderX', …)`, so every caller, including
+  `renderAll`/`TABR` and click handlers, draws the React one). `draw(el, <X/>)` (bridge.js) renders with a fresh root
+  and `flushSync`, i.e. exactly like `innerHTML=`: rebuilt each time, synchronous, so focus restore by `data-key`,
+  `fmtAll`, open folds and inputs behave as before. Components are pure and read the globals (`S`, `plan`, caches)
+  like the old code; buttons keep their `data-act`/`data-*` attributes, so the delegated click/change/input handlers
+  in events.js run unchanged. `tx()` = `esc()`'s text rules (React escapes the rest).
+  Done: History. To do: Wealth, Goals (+ goal-accounts card), Loans (+ linked-loans), Settings, Bank, Budget
+  (This month, Build, Forecast, flow, compare).
+- **Parity check** (`app/src/parity.js`, part of the self-test, run on the sample as loaded and again at the end):
+  every converted screen is drawn by the old function (kept in `LEGACY` until phase 1 is done) and by React for many
+  cases (every month, each range/view setting, an empty household) and must match: same elements, attributes (style
+  and class compared parsed), input values, text, and the text the browser shows (catches a lost space between inline
+  elements). Add cases to `main.jsx` for every view switch a screen has. Planted mistakes are caught; whitespace only
+  counts where it renders (a grid/flex row ignores it, so that isn't a difference).
+  JSX notes: SVG attributes camelCase (`strokeWidth`), keep attribute strings exact (`fillOpacity=".35"`), lengths
+  as strings (`'16px'`), `{' '}` where the old template had a line break between inline elements, `cond ? x : null`
+  (never `cond && x`, which prints 0).
+- **Phase 2:** pop-ups and dialogs (`catRender`, Move panel, `#skc`, `fcDetail`, …) the same way.
+- **Phase 3:** state and events into React (handlers on elements instead of `data-act` switches, `S` in a store with
+  a hook, real re-renders instead of remounts); then the math into ES modules; then remove the old draw functions
+  and the classic-script globals.
 
 ## Server API (`server.js`)
 
