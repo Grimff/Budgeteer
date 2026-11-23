@@ -15,6 +15,7 @@ import { catRenderR, flowRenderR } from './popups/Category.jsx';
 import { lnkListR, lnkRuleR } from './popups/Link.jsx';
 import { openDR } from './popups/Amount.jsx';
 import { spFormR, spAddPartR } from './popups/Split.jsx';
+import { compareViewR } from './flow/Compare.jsx';
 
 replaceScreen('renderHistory', () => draw($('#T-history'), <History />));
 // Budget: This month is React; Build budget and Forecast are still drawn by renderBuild / renderForecast. The
@@ -31,6 +32,7 @@ replaceScreen('lnkRule', lnkRuleR);
 replaceScreen('openD', openDR);
 replaceScreen('spForm', spFormR);
 replaceScreen('spAddPart', spAddPartR);
+replaceScreen('compareView', compareViewR);
 replaceScreen('renderBuild', () => draw($('#T-budget'), <Build />));
 replaceScreen('renderForecast', () => { draw($('#T-budget'), <Forecast />); fcBody(); });
 // bankBadge (the count on the Bank tab) ran at the end of the old renderBank once the bank was set up.
@@ -394,6 +396,21 @@ addParity({
     const [id0] = pick[0] || [];
     if (id0) for (const v of ['xfer', 'skip', 'once', 'i:gone', S.loans[0] ? 'l:' + S.loans[0].id : 'xfer', S.goals[0] ? 'g:' + S.goals[0].id : 'skip']) c.push({ label: 'filed as ' + v, set: () => both(tweak(s => { s.txd[id0].v = v; })(), spBox(id0)()), call: () => { spForm($('#spx'), id0); spAddPart($('#spx')); } });
     if (id0) c.push({ label: 'odd names, other month', set: () => both(tweak(s => { s.txd[id0].k = addM(TK, -1); Object.values(s.plans).forEach(p => p.groups.forEach(g => { g.name += ' & <g>'; g.items.forEach(i => { i.name = '"' + i.name + '" <i>'; }); })); })(), spBox(id0)()), call: () => spForm($('#spx'), id0) });
+    return c;
+  },
+});
+// The money-flow card's Compare view, drawn into a scratch box: every month, no-plan lines, odd names, a goal saved
+// over plan, a loan short, an empty household.
+const scratch = (id, cls = '') => () => { const b = document.createElement('div'); b.id = id; b.className = cls; $('main').appendChild(b); return () => b.remove(); };
+addParity({
+  name: 'Compare view', fn: 'compareView', el: '#cmx', call: () => compareView($('#cmx')), cases: () => {
+    const c = [];
+    for (const k of monthsToTry()) c.push({ label: k, set: () => both(scratch('cmx', 'sk cmpv')(), at(k)) });
+    c.push({ label: 'no plan, odd names', set: () => both(scratch('cmx', 'sk cmpv')(), tweak(s => { Object.values(s.plans).forEach(p => p.groups.forEach(g => { g.name += ' & <g>'; g.items.forEach((i, n) => { i.name += ' "<i>"'; if (n === 0) i.amt = 0; }); })); })()) });
+    c.push({ label: 'saved over, loan short', set: () => both(scratch('cmx', 'sk cmpv')(), tweak(s => { const m = s.months[TK] || (s.months[TK] = { act: {}, pay: {}, dep: {} }); m.dep = m.dep || {}; m.pay = m.pay || {}; s.goals.forEach(g => { m.dep[g.id] = 5000; }); s.loans.forEach(l => { m.pay[l.id] = 1; }); })()) });
+    c.push({ label: 'empty household', set: () => both(scratch('cmx', 'sk cmpv')(), withS(emptyHousehold())) });
+    // this month: a bill not paid yet (its filings removed), a spending line planned at 30¢
+    c.push({ label: 'bill unpaid this month, tiny plan', set: () => both(scratch('cmx', 'sk cmpv')(), tweak(s => { const p = plan(TK), b = p.groups.find(g => !g.flex).items[0], f = p.groups.find(g => g.flex).items[0]; for (const [id, r] of Object.entries(s.txd)) if (r.v === 'i:' + b.id && r.k === TK) delete s.txd[id]; Object.values(s.plans).forEach(q => q.groups.forEach(g => g.items.forEach(i => { if (i.id === f.id) i.amt = 0.3; }))); })()) });
     return c;
   },
 });
