@@ -216,6 +216,8 @@ document.addEventListener('click',e=>{const nd=e.target.closest('#sk .nd'),lk=nd
  case'export':{const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([JSON.stringify(S,null,1)],{type:'application/json'}));a.download='budgeteer-backup-'+new Date().toISOString().slice(0,10)+'.json';a.click();return}
  case'import':return $('#file').click();
  case'bkList':return bkList();
+ case'ntHide':return ntHide(d.id);
+ case'ntTest':return ntTest();
  case'bkRestore':return bkRestore(d.id);
  case'fsRetry':return FS.loaded?fsFlush(true):fsInit();
  case'syncInfo':return $('footer').scrollIntoView({behavior:RM?'auto':'smooth'})}});

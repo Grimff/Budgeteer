@@ -138,5 +138,5 @@ function renderSettings(){const el=$('#T-settings');if(!el)return;const v=['gene
  else if(!SRV)h+=`<section class="card"><p>Bank sync runs on the server, which can’t be reached right now. It reconnects on its own.</p></section>`;
  else if(v==='rules')h+=filingCard()+(rulesCard()||`<section class="card"><h2>Rules</h2><p class="mut" style="margin-top:6px">No rules yet. Make one with <b>Link payment</b>, <b>Flag a deposit</b> or <b>Link stores</b> in Build budget, or tick <b>Always</b> when you add a transaction in Bank → To review.</p></section>`);
  else if(!st||!st.configured)h+=`<section class="card"><p class="mut">${BK.err||(st?'Add your Plaid keys first; the Bank tab shows how.':'Loading…')}</p></section>`;
- else h+=connCard(items);
+ else h+=connCard(items)+ntCard();
  el.innerHTML=h;rulesFilter()}

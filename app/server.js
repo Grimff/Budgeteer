@@ -91,6 +91,46 @@ function listBackups() {
   }).filter(Boolean).sort((a, b) => b.at.localeCompare(a.at));
 }
 
+// ---------- phone alerts (optional) ----------
+// NOTIFY_URL: an ntfy topic URL (https://ntfy.sh/your-topic or your own ntfy server) or a Home Assistant webhook
+// (http://homeassistant.local:8123/api/webhook/<id>). ntfy gets its JSON publish format ({topic,title,message} posted to
+// the server root), anything else gets {title,message}. NOTIFY_AUTH, if set, is sent as the Authorization header.
+// Each alert key is sent once (data/notify-sent.json, kept 62 days), so the same alert never repeats.
+const NOTIFY_URL = process.env.NOTIFY_URL || '', NOTIFY_AUTH = process.env.NOTIFY_AUTH || '';
+const SENT_FILE = path.join(DATA_DIR, 'notify-sent.json');
+function notifyTarget() {
+  if (!NOTIFY_URL) return null;
+  let u; try { u = new URL(NOTIFY_URL); } catch (_) { return null; }
+  if (/\/api\/webhook\//.test(u.pathname)) return { kind: 'webhook', url: u.href, label: 'Home Assistant (' + u.host + ')' };
+  const parts = u.pathname.split('/').filter(Boolean), topic = parts.pop();
+  if (!topic) return { kind: 'webhook', url: u.href, label: u.host };
+  return { kind: 'ntfy', url: u.origin + '/' + parts.join('/'), topic, label: `ntfy topic “${topic}” on ${u.host}` };
+}
+async function pushOne(title, message) {
+  const t = notifyTarget(); if (!t) throw new Error('NOTIFY_URL is not set or not a valid address');
+  const headers = { 'Content-Type': 'application/json', ...(NOTIFY_AUTH ? { Authorization: NOTIFY_AUTH } : {}) };
+  const body = t.kind === 'ntfy' ? { topic: t.topic, title, message, tags: ['moneybag'] } : { title, message };
+  const r = await fetch(t.url, { method: 'POST', headers, body: JSON.stringify(body) });
+  if (!r.ok) throw new Error(`${t.kind === 'ntfy' ? 'ntfy' : 'The webhook'} answered HTTP ${r.status}`);
+}
+let notifying = Promise.resolve();
+function notify(alerts) {   // one at a time, so two browsers sending the same alert can't both send it
+  const run = notifying.then(async () => {
+    if (!notifyTarget()) return { configured: false, sent: 0 };
+    const sent = readJ(SENT_FILE, {}), now = Date.now(); let n = 0;
+    for (const a of alerts || []) {
+      if (!a || typeof a.key !== 'string' || !a.key || sent[a.key]) continue;
+      try { await pushOne(String(a.title || 'Budgeteer').slice(0, 200), String(a.message || '').slice(0, 1000)); sent[a.key] = now; n++; }
+      catch (e) { log('alert not sent:', e.message); break; }
+    }
+    for (const k of Object.keys(sent)) if (now - sent[k] > 62 * 864e5) delete sent[k];
+    writeJ(SENT_FILE, sent);
+    return { configured: true, sent: n };
+  });
+  notifying = run.catch(() => {});
+  return run;
+}
+
 // ---------- bank sync through Plaid ----------
 // Keys come from the environment and never leave this server.
 const PLAID_ID = process.env.PLAID_CLIENT_ID || '';
@@ -299,6 +339,9 @@ function syncAll(full) {
     }
     writeJ(TX_FILE, store); writeJ(BANK_FILE, bank); writeJ(LOAN_FILE, loans); writeJ(INV_FILE, inv);
     lastAll = Date.now();
+    // A connection that needs signing in again is sent to the phone by the server itself (same key as the app uses).
+    const bad = bank.items.filter(it => it.error).map(it => ({ key: `conn:${it.item_id}:${it.error.code || ''}`, title: `${it.institution && it.institution.name || 'A bank'} needs you to sign in again`, message: it.error.message || 'Its bank sync stopped.' }));
+    if (bad.length) notify(bad).catch(() => {});
     return { added };
   })().finally(() => { syncing = null; });
   syncing.full = !!full;
@@ -461,6 +504,17 @@ const server = http.createServer(async (req, res) => {
     }
 
     if (p === '/api/rev' && req.method === 'GET') return send(res, 200, { rev: revOf(readData()) });
+
+    // Phone alerts: whether they're set up, the app's alerts (each key sent once), and a test message.
+    if (p === '/api/notify' && req.method === 'GET') { const t = notifyTarget(); return send(res, 200, { configured: !!t, target: t ? t.label : '' }); }
+    if (p === '/api/notify' && req.method === 'POST') {
+      let b; try { b = JSON.parse(await readBody(req) || '{}'); } catch (_) { return send(res, 400, { error: 'bad json' }); }
+      return send(res, 200, await notify(Array.isArray(b.alerts) ? b.alerts.slice(0, 50) : []));
+    }
+    if (p === '/api/notify/test' && req.method === 'POST') {
+      try { await pushOne('Budgeteer test', 'Alerts from Budgeteer will show up like this.'); return send(res, 200, { ok: true }); }
+      catch (e) { return send(res, 400, { error: e.message }); }
+    }
 
     // Daily copies of the budget, newest first, plus the copies saved just before a restore (so a restore can be undone).
     if (p === '/api/backups' && req.method === 'GET') return send(res, 200, { backups: listBackups() });

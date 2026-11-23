@@ -9,7 +9,9 @@ const item = (id, detailAt) => ({ item_id: id, access_token: 'fake-' + id, insti
   accounts: [{ id: id + '-chk', name: 'Checking', type: 'depository', subtype: 'checking' }, { id: id + '-loan', name: 'Loan', type: 'loan', subtype: 'student' }, { id: id + '-inv', name: 'Brokerage', type: 'investment', subtype: 'brokerage' }] });
 fs.writeFileSync(path.join(DIR, 'bank-connections.json'), JSON.stringify({ items: [item('a', new Date(Date.now() - (STALE ? 25 * 3600e3 : 0)).toISOString())] }));
 const calls = {}, txs = Array.from({ length: 3000 }, (_, i) => ({ transaction_id: 't' + i, account_id: i % 50 ? 'a-chk' : 'a-loan', date: '2026-10-' + String(1 + i % 28).padStart(2, '0'), name: 'STORE ' + (i % 40), merchant_name: 'Store ' + (i % 40), amount: i % 50 ? 12.5 + i % 90 : -300, pending: false }));
+const pushed = [];   // what the fake ntfy server received
 http.createServer((q, r) => { let b = ''; q.on('data', d => b += d); q.on('end', () => {
+  if (q.url === '/ntfy') { pushed.push(JSON.parse(b)); r.writeHead(200); return r.end('{}'); }
   calls[q.url] = (calls[q.url] || 0) + 1; const j = JSON.parse(b || '{}'), it = j.access_token && j.access_token.slice(5), send = o => { r.writeHead(200, { 'content-type': 'application/json' }); setTimeout(() => r.end(JSON.stringify(o)), 150); };
   if (q.url === '/accounts/get') return send({ accounts: [{ account_id: it + '-chk', name: 'Checking', type: 'depository', subtype: 'checking', balances: { current: 1000 } }, { account_id: it + '-loan', name: 'Loan', type: 'loan', subtype: 'student', balances: { current: 9000 } }, { account_id: it + '-inv', name: 'Brokerage', type: 'investment', subtype: 'brokerage', balances: { current: 5000 } }] });
   if (q.url === '/transactions/sync') return send({ added: j.cursor ? [] : txs, modified: [], removed: [], next_cursor: 'c1', has_more: false });
@@ -18,7 +20,7 @@ http.createServer((q, r) => { let b = ''; q.on('data', d => b += d); q.on('end',
   if (q.url === '/investments/transactions/get') return send({ investment_transactions: [], total_investment_transactions: 0 });
   r.writeHead(500); r.end('{}');
 }); }).listen(18201);
-Object.assign(process.env, { PORT: '18202', DATA_DIR: DIR, PLAID_CLIENT_ID: 'test', PLAID_SECRET: 'test', PLAID_ENV: 'sandbox', PLAID_BASE: 'http://127.0.0.1:18201', BANK_SYNC_HOURS: '24' });
+Object.assign(process.env, { PORT: '18202', DATA_DIR: DIR, PLAID_CLIENT_ID: 'test', PLAID_SECRET: 'test', PLAID_ENV: 'sandbox', PLAID_BASE: 'http://127.0.0.1:18201', BANK_SYNC_HOURS: '24', NOTIFY_URL: 'http://127.0.0.1:18201/ntfy/budget-alerts' });
 require(path.join(ROOT, 'app', 'server.js'));
 const req = (method, p, body, headers = {}) => new Promise((ok, no) => { const q = http.request({ host: '127.0.0.1', port: 18202, path: p, method, headers: { 'content-type': 'application/json', ...headers } }, r => { const c = []; r.on('data', d => c.push(d)); r.on('end', () => { let buf = Buffer.concat(c); if (r.headers['content-encoding'] === 'gzip') buf = zlib.gunzipSync(buf); ok({ code: r.statusCode, h: r.headers, raw: Buffer.concat(c).length, body: buf.toString() }); }); }); q.on('error', no); if (body) q.write(JSON.stringify(body)); q.end(); });
 let fail = 0; const ok = (c, m) => { console.log((c ? 'PASS ' : 'FAIL ') + m); if (!c) fail++; };
@@ -52,6 +54,13 @@ const det = () => (calls['/liabilities/get'] || 0) + '/' + (calls['/investments/
   const c = await req('PUT', '/api/data', { baseRev: r1 - 5, data: { plans: {}, loans: [] } }); ok(c.code === 409, 'stale save → 409');
   const f = path.join(DIR, 'budgeteer-data.json'), j = JSON.parse(fs.readFileSync(f)); j.rev = r1 + 1000; j.data.n = 2; fs.writeFileSync(f, JSON.stringify(j));
   ok(JSON.parse((await req('GET', '/api/rev')).body).rev === r1 + 1000 && JSON.parse((await req('GET', '/api/data')).body).data.n === 2, 'a file edited outside the app is picked up (cache follows the file)');
+  // phone alerts: ntfy format, each key sent once, test message
+  const nt = JSON.parse((await req('GET', '/api/notify')).body);
+  ok(nt.configured && /budget-alerts/.test(nt.target), 'phone alerts are on: ' + nt.target);
+  const A = [{ key: 'over:x:1', title: 'Dining is $20 over plan', message: 'm1' }, { key: 'over:x:1', title: 'dup', message: '' }, { key: 'due:x:2', title: 'Rent is due tomorrow', message: 'm2' }];
+  const s1 = JSON.parse((await req('POST', '/api/notify', { alerts: A })).body), s2 = JSON.parse((await req('POST', '/api/notify', { alerts: A })).body);
+  ok(s1.sent === 2 && s2.sent === 0 && pushed.length === 2 && pushed[0].topic === 'budget-alerts' && pushed[0].title === 'Dining is $20 over plan', `each alert is sent once (${s1.sent} then ${s2.sent}), as ntfy JSON`);
+  const tst = await req('POST', '/api/notify/test'); ok(tst.code === 200 && pushed.length === 3, 'test alert sends');
   // daily copies: a save on a day with a budget file makes one; restoring it brings that budget back and keeps an undo copy
   const pre = JSON.parse((await req('GET', '/api/data')).body);
   await req('PUT', '/api/data', { baseRev: pre.rev, data: { plans: {}, loans: [], n: 3 } });

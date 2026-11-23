@@ -75,6 +75,7 @@ async function demoFetch(u,o={}){const url=new URL(String(u),location.href);if(!
  if(p==='/api/bank/accounts')return J(200,{accounts:D.accts});
  if(p==='/api/bank/sync')return J(200,{ok:true,added:0,items:D.items});
  if(p==='/api/bank/settings'&&m==='PUT'){Object.assign(D.refresh,body());return J(200,{ok:true,refresh:{...D.refresh}})}
+ if(p.startsWith('/api/notify'))return J(200,{configured:false,sent:0});   // no phone alerts from sample data
  if(p==='/api/backups')return J(200,{backups:[1,2,3].map(n=>{const at=new Date(Date.now()-n*864e5).toISOString().slice(0,10);return{id:`budgeteer-${at}.json`,kind:'daily',at,size:20000}})});
  if(p==='/api/backups/restore'&&m==='POST'){D.rev+=2;D.restored=(D.restored||0)+1;return J(200,{ok:true,rev:D.rev})}   // sample: keeps the same budget
  return J(400,{error:'Not available with sample data.'})}
@@ -115,6 +116,16 @@ async function selfTest(){const T=[],ok=(c,name,detail='')=>T.push({ok:!!c,name,
   ok(ng&&goalMon(ng,TK)===200,'A new goal starts at 200 a month',ng&&f0(goalMon(ng,TK)));
   // The app's own health checks.
   healthChecks().forEach(h=>ok(h.lv==='ok','Health check: '+h.t.replace(/<[^>]+>/g,''),h.lv==='ok'?'':h.d.replace(/<[^>]+>/g,'')));
+  // Alerts: paid bills never show as missing; a bank that needs signing in and a category over plan do, and Hide works.
+  ok(!alertsNow().some(a=>a.key.startsWith('late:')),'Paid bills don’t show as missing',alertsNow().map(a=>a.key).join(', '));
+  BK.st.items[0].error={code:'ITEM_LOGIN_REQUIRED',message:'Sign in again to keep syncing.'};
+  const fi=allItems(TK).find(x=>x.g.flex&&(flexAct(TK,x.i.id)||0)>1);if(fi)editPlan(p=>{const it=p.groups.find(g=>g.id===fi.g.id).items.find(i=>i.id===fi.i.id);it._was=it.amt;it.amt=1},TK);
+  S.cur=TK;document.querySelector('.tabs button[data-t="budget"]').click();renderBudget();
+  const keys=alertsNow().map(a=>a.key),card=document.querySelector('#T-budget .nt');
+  ok(keys.includes('conn:it-bank:ITEM_LOGIN_REQUIRED')&&card&&/sign in again/.test(card.textContent),'A bank that needs signing in shows on the Budget page');
+  ok(!fi||keys.includes(`over:${TK}:${fi.i.id}`),'A category over plan shows',fi?fi.i.name:'(nothing spent yet this month)');
+  ntHide('conn:it-bank:ITEM_LOGIN_REQUIRED');ok(!/sign in again/.test((document.querySelector('#T-budget .nt')||{}).textContent||''),'Hide removes an alert');
+  BK.st.items[0].error=null;delete NTH['conn:it-bank:ITEM_LOGIN_REQUIRED'];if(fi)editPlan(p=>{const it=p.groups.find(g=>g.id===fi.g.id).items.find(i=>i.id===fi.i.id);it.amt=it._was;delete it._was},TK);
   // Daily copies: the list loads, and restoring one reloads the budget from the server.
   await bkList();ok(Array.isArray(BKP)&&BKP.length===3&&document.querySelectorAll('.bkr').length>=0,'Daily copies are listed',Array.isArray(BKP)?BKP.length+' copies':'not loaded');
   {const cf=window.confirm;window.confirm=()=>true;try{await bkRestore(BKP[0].id)}finally{window.confirm=cf}}ok(D.restored===1&&FS.state==='ok'&&S.goals.some(g=>g.id==='trip'),'Restoring a daily copy reloads the budget');

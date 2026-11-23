@@ -5,7 +5,7 @@ const BK={st:null,tx:[],loans:null,accts:null,err:'',show:40,busy:false};
 const bankFrom=()=>S.bankFrom||(TK+'-01');
 async function bankLoad(){if(!SRV)return;try{const[a,b,c,e]=await Promise.all([fetch('api/bank/status',{cache:'no-store'}),fetch('api/bank/transactions?from='+bankFrom(),{cache:'no-store'}),fetch('api/bank/loans',{cache:'no-store'}),fetch('api/bank/accounts',{cache:'no-store'})]);BK.st=await a.json();if(b.ok){BK.tx=(await b.json()).tx||[];PSET=new Set(BK.tx.filter(t=>t.pending).map(t=>t.id))}if(c.ok)BK.loans=(await c.json()).accounts||[];if(e.ok)BK.accts=(await e.json()).accounts||[];BK.err=''}catch(e){BK.err='Couldn’t reach the bank service on the server.'}
  autoSave();
- rerender();bankBadge()}
+ rerender();bankBadge();notifyAlerts()}
 // Files what it can and saves that as an auto-only change (see fsFlush).
 function autoSave(){if(!autoFile())return false;if(!FS.dirty)FS.autoOnly=true;AUTOSAVE=true;save();AUTOSAVE=false;return true}
 /* ---------- filing rules: tie a payment once, the rest file themselves ---------- */
