@@ -1,6 +1,6 @@
 // Small pieces shared by the React screens.
 import { useLayoutEffect, useRef } from 'react';
-import { tx, onAct } from './bridge.js';
+import { tx, onAct, onChg } from './bridge.js';
 
 // The gear icon on header buttons that open a page's setup (was the GEAR string in loans.js).
 export const Gear = () => <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3" /><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09a1.65 1.65 0 0 0-1-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09a1.65 1.65 0 0 0 1.51-1 1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" /></svg>;
@@ -46,5 +46,5 @@ export function TxOpts({ k, dir }) {
 // Where purchases with no store link go (was catchSel in settings.js; also in Build budget → Spending).
 export function CatchSel() {
   const auto = (allItems(TK).find(x => x.i.id === (S.catchAll && S.catchAll !== 'review' ? '' : flexDefaultAuto(TK))) || { i: { name: 'Flex' } }).i.name;
-  return <div className="catchr"><b>Purchases with no store link go to</b><select className="in" data-catchall="1" aria-label="Where purchases with no store link go" defaultValue={S.catchAll || ''}><option value="">{'Automatic: ' + tx(auto)}</option>{plan().groups.map(g => <optgroup key={g.id} label={tx(g.name)}>{g.items.filter(i => !i.once).map(i => <option key={i.id} value={i.id}>{tx(i.name)}</option>)}</optgroup>)}<option value="review">Leave them in To review</option></select></div>;
+  return <div className="catchr"><b>Purchases with no store link go to</b><select className="in" data-catchall="1" aria-label="Where purchases with no store link go" defaultValue={S.catchAll || ''} ref={onChg}><option value="">{'Automatic: ' + tx(auto)}</option>{plan().groups.map(g => <optgroup key={g.id} label={tx(g.name)}>{g.items.filter(i => !i.once).map(i => <option key={i.id} value={i.id}>{tx(i.name)}</option>)}</optgroup>)}<option value="review">Leave them in To review</option></select></div>;
 }

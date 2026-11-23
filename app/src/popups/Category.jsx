@@ -2,7 +2,7 @@
 // flowRender in js/compare.js). The dialogs' frames stay in index.html; each part (#tdt, #tds, #tdr, #tdrg, #tdl,
 // #fds, #fdb) is drawn on its own, so the search box (#tdq) keeps what's typed. catFilter still hides rows that
 // don't match the search, after each draw and while typing.
-import { draw, tx, onAct } from '../bridge.js';
+import { draw, tx, onAct, onChg } from '../bridge.js';
 import { TxOpts } from '../ui.jsx';
 import { Pnd, ruleTagT } from '../screens/Bank.jsx';
 
@@ -64,7 +64,7 @@ function CatRow({ x, v, sgn }) {
   // the search text keeps the old wording exactly (ruleTag gave escaped text there)
   const tagParts = auto => [r.auto === 'rest' ? 'catch-all' : r.auto === 'pair' ? 'paired transfer' : r.auto ? auto(r.auto) : '', moved ? `paid in ${mon(x.d.slice(0, 7))}, counts in ${mon(r.k)}` : ''].filter(Boolean).join(' · ');
   const tag = tagParts(ruleTagT), tagS = tagParts(ruleTag), pm = x.d.slice(0, 7), eid = tx(x.id);
-  return <div className="trow" data-txt={tx((x.n + ' ' + (ac ? ac.institution + ' ' + (ac.mask || '') : '') + ' ' + tagS).toLowerCase())} data-amt={sgn(+x.amt || 0)}><span className="txd">{dshort(x.d)}</span><div className="nm"><b>{tx(x.n)}<Pnd id={x.id} /></b><small>{ac ? tx(ac.institution) + (ac.mask ? ' ••' + tx(ac.mask) : '') : ''}{tag ? ` · ${tag}` : ''}</small></div><b className="n">{f2(sgn(+x.amt || 0))}</b><button type="button" className="lnk" data-act="mvShow" onClick={onAct('mvShow')} data-id={eid} style={{ fontSize: '13px', padding: 0 }}>Move</button><div className="mvp" data-mvp={eid} hidden><label>Category<select className="in" data-mv={eid} aria-label={`Category for ${tx(x.n)}`} defaultValue={v}><TxOpts k={r.k || S.cur} dir={x.amt < 0 ? 'in' : 'out'} /></select></label><label>Counts in<select className="in" data-mm={eid} aria-label={`Month ${tx(x.n)} counts in`} defaultValue={r.k}>{[...new Set([addM(pm, -1), pm, addM(pm, 1), r.k].filter(Boolean))].sort().map(m => <option key={m} value={m}>{lab(m) + (m === pm ? ' (when paid)' : '')}</option>)}</select></label></div></div>;
+  return <div className="trow" data-txt={tx((x.n + ' ' + (ac ? ac.institution + ' ' + (ac.mask || '') : '') + ' ' + tagS).toLowerCase())} data-amt={sgn(+x.amt || 0)}><span className="txd">{dshort(x.d)}</span><div className="nm"><b>{tx(x.n)}<Pnd id={x.id} /></b><small>{ac ? tx(ac.institution) + (ac.mask ? ' ••' + tx(ac.mask) : '') : ''}{tag ? ` · ${tag}` : ''}</small></div><b className="n">{f2(sgn(+x.amt || 0))}</b><button type="button" className="lnk" data-act="mvShow" onClick={onAct('mvShow')} data-id={eid} style={{ fontSize: '13px', padding: 0 }}>Move</button><div className="mvp" data-mvp={eid} hidden><label>Category<select className="in" data-mv={eid} aria-label={`Category for ${tx(x.n)}`} defaultValue={v} ref={onChg}><TxOpts k={r.k || S.cur} dir={x.amt < 0 ? 'in' : 'out'} /></select></label><label>Counts in<select className="in" data-mm={eid} aria-label={`Month ${tx(x.n)} counts in`} defaultValue={r.k} ref={onChg}>{[...new Set([addM(pm, -1), pm, addM(pm, 1), r.k].filter(Boolean))].sort().map(m => <option key={m} value={m}>{lab(m) + (m === pm ? ' (when paid)' : '')}</option>)}</select></label></div></div>;
 }
 
 function catData() {

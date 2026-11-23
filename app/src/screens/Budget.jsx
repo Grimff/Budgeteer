@@ -1,7 +1,7 @@
 // Budget tab, This month view (was renderBudget in js/budget.js with guideCard, rvCard, xmCard there, alertsCard in
 // js/alerts.js, rcList in js/linked-loans.js). Build budget and Forecast are still drawn by renderBuild /
 // renderForecast. The money-flow chart (#sk) is drawn after this by sankey() in flow.js, as before.
-import { tx, onAct } from '../bridge.js';
+import { tx, onAct, onInp } from '../bridge.js';
 import { CountUp, Clh, ActBtn } from '../ui.jsx';
 
 // A button's data ({act, v, …}) → data-act, data-v, … props.
@@ -114,7 +114,7 @@ export function ThisMonth() {
     const rows = gr.items.map(i => {
       const amt = +i.amt || 0, fa = flexAct(k, i.id), nr = SRV ? rulesFor('i:' + i.id).length : 0; pl += amt; a += fa || 0; if (amt <= 0.5) ua += fa || 0; else if (fa > amt + 0.5) ov += fa - amt;
       const s = fa == null ? stp('Nothing yet', 'dim') : amt <= 0.5 ? stp('No plan', 'dim') : fa <= amt + 0.5 ? stp(f0(amt - fa) + ' left', 'ok') : stp(f0(fa - amt) + ' over', 'bad');
-      const inp = SRV ? null : <input className="in a" data-k="act" data-id={i.id} data-key={'fa-' + i.id} inputMode="decimal" defaultValue={m.act[i.id] != null ? m.act[i.id] : ''} placeholder="—" aria-label={`${tx(i.name)} actual`} />;
+      const inp = SRV ? null : <input className="in a" data-k="act" data-id={i.id} data-key={'fa-' + i.id} inputMode="decimal" defaultValue={m.act[i.id] != null ? m.act[i.id] : ''} placeholder="—" aria-label={`${tx(i.name)} actual`} onInput={onInp} />;
       return { v: 'i:' + i.id, name: i.name, tag: once1(i), meta: [nr ? nr + ' store' + (nr === 1 ? '' : 's') + ' linked' : '', i.id === fdf ? 'unlinked purchases land here' : ''].filter(Boolean).join(' · '), pl: amt, a: fa, s, inp };
     });
     LG.push({ kind: gr.loose ? 'Not in a group' : 'Spending', name: gr.name, c: gr.color, pl, a, ua, rows, over: ov > 0.5, ah: 'Spent' });

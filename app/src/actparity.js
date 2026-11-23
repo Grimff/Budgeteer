@@ -9,12 +9,16 @@ import { fresh } from './parity.js';
 const SCREENS = [];
 // screen: {name, set(): undo?} — set draws the screen (renderAll or a view of it)
 export const addActScreen = s => SCREENS.push(s);
-const SKIP = new Set(['bankConnect', 'invAllow', 'bankSync', 'bankRemove', 'liabAllow', 'lnkAdd', 'bkList', 'bkRestore', 'cvImport', 'cvDel', 'ntTest', 'fsRetry', 'import', 'pick']);
+const SKIP = new Set([   // server actions (a field of kind bankfrom / refresh talks to the server too)
+  'field input:date c bankfrom', 'field select:select-one c,f refresh/hours', 'field input:checkbox c,f refresh/open','bankConnect', 'invAllow', 'bankSync', 'bankRemove', 'liabAllow', 'lnkAdd', 'bkList', 'bkRestore', 'cvImport', 'cvDel', 'ntTest', 'fsRetry', 'import', 'pick']);
 const PER_ACT = 2;   // at most this many elements per action and screen
 // The page's state globals (let bindings of the classic scripts, read and written by name).
 const UI = ['BUDV', 'BSCOPE', 'SV', 'RQ', 'BV', 'FLF', 'FLQ', 'FLN', 'CT', 'CR', 'FD', 'ALE', 'FSC', 'FR', 'HR', 'LR', 'GR', 'WR', 'PX', 'PS', 'FDK', 'SEL', 'Z', 'ZW', 'ZH', 'WFS', 'CV', 'LK', 'DLG', 'BKP'];
-const gv = n => (0, eval)(n);
-const sv = (n, v) => { window.__apv = v; (0, eval)(n + '=window.__apv'); delete window.__apv; };
+// getters/setters for those, made once (eval per read kept every evaluated script alive under a debugger)
+let ACC = null;
+const acc = () => ACC || (ACC = (0, eval)('({' + UI.map(n => `${n}:[()=>${n},v=>{${n}=v}]`).join(',') + '})'));
+const gv = n => acc()[n][0]();
+const sv = (n, v) => acc()[n][1](v);
 const clone = o => o === undefined ? undefined : JSON.parse(JSON.stringify(o));
 const pfb = () => Object.keys(localStorage).filter(k => k.startsWith('pfb_')).sort().map(k => [k, localStorage.getItem(k)]);
 
@@ -22,6 +26,7 @@ function save() {
   return { S: clone(S), ui: UI.map(n => { const v = gv(n); return v && typeof v === 'object' && !(v instanceof Set) ? clone(v) : v; }), open: [...OPEN], bcl: [...BCL], nth: clone(NTH), wi: clone(WI), pv: { ...PV }, show: BK.show, ls: pfb() };
 }
 function restore(s) {
+  clearTimeout(inT);   // a field edit's debounced commit (350 ms) must not land in the next run or after the test
   S = clone(s.S); UI.forEach((n, i) => sv(n, s.ui[i] && typeof s.ui[i] === 'object' ? clone(s.ui[i]) : s.ui[i]));
   OPEN.clear(); s.open.forEach(x => OPEN.add(x)); BCL = new Set(s.bcl);
   for (const k of Object.keys(NTH)) delete NTH[k]; Object.assign(NTH, clone(s.nth));
@@ -30,6 +35,8 @@ function restore(s) {
   BK.show = s.show;   // rows shown in To review (txMore)   // count-ups start from what they showed
   const now = new Map(pfb()); for (const [k] of now) localStorage.removeItem(k); for (const [k, v] of s.ls) localStorage.setItem(k, v);
   document.querySelectorAll('dialog[open]').forEach(d => d.close());
+  // closing a modal dialog hands focus back to what had it before; every run starts with nothing focused
+  if (document.activeElement && document.activeElement !== document.body) document.activeElement.blur();
   const t = $('#toast'); t.classList.remove('on'); t.textContent = '';
   fresh();
 }
@@ -45,7 +52,20 @@ function capture() {
 // a seeded Math.random, so uid() gives the same ids in both runs
 function seeded() { let x = 12345; return () => { x = (x * 1103515245 + 12345) % 2147483648; return x / 2147483648; }; }
 // what can be clicked: shown on the page (hidden tabs keep their old content, which nobody can click)
-const live = () => [...document.querySelectorAll('[data-act]')].filter(b => b.isConnected && b.getClientRects().length && hasReact(b));
+const hasField = el => { const k = Object.keys(el).find(k => k.startsWith('__reactProps$')); return !!(el._chg || (k && el[k].onInput)); };
+const live = () => [...document.querySelectorAll('[data-act], input, select, textarea')].filter(b => b.isConnected && b.getClientRects().length && (b.dataset.act ? hasReact(b) : hasField(b)));
+// What a field's change is: every field of a kind (same data-* names and k/c/f values) changes the same way.
+const kindOf = b => b.dataset.act || 'field ' + b.tagName.toLowerCase() + ':' + (b.type || '') + ' ' + Object.keys(b.dataset).sort().join(',') + ' ' + [b.dataset.k, b.dataset.c, b.dataset.f, b.dataset.live].filter(Boolean).join('/');
+const fire = (el, type) => el.dispatchEvent(new Event(type, { bubbles: true }));
+function doField(el) {
+  const ty = (el.type || '').toLowerCase();
+  if (el.tagName === 'SELECT') { if (!el.options.length) return; el.selectedIndex = (el.selectedIndex + 1) % el.options.length; fire(el, 'input'); fire(el, 'change'); return; }
+  if (ty === 'checkbox' || ty === 'radio') { el.click(); return; }
+  if (ty === 'range') { const lo = +el.min || 0, hi = el.max === '' ? 100 : +el.max; el.value = String(lo + Math.round((hi - lo) / 2)); fire(el, 'input'); fire(el, 'change'); return; }
+  el.focus();
+  el.value = ty === 'month' ? '2026-03' : ty === 'date' ? '2026-03-15' : (el.inputMode === 'decimal' || ty === 'number') ? '1234.5' : (el.value || '') + ' & x ';   // the trailing space shows a trim
+  fire(el, 'input'); fire(el, 'change');
+}
 const hasReact = el => { const k = Object.keys(el).find(k => k.startsWith('__reactProps$')); return !!(k && el[k].onClick); };
 
 function stubs() {
@@ -54,11 +74,11 @@ function stubs() {
   return () => { window.confirm = o.confirm; window.scrollTo = o.scrollTo; Element.prototype.scrollIntoView = o.siv; HTMLAnchorElement.prototype.click = o.ac; Math.random = o.rnd; };
 }
 // An element's identity across redraws: its data-* values, and which one of those it is on the page.
-const sigs = () => { const n = {}; return live().map(b => { const s = JSON.stringify({ ...b.dataset }); n[s] = (n[s] || 0) + 1; return { b, sig: s + '#' + n[s] }; }); };
+const sigs = () => { const n = {}; return live().map(b => { const s = (b.dataset.act ? '' : b.tagName + ':' + (b.type || '') + ' ') + JSON.stringify({ ...b.dataset }); n[s] = (n[s] || 0) + 1; return { b, sig: s + '#' + n[s] }; }); };
 // The elements to click on a screen: React-handled, by action, at most PER_ACT of each.
 function targets() {
   const seen = {}, out = [];
-  sigs().forEach(({ b, sig }) => { const a = b.dataset.act; if (SKIP.has(a)) return; seen[a] = (seen[a] || 0) + 1; if (seen[a] <= PER_ACT) out.push({ sig, act: a }); });
+  sigs().forEach(({ b, sig }) => { const a = kindOf(b); if (SKIP.has(a)) return; seen[a] = (seen[a] || 0) + 1; if (seen[a] <= PER_ACT) out.push({ sig, act: a }); });
   return out;
 }
 function clickRun(base, sc, sig, react) {
@@ -66,7 +86,7 @@ function clickRun(base, sc, sig, react) {
   const t = sigs().find(x => x.sig === sig); if (!t) { try { u && u(); } catch (_) { } return { missing: sig }; }
   const b = t.b;
   const un = stubs(); let out;
-  try { window.REACT_EVENTS = react; b.click(); out = capture(); }
+  try { window.REACT_EVENTS = react; if (b.dataset.act) b.click(); else doField(b); out = capture(); }
   catch (e) { out = { error: String(e && e.message) }; }
   finally { window.REACT_EVENTS = true; un(); }
   try { u && u(); } catch (_) { }
@@ -74,24 +94,30 @@ function clickRun(base, sc, sig, react) {
 }
 export const COVERED = new Set();   // actions clicked by some screen (to see what no screen reaches)
 // part: [n, m] runs every m-th screen from the n-th (npm test runs four parts, each a page load of its own)
-export function runActParity(part) {
+// Async: between runs the page gets a turn, so what actions leave for later (timers, frames, promises) runs and is
+// let go, as between a person's clicks; run all at once, thousands piled up (hundreds of MB) and stalled Chrome.
+const tick = () => new Promise(r => setTimeout(r, 0));
+export async function runActParity(part) {
   const out = [], base = save(), [pn, pm] = part || [1, 1];
-  for (const sc of SCREENS.filter((x, i) => i % pm === pn - 1)) {
+  const only = decodeURIComponent((location.search.match(/[?&]aponly=([^&]*)/) || [])[1] || '');   // debugging: screens whose name has this
+  for (const sc of SCREENS.filter((x, i) => i % pm === pn - 1 && (!only || x.name.includes(only)))) {
     const t0 = performance.now();
     restore(base); const u = sc.set && sc.set(); const T = targets(); try { u && u(); } catch (_) { }
     const fails = [];
     T.forEach(t => COVERED.add(t.act));
-    T.forEach(({ sig, act }) => {
+    for (const { sig, act } of T) {
       if (/aplog/.test(location.search)) console.log('ap click', sc.name, sig);
-      const A = clickRun(base, sc, sig, false), B = clickRun(base, sc, sig, true);
+      const A = clickRun(base, sc, sig, false); await tick();
+      const B = clickRun(base, sc, sig, true); await tick();
       const diff = Object.keys({ ...A, ...B }).filter(k => A[k] !== B[k]);
       if (A.missing || B.missing) fails.push(`${act}: not on the page again (${sig})`);
       const uiD = () => { const a = JSON.parse(A.ui), b = JSON.parse(B.ui); return UI.filter((n, i) => JSON.stringify(a[i]) !== JSON.stringify(b[i])).map(n => n + ' old ' + JSON.stringify(a[UI.indexOf(n)]).slice(0, 60) + ' new ' + JSON.stringify(b[UI.indexOf(n)]).slice(0, 60)).join(', '); };
       if (!A.missing && !B.missing && diff.length) fails.push(`${sig}: ${diff.map(k => k === 'ui' ? 'ui (' + uiD() + ')' : k + (k === 'page' || k === 'S' ? '' : ` old ${String(A[k]).slice(0, 80)} | new ${String(B[k]).slice(0, 80)}`)).join('; ')}`);
-    });
-    if (window.AP_LOG || /aplog/.test(location.search)) console.log('actparity', sc.name, T.length, Math.round(performance.now() - t0) + 'ms');
-    out.push({ ok: !fails.length && T.length > 0, name: `React click handlers do what the old ones did: ${sc.name} (${T.length} clicks, ${new Set(T.map(t => t.act)).size} actions)`, detail: fails.length ? fails.length + ' differ: ' + fails.slice(0, 3).join(' ‖ ') : '' });
+    }
+    if (window.AP_LOG || /aplog/.test(location.search)) { if (window.gc) gc(); console.log('actparity', sc.name, T.length, Math.round(performance.now() - t0) + 'ms', performance.memory ? Math.round(performance.memory.usedJSHeapSize / 1e6) + 'MB' : '', document.getElementsByTagName('*').length + ' nodes'); }
+    out.push({ ok: !fails.length && T.length > 0, name: `React handlers do what the old ones did: ${sc.name} (${T.length} clicks and edits, ${new Set(T.map(t => t.act)).size} kinds)`, detail: fails.length ? fails.length + ' differ: ' + fails.slice(0, 3).join(' ‖ ') : '' });
   }
   restore(base); renderAll();
   return out;
 }
+if (typeof DEMO !== "undefined" && DEMO) window.__ap = { save, restore, capture, stubs, sigs, doField, clickRun, targets, SCREENS };

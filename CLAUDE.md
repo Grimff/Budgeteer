@@ -145,8 +145,14 @@ works (and `npm test` passes) after every step.
   registered in main.jsx (`addActScreen`, ~45 states incl. open cards, editors, pop-ups, failing checks) have every
   React-handled element (2 per action) clicked once with the old switch (`REACT_EVENTS=false`) and once with its
   handler; S, the screen globals, folds, dialogs, toast, page text and focus must match. Seeded ids, confirm() =
-  yes, no scrolling/downloads; server actions are skipped. It runs as `?selftest&act=n/4` (four page loads in npm test;
-  one long run stalls Chrome's --dump-dom). Then: change/input handlers, the static buttons, then state into React (handlers on elements instead of `data-act` switches, `S` in a store with
+  yes, no scrolling/downloads; server actions are skipped. Fields too: the input/change listeners' branches are
+  `INP` / `CHG` in actions.js (unchanged bodies); a field gets `onInput={onInp}` and/or `ref={onChg}` (a native
+  `change` listener, so text/month fields still fire on commit) and runs the first handler that applies, in the old
+  order (`ORDER_INP` / `ORDER_CHG`); the harness changes each kind of field (next option, click a checkbox, middle of
+  a slider, a date, 1234.5, text + " & x") both ways. It is async (yields after each run: done in one task, what
+  actions leave for later piled up to hundreds of MB and stalled Chrome), clears focus and the typing debounce
+  (`inT`) between runs, and runs as `?selftest&act=n/4` (four page loads in npm test). `?aponly=<name>` runs one
+  screen, `&aplog` logs progress. Then: the static buttons in index.html, then state into React (handlers on elements instead of `data-act` switches, `S` in a store with
   a hook, real re-renders instead of remounts); then the math into ES modules; then remove the old draw functions
   and the classic-script globals.
 

@@ -16,7 +16,7 @@ function go(k){S.cur=k;commit(true)}
 
 /* ---------- events ---------- */
 let inT;
-document.addEventListener('input',e=>{const t=e.target,d=t.dataset;INB=!!(t.closest&&t.closest('[data-build]'));
+document.addEventListener('input',e=>{if(e.rx)return;const t=e.target,d=t.dataset;INB=!!(t.closest&&t.closest('[data-build]'));
  if(d.alpct){const e=(S.alloc||{})[d.alpct];if(e){e.pct||(e.pct={});e.pct[d.g]=num(t.value)}save();clearTimeout(inT);inT=setTimeout(()=>commit(),350);return}
  if(d.filt){FLQ=t.value;FLN=50;const a=document.activeElement,ss=[a.selectionStart,a.selectionEnd];renderBank();const e2=document.querySelector('[data-key="flq"]');if(e2){RESTORING=true;try{e2.focus()}finally{RESTORING=false}try{e2.setSelectionRange(ss[0],ss[1])}catch(_){}}return}
  if(d.live==='sp'){const box=t.closest('.spf');if(box)spLeft(box);return}
@@ -37,7 +37,7 @@ document.addEventListener('input',e=>{const t=e.target,d=t.dataset;INB=!!(t.clos
  else if(d.k==='lname'){const l=S.loans.find(x=>x.id===d.id);if(l)l.name=v}
  else if(d.k==='gname2'){const g=S.goals.find(x=>x.id===d.id);if(g)g.name=v}
  save();clearTimeout(inT);inT=setTimeout(()=>commit(),350)});
-document.addEventListener('change',e=>{const t=e.target,d=t.dataset;INB=!!(t.closest&&t.closest('[data-build]'));
+document.addEventListener('change',e=>{if(e.rx)return;const t=e.target,d=t.dataset;INB=!!(t.closest&&t.closest('[data-build]'));
  if(d.mm){monthMove(d.mm,t.value);return}
  if(d.mv){catMove(d.mv,t.value);return}
  if(d.tx&&t.tagName==='SELECT'){const cb=document.querySelector(`input[data-alw="${CSS.escape(d.tx)}"]`);const tx=BK.tx.find(x=>x.id===d.tx);if(cb&&tx)cb.checked=defAlways(t.value,tx.date.slice(0,7));return}

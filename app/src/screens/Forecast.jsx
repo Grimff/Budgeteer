@@ -2,7 +2,7 @@
 // run, with what-ifs) stays there. renderForecast draws the frame, then fcBody draws #fcb, as before: the what-if
 // sliders (data-live wf), the range buttons and "Months over budget" redraw only the body.
 import { useLayoutEffect, useRef, useState } from 'react';
-import { tx, onAct } from '../bridge.js';
+import { tx, onAct, onInp } from '../bridge.js';
 import { BudSwitch } from './Budget.jsx';
 import { AlForm, AlAdds, AlList } from '../schedule.jsx';
 
@@ -11,7 +11,7 @@ export function Forecast() {
   return <>
     <div className="phead bhd" style={{ '--i': 0 }}><div><h1>Forecast</h1><p className="mut">Where your plan takes you from {lab(TK)}: every future month of your budget, one-time items and your schedule. Change the schedule here; try what-ifs without saving.</p></div><BudSwitch /></div><div id="fcb"></div>{' '}
     <details className="more card" style={{ marginTop: '16px', padding: '16px 18px' }} open={!!on}><summary>What if…</summary><p className="mut" style={{ fontSize: '14px', margin: '8px 0 12px' }}>Move a slider to see what changes. Nothing is saved.{on ? <> <button className="lnk" data-act="wfReset" onClick={onAct('wfReset')}>Reset</button></> : null}</p>{' '}
-      <div className="wfs">{[['inc', 'Income changes by', -3000, 3000, 'a month'], ['cost', 'A new monthly cost of', 0, 3000, 'a month'], ['extra', 'Extra toward loans', 0, 3000, 'a month, highest rate first']].map(([f, l, a, b, u]) => <label className="wf" key={f}><span>{l} <output id={'wfo-' + f}>{(WFS[f] < 0 ? '−' : f === 'inc' && WFS[f] > 0 ? '+' : '') + f0(Math.abs(WFS[f]))}</output> <small>{u}</small></span><input type="range" data-live="wf" data-f={f} min={a} max={b} step="50" defaultValue={WFS[f]} /></label>)}</div></details>
+      <div className="wfs">{[['inc', 'Income changes by', -3000, 3000, 'a month'], ['cost', 'A new monthly cost of', 0, 3000, 'a month'], ['extra', 'Extra toward loans', 0, 3000, 'a month, highest rate first']].map(([f, l, a, b, u]) => <label className="wf" key={f}><span>{l} <output id={'wfo-' + f}>{(WFS[f] < 0 ? '−' : f === 'inc' && WFS[f] > 0 ? '+' : '') + f0(Math.abs(WFS[f]))}</output> <small>{u}</small></span><input type="range" data-live="wf" data-f={f} min={a} max={b} step="50" defaultValue={WFS[f]} onInput={onInp} /></label>)}</div></details>
   </>;
 }
 

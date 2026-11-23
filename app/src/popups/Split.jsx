@@ -4,12 +4,12 @@
 // the boxes by class, as before.
 import { createRoot } from 'react-dom/client';
 import { flushSync } from 'react-dom';
-import { tx, onAct } from '../bridge.js';
+import { tx, onAct, onInp } from '../bridge.js';
 import { TxOpts } from '../ui.jsx';
 
 function SpForm({ id, n }) {
   const r = S.txd[id], dir = r.amt < 0 ? 'in' : 'out', rows = [[r.v, Math.abs(r.amt)], ...Array.from({ length: n - 1 }, () => ['', ''])];
-  return <>{rows.map(([v, a], i) => <div className="spr" key={i}><select className="in" aria-label="Category" defaultValue={v}><TxOpts k={r.k} dir={dir} /></select><input className="in a" data-live="sp" inputMode="decimal" defaultValue={tx(a)} placeholder="$0" aria-label="Amount" /></div>)}
+  return <>{rows.map(([v, a], i) => <div className="spr" key={i}><select className="in" aria-label="Category" defaultValue={v}><TxOpts k={r.k} dir={dir} /></select><input className="in a" data-live="sp" inputMode="decimal" defaultValue={tx(a)} placeholder="$0" aria-label="Amount" onInput={onInp} /></div>)}
     <div className="spa"><button className="lnk" data-act="spAdd" onClick={onAct('spAdd')}>Add a part</button><span className="spl dim"></span><button className="btn sm" data-act="spSave" onClick={onAct('spSave')}>Save split</button></div></>;
 }
 const show = (box, id, n) => { flushSync(() => box._sp.root.render(<SpForm id={id} n={n} />)); box._sp.n = n; spLeft(box); };

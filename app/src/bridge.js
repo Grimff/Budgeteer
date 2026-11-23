@@ -45,3 +45,22 @@ export const onAct = name => e => {
   e.nativeEvent.skDone = true;
   ACT[name](b.dataset, b, e.nativeEvent);
 };
+
+// Field handlers (phase 3): typing (onInput={onInp}) and change (ref={onChg}, the native change event, so text and
+// month fields still fire when the value is committed, not on every key). Each runs the first handler that applies
+// to the field's data-* values, in the old listeners' order (ORDER_INP / ORDER_CHG in actions.js), and marks the
+// event so the old listeners skip it. The amount-formatting input listener in events.js still runs for every field.
+import { INP, CHG, ORDER_INP, ORDER_CHG } from './actions.js';
+export const onInp = e => {
+  if (!window.REACT_EVENTS) return;
+  const t = e.currentTarget, d = t.dataset, h = ORDER_INP.find(([, f]) => f(d, t));
+  e.nativeEvent.rx = true; INB = !!t.closest('[data-build]');
+  if (h) INP[h[0]](t, d, e.nativeEvent);
+};
+const chg = e => {
+  if (!window.REACT_EVENTS) return;
+  const t = e.currentTarget, d = t.dataset, h = ORDER_CHG.find(([, f]) => f(d, t));
+  e.rx = true; INB = !!t.closest('[data-build]');
+  if (h) CHG[h[0]](t, d, e);
+};
+export const onChg = el => { if (el && !el._chg) { el._chg = true; el.addEventListener('change', chg); } };

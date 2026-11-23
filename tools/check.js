@@ -50,7 +50,7 @@ for (const [re, name] of [[/d\.k==='([A-Za-z0-9_]+)'/g, 'data-k'], [/d\.c==='([A
   if (rep.length) bad.push(`Same ${name} handled twice: ` + rep.join(', '));
 }
 
-const ch = js.indexOf("document.addEventListener('change',e=>{const t=e.target,d=t.dataset;INB");
+const ch = js.indexOf("document.addEventListener('change',e=>{if(e.rx)return;const t=e.target,d=t.dataset;INB");
 if (ch >= 0) {
   const body = js.slice(ch, js.indexOf('\ndocument.addEventListener(', ch + 10) >>> 0 || undefined), ret = body.indexOf('if(!d.c)return;');
   if (ret >= 0) {

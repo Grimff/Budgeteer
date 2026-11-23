@@ -96,7 +96,7 @@ async function selfTest(){const T=[],ok=(c,name,detail='')=>T.push({ok:!!c,name,
  const parity=when=>{if(window.reactParity)reactParity().forEach(r=>ok(r.ok,r.name+' · '+when,r.detail));else ok(false,'React screens loaded')};
  // ?selftest&act (a second run of npm test): only the click-handler comparison (app/src/actparity.js), which takes a while.
  const AP=location.search.match(/[?&]act(?:=(\d+)\/(\d+))?(&|$)/);
- try{if(AP){if(window.reactActParity)reactActParity(AP[1]?[+AP[1],+AP[2]]:null).forEach(r=>ok(r.ok,r.name,r.detail));else ok(false,'React click handlers loaded')}else{parity('sample as loaded');
+ try{if(AP){if(window.reactActParity)(await reactActParity(AP[1]?[+AP[1],+AP[2]]:null)).forEach(r=>ok(r.ok,r.name,r.detail));else ok(false,'React click handlers loaded')}else{parity('sample as loaded');
   ok(BK.tx.length===D.tx.length&&BK.accts.length===5,'Sample bank data loaded',`${BK.tx.length} transactions, ${BK.accts.length} accounts`);
   ok(inbox().length===0,'Every sample transaction is filed',`${inbox().length} left to review`);
   // Income, a fixed bill, groceries and dining for last month, straight from the transactions.

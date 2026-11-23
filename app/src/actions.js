@@ -159,3 +159,93 @@ export const ACT = {
   'syncInfo': function (d, b, e) { return $('footer').scrollIntoView({behavior:RM?'auto':'smooth'}) },
 };
 ACT.alDn = ACT.alUp;   // one handler moves a goal up or down (d.act says which)
+
+// Typing handlers (were the branches of the input listener in js/events.js, moved here unchanged): t = the field,
+// d = its data-* values, e = the event. A field gets the first that applies, in this order (fieldHandlers, bridge.js).
+export const INP = {
+  'alpct': function (t, d, e) {
+    if(d.alpct){const e=(S.alloc||{})[d.alpct];if(e){e.pct||(e.pct={});e.pct[d.g]=num(t.value)}save();clearTimeout(inT);inT=setTimeout(()=>commit(),350);return}
+  },
+  'filt': function (t, d, e) {
+    if(d.filt){FLQ=t.value;FLN=50;const a=document.activeElement,ss=[a.selectionStart,a.selectionEnd];renderBank();const e2=document.querySelector('[data-key="flq"]');if(e2){RESTORING=true;try{e2.focus()}finally{RESTORING=false}try{e2.setSelectionRange(ss[0],ss[1])}catch(_){}}return}
+  },
+  'live': function (t, d, e) {
+    if(d.live==='sp'){const box=t.closest('.spf');if(box)spLeft(box);return}
+    if(d.live==='wf'){WFS[d.f]=+t.value;const o=$('#wfo-'+d.f);if(o)o.textContent=(WFS[d.f]<0?'−':d.f==='inc'&&WFS[d.f]>0?'+':'')+f0(Math.abs(WFS[d.f]));clearTimeout(inT);inT=setTimeout(fcBody,250);return}
+    if(d.live==='px'){PX=num(t.value);pxLive();return}
+    if(d.live==='wi'){const l=S.loans.find(x=>x.id===d.id);WI[l.id]=+t.value;$('#wo-'+l.id).textContent=f0(+t.value);wiLive(l,+t.value);return}
+  },
+  'k': function (t, d, e) {
+    if(!d.k)return;const v=t.value,n=num(v);
+    if(d.k==='inc')editPlan(p=>{const i=p.income.find(x=>x.id===d.id);if(i)i[d.f]=d.f==='name'?v:n});
+    else if(d.k==='item')editPlan(p=>{const g=p.groups.find(x=>x.id===d.g),i=g&&g.items.find(x=>x.id===d.id);if(i)i[d.f]=d.f==='name'?v:d.f==='due'?Math.min(31,Math.round(n)):n});
+    else if(d.k==='gname')editPlan(p=>{const g=p.groups.find(x=>x.id===d.g);if(g)g.name=v});
+    else if(d.k==='act'){const m=MOW(S.cur);if(v.trim()==='')delete m.act[d.id];else m.act[d.id]=n}
+    else if(d.k==='gmon'){const g=S.goals.find(x=>x.id===d.id);if(g)verSet(g,'mp',xStart(),Math.max(0,n))}
+    else if(d.k==='gov'){const m=MOW(S.cur);m.gplan||(m.gplan={});if(v.trim()==='')delete m.gplan[d.id];else m.gplan[d.id]=n}
+    else if(d.k==='lxb'){const l=S.loans.find(x=>x.id===d.id);if(l)setUsual(l,xStart(),Math.max(0,n))}
+    else if(d.k==='alv'){const a=(S.al||[]).find(x=>x.id===d.id);if(a)a.v=Math.max(0,a.src==='extra'&&a.mode==='%'?Math.min(100,n):n)}
+    else if(d.k==='lov'){const m=MOW(S.cur);m.lxp||(m.lxp={});if(v.trim()==='')delete m.lxp[d.id];else m.lxp[d.id]=Math.max(0,n)}
+    else if(d.k==='once'){const e=extras().find(x=>x.id===d.id);if(e)e[d.f]=d.f==='name'?v:d.f==='due'?Math.min(31,Math.round(n)):n}
+    else if(d.k==='lname'){const l=S.loans.find(x=>x.id===d.id);if(l)l.name=v}
+    else if(d.k==='gname2'){const g=S.goals.find(x=>x.id===d.id);if(g)g.name=v}
+    save();clearTimeout(inT);inT=setTimeout(()=>commit(),350)
+  },
+};
+export const ORDER_INP = [['alpct', d => d.alpct], ['filt', d => d.filt], ['live', d => d.live], ['k', d => d.k]];
+
+// Change handlers (the branches of the change listener; 'c' is every data-c field, then commit). Same order rule.
+export const CHG = {
+  'mm': function (t, d, e) {
+    if(d.mm){monthMove(d.mm,t.value);return}
+  },
+  'mv': function (t, d, e) {
+    if(d.mv){catMove(d.mv,t.value);return}
+  },
+  'tx': function (t, d, e) {
+    if(d.tx&&t.tagName==='SELECT'){const cb=document.querySelector(`input[data-alw="${CSS.escape(d.tx)}"]`);const tx=BK.tx.find(x=>x.id===d.tx);if(cb&&tx)cb.checked=defAlways(t.value,tx.date.slice(0,7));return}
+  },
+  'alacct': function (t, d, e) {
+    if(d.alacct){if(t.value){S.alloc||(S.alloc={});S.alloc[t.value]={mode:'order',goals:[],pct:{},rest:'last'}}return commit()}
+  },
+  'gacct': function (t, d, e) {
+    if(d.gacct){const g=S.goals.find(x=>x.id===d.gacct);if(g&&t.value){S.alloc||(S.alloc={});const e=S.alloc[t.value]||(S.alloc[t.value]={mode:'order',goals:[],pct:{},rest:'last'});if(!e.goals.includes(g.id)){e.goals.push(g.id);if(e.mode==='split'){e.pct||(e.pct={});const used=e.goals.reduce((x,id)=>x+(+(e.pct[id]||0)),0);e.pct[g.id]=Math.max(0,100-used)}}toast(e.goals.length>1?`Shared with ${e.goals.length-1} other goal${e.goals.length>2?'s':''}. Set the order or split in Accounts for goals.`:`${g.name} now uses this account`)}return commit()}
+  },
+  'catchall': function (t, d, e) {
+    if(d.catchall){S.catchAll=t.value||undefined;if(!S.catchAll)delete S.catchAll;let n=0;Object.entries(S.txd||{}).forEach(([id,r])=>{if(r.auto==='rest'){txUndo(id);n++}});const f=autoFile();
+      toast(S.catchAll==='review'?`${n} purchase${n===1?'':'s'} moved back to To review`:`Unlinked purchases now go to ${txLabel({v:'i:'+flexDefault(TK),k:TK})}${f?` (${f} re-filed)`:''}`);return commit()}
+  },
+  'aladd': function (t, d, e) {
+    if(d.aladd){const e=(S.alloc||{})[d.aladd];if(e&&t.value&&!e.goals.includes(t.value)){e.goals.push(t.value);if(e.mode==='split'){e.pct||(e.pct={});const used=e.goals.reduce((x,id)=>x+(+(e.pct[id]||0)),0);e.pct[t.value]=Math.max(0,100-used)}}return commit()}
+  },
+  'alrest': function (t, d, e) {
+    if(d.alrest){const e=(S.alloc||{})[d.alrest];if(e)e.rest=t.checked?'last':'none';return commit()}
+  },
+  'tops': function (t, d, e) {
+    if(d.tops)return;
+  },
+  'rule': function (t, d, e) {
+    if(d.rule){const r=(S.rules||[]).find(x=>x.id===d.rule);if(r){const v=normT(t.value);if(v&&v!==r.p){r.p=v;ruleReapply(r);toast('Rule updated and re-applied')}}return commit()}
+  },
+  'rulev': function (t, d, e) {
+    if(d.rulev){const r=(S.rules||[]).find(x=>x.id===d.rulev);if(r&&t.value&&t.value!==r.v){r.v=t.value;ruleReapply(r);toast(`Now filing to ${txLabel({v:r.v,k:TK})}`)}return commit()}
+  },
+  'ruleshift': function (t, d, e) {
+    if(d.ruleshift){const r=(S.rules||[]).find(x=>x.id===d.ruleshift);if(r){if(t.value)r.shift=t.value;else delete r.shift;ruleReapply(r);toast('Rule updated and re-applied')}return commit()}
+  },
+  'rulemm': function (t, d, e) {
+    if(d.rulemin||d.rulemax){const r=(S.rules||[]).find(x=>x.id===(d.rulemin||d.rulemax));if(r){const f=d.rulemin?'min':'max',v=t.value.trim();if(v==='')delete r[f];else r[f]=r2(num(v));ruleReapply(r)}return commit()}
+  },
+  'al': function (t, d, e) {
+    if(d.al){const a=(S.al||[]).find(x=>x.id===d.al);if(!a)return;const v=t.value;if(d.f==='to'){a.to=v;if(v==='snow'){a.how=a.how||'rate';a.loans=a.loans||[];if(a.roll==null)a.roll=true}if(v==='keep'){a.src='extra'}}else if(d.f==='from'){if(v)a.from=v;if(a.until&&a.until<a.from)a.until=a.from}else if(d.f==='until'){a.until=v&&v<a.from?a.from:v}else if(d.f==='loan'){const L=new Set(a.loans||[]);t.checked?L.add(d.l):L.delete(d.l);a.loans=[...L]}else if(d.f==='roll')a.roll=t.checked;return commit()}
+  },
+  'c': function (t, d, e) {
+    if(d.c==='loan'){const l=S.loans.find(x=>x.id===d.id);if(!l)return;if(d.f==='start'){if(t.value)l.start=t.value}else if(d.f==='origStart'){l.origStart=t.value||''}else if(d.f==='due')l.due=Math.min(31,Math.round(num(t.value)));else if(d.f==='xtra')setUsual(l,xStart(),Math.max(0,num(t.value)));else l[d.f]=num(t.value)}
+    if(d.c==='hh'){S.hh={...(S.hh||{}),[d.f]:t.value.trim()};brandSet();return commit()}
+    if(d.c==='bankfrom'){S.bankFrom=t.value||'';save();bankLoad();return}
+    if(d.c==='refresh'){const b=d.f==='open'?{open:t.checked}:{hours:+t.value};fetch('api/bank/settings',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify(b)}).then(async r=>{const j=await r.json().catch(()=>({}));if(!r.ok)throw new Error(j.error||'Couldn’t save');if(BK.st)BK.st.refresh=j.refresh;toast(syncWord(j.refresh));renderSettings()}).catch(e=>{toast(e.message);renderSettings()});return}
+    if(d.c==='goal'){const g=S.goals.find(x=>x.id===d.id);if(!g)return;if(d.f==='auto')g.auto=t.checked;else if(d.f==='monthly')verSet(g,'mp',xStart(),Math.max(0,num(t.value)));else if(d.f==='by'){if(t.value)g.by=t.value;else delete g.by}else g[d.f]=num(t.value)}
+    commit()
+  },
+};
+export const ORDER_CHG = [['mm', (d) => d.mm], ['mv', (d) => d.mv], ['tx', (d, t) => d.tx && t.tagName === 'SELECT'], ['alacct', (d) => d.alacct], ['gacct', (d) => d.gacct], ['catchall', (d) => d.catchall], ['aladd', (d) => d.aladd], ['alrest', (d) => d.alrest], ['tops', (d) => d.tops], ['rule', (d) => d.rule], ['rulev', (d) => d.rulev], ['ruleshift', (d) => d.ruleshift], ['rulemm', (d) => d.rulemin || d.rulemax], ['al', (d) => d.al], ['c', (d) => d.c]];
