@@ -115,7 +115,12 @@ works (and `npm test` passes) after every step.
   JSX notes: a `<table>` needs an explicit `<tbody>` (the HTML parser added one to the old markup), SVG attributes camelCase (`strokeWidth`), keep attribute strings exact (`fillOpacity=".35"`), lengths
   as strings (`'16px'`), `{' '}` where the old template had a line break between inline elements, `cond ? x : null`
   (never `cond && x`, which prints 0).
-- **Phase 2:** pop-ups and dialogs (`catRender`, Move panel, `#skc`, `fcDetail`, …) the same way.
+- **Phase 2 (in progress): pop-ups and dialogs**, the same way (`app/src/popups/`). Their frames stay in index.html;
+  each part a function wrote is drawn as its own root, so inputs outside those parts (the pop-up's search `#tdq`) keep
+  what's typed. Parity screens get `dialog: '#tdlg'` (opened while measured). Done: the line pop-up (`catRenderR`:
+  #tds/#tdr/#tdrg/#tdl; catFilter still hides rows for the search) and the trends dialog (`flowRenderR`: #fds/#fdb,
+  also the pop-up's Trends view). To do: link dialog (lnkOpen/lnkList/lnkRule), amount dialog (openD: pay, deposit,
+  …), split form (spRows), the money-flow chart and its card (sankey, skCard, compareView).
 - **Phase 3:** state and events into React (handlers on elements instead of `data-act` switches, `S` in a store with
   a hook, real re-renders instead of remounts); then the math into ES modules; then remove the old draw functions
   and the classic-script globals.

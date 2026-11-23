@@ -11,6 +11,7 @@ import { Bank } from './screens/Bank.jsx';
 import { ThisMonth, RcList } from './screens/Budget.jsx';
 import { Forecast, FcBody } from './screens/Forecast.jsx';
 import { Build } from './screens/Build.jsx';
+import { catRenderR, flowRenderR } from './popups/Category.jsx';
 
 replaceScreen('renderHistory', () => draw($('#T-history'), <History />));
 // Budget: This month is React; Build budget and Forecast are still drawn by renderBuild / renderForecast. The
@@ -19,6 +20,9 @@ replaceScreen('renderBudget', () => { if (BUDV === 'build') return renderBuild()
 // Forecast: the frame, then the body into #fcb (the what-if sliders, range and month buttons redraw only the body);
 // FSC: scroll the open schedule editor or the month detail into view after adding/opening.
 replaceScreen('fcBody', () => { const el = $('#fcb'); if (!el) return; draw(el, <FcBody />); if (FSC) { FSC = false; const t = $('.fcle') || ($('.fcd') && FDK ? $('.fcd') : null); if (t) t.scrollIntoView({ block: 'nearest', behavior: RM ? 'auto' : 'smooth' }); } });
+// Pop-ups (phase 2): drawn into the parts of their dialogs in index.html.
+replaceScreen('catRender', catRenderR);
+replaceScreen('flowRender', flowRenderR);
 replaceScreen('renderBuild', () => draw($('#T-budget'), <Build />));
 replaceScreen('renderForecast', () => { draw($('#T-budget'), <Forecast />); fcBody(); });
 // bankBadge (the count on the Bank tab) ran at the end of the old renderBank once the bank was set up.
@@ -283,6 +287,35 @@ addParity({
     c.push({ label: 'next month', set: () => both(steps(false)(), at(addM(TK, 1))) });
     c.push({ label: 'no bank', set: () => both(steps(false)(), (() => { const o = SRV; SRV = false; return () => { SRV = o; }; })()) });
     c.push({ label: 'empty household', set: () => both(steps(false)(), withS(emptyHousehold())) });
+    return c;
+  },
+});
+// Every line the pop-up can open: income, bills and spending, loans, goals (and groups for the trends dialog).
+const allLines = (k = S.cur) => [...plan(k).income.map(i => 'inc:' + i.id), ...plan(k).groups.flatMap(g => g.items.map(i => 'i:' + i.id)), ...S.loans.map(l => 'l:' + l.id), ...S.goals.map(g => 'g:' + g.id)];
+const ct = setVar(() => CT, v => { CT = v; }), cr = setVar(() => CR, v => { CR = v; }), fd = setVar(() => FD, v => { FD = v; });
+const tdq = v => () => { const e = $('#tdq'), o = e.value; e.value = v; return () => { e.value = o; }; };
+addParity({
+  name: 'Line pop-up', fn: 'catRender', also: ['flowRender'], el: '#tdlg form', dialog: '#tdlg', cases: () => {
+    const c = [];
+    for (const v of allLines()) for (const r of ['month', 'all', 'trend']) c.push({ label: `${v} ${r}`, set: () => both(ct(v)(), cr(r)(), tdq('')()) });
+    for (const v of allLines().slice(0, 6)) for (const k of [addM(TK, -1), addM(TK, -4), addM(TK, 1)]) c.push({ label: `${v} ${k}`, set: () => both(ct(v)(), cr('month')(), at(k), tdq('')()) });
+    for (const q of ['a', 'zzz', 'catch']) c.push({ label: 'search ' + q, set: () => both(ct(allLines().find(v => v.startsWith('i:')))(), cr('all')(), tdq(q)()) });
+    c.push({ label: 'hand entries, pending, moved, odd names', set: () => { const v = allLines().find(v => S.txd && Object.values(S.txd).some(r => r.v === v && r.k === TK && plan().groups.some(g => g.flex && g.items.some(i => 'i:' + i.id === v)))) || allLines()[0], id = v.slice(2); return both(ct(v)(), cr('all')(), tdq('')(), tweak(s => { const m = s.months[TK] || (s.months[TK] = { act: {}, pay: {}, dep: {} }); m.rc = [{ id: 'h1', store: 'Corner & <shop>', amt: 9.5, item: id, date: TK + '-02' }, { id: 'h2', amt: 3, item: id }, { id: 'h3', store: 'Bank row', amt: 7, item: id, bank: true }]; Object.entries(s.txd || {}).filter(([, r]) => r.v === v).slice(0, 2).forEach(([, r]) => { r.k = addM(r.k, 1); r.n += ' & co'; }); })(), (() => { const ids = Object.keys(S.txd || {}).filter(i => S.txd[i].v === v).slice(0, 3); ids.forEach(i => PSET.add(i)); return () => ids.forEach(i => PSET.delete(i)); })()); } });
+    c.push({ label: 'linked loan', set: () => (tweak(s => { const a = (BK.loans || []).find(x => x.type === 'loan'); if (a) s.loans.push({ id: 'lk1', name: 'Linked loan', apr: 5, bal: openBal(a), min: 200, due: 10, start: TK, color: '#8fc9ff', acct: a.id, anch: { k: TK, eob: openBal(a) } }); }))() });
+    for (const r of ['month', 'trend']) c.push({ label: 'linked loan ' + r, set: () => both(tweak(s => { const a = (BK.loans || []).find(x => x.type === 'loan'); if (a) s.loans.push({ id: 'lk1', name: 'Linked loan', apr: 5, bal: openBal(a), min: 200, due: 10, start: TK, color: '#8fc9ff', acct: a.id, anch: { k: TK, eob: openBal(a) } }); })(), ct('l:lk1')(), cr(r)(), tdq('')()) });
+    // a line whose payments were partly filed elsewhere, a rule named with "&", a store visited 10+ times a month
+    const busy = () => { const E = Object.entries(S.txd || {}).filter(([, r]) => r.auto && r.auto !== 'pair' && r.auto !== 'rest' && r.v.startsWith('i:')); return E.length ? E[0][1].v : allLines()[0]; };
+    for (const r of ['month', 'all', 'trend']) c.push({ label: 'filed elsewhere, odd rule, busy store ' + r, set: () => { const v = busy(); return both(ct(v)(), cr(r)(), tdq('')(), tweak(s => { const E = Object.entries(s.txd).filter(([, x]) => x.v === v); if (E[1]) E[1][1].v = 'skip'; if (E[2]) { E[2][1].v = 'xfer'; E[2][1].k = addM(E[2][1].k, -1); } const rid = E[0] && E[0][1].auto, rr = (s.rules || []).find(x => x.id === rid); if (rr) rr.p += ' & co'; if (E[0]) for (let n = 0; n < 70; n++) s.txd[E[0][0] + '-dup' + n] = { ...E[0][1], k: TK }; })()); } });
+    c.push({ label: 'removed line', set: () => both(ct('i:gone')(), cr('month')(), tdq('')()) });
+    return c;
+  },
+});
+addParity({
+  name: 'Trends dialog', fn: 'flowRender', el: '#fdlg form', dialog: '#fdlg', cases: () => {
+    const c = [], keys = [...plan().groups.map(g => 'grp:' + g.id), ...allLines()];
+    for (const key of keys) c.push({ label: key, set: fd(key) });
+    for (const key of keys.slice(0, 5)) for (const k of [addM(TK, -2), addM(TK, 2)]) c.push({ label: `${key} ${k}`, set: () => both(fd(key)(), at(k)) });
+    c.push({ label: 'missing group', set: fd('grp:gone') });
     return c;
   },
 });

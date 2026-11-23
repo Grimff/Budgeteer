@@ -7,7 +7,7 @@
 import { LEGACY, draw } from './bridge.js';
 
 const SCREENS = [];
-// screen: {name, fn: 'renderX', el: '#T-x', also?: ['renderY'], cases(): [{label, set?(): undo?}]}
+// screen: {name, fn: 'renderX', el: '#T-x', also?: ['renderY'], dialog?: '#dlg' (opened while measured), cases(): [{label, set?(): undo?}]}
 export const addParity = s => SCREENS.push(s);
 
 function attrsOf(n) {
@@ -109,6 +109,9 @@ export function runParity() {
       try {
         undo = c.set && c.set();
         const el = document.querySelector(sc.el);
+        // a pop-up's text only shows while its dialog is open
+        const dlg = sc.dialog && document.querySelector(sc.dialog), shut = dlg && !dlg.open; if (shut) dlg.show();
+        try {
         // count-ups (cu) remember what they showed last; both draws start from the same memory
         const pv = { ...PV }, back = () => { for (const k of Object.keys(PV)) delete PV[k]; Object.assign(PV, pv); };
         // also: old functions the old screen calls by name (renderForecast → fcBody) are the old ones while it draws
@@ -119,10 +122,11 @@ export function runParity() {
         n++;
         const d = diff(A, B);
         if (d) fails.push(c.label + ' ' + d);
+        } finally { if (shut) dlg.close(); }
       } catch (e) { fails.push(c.label + ' crashed: ' + (e.stack || e.message)); }
       finally { try { if (undo) undo(); } catch (_) { } }
     }
-    out.push({ ok: !fails.length && n > 0, name: `React ${sc.name} screen draws what the old one did (${n} cases)`, detail: fails.length ? fails.length + ' differ: ' + fails.slice(0, 3).join(' ‖ ') : '' });
+    out.push({ ok: !fails.length && n > 0, name: `React ${sc.name}${sc.dialog ? '' : ' screen'} draws what the old one did (${n} cases)`, detail: fails.length ? fails.length + ' differ: ' + fails.slice(0, 3).join(' ‖ ') : '' });
   }
   runPieces(out);
   S = keep.S; S.cur = keep.cur;
