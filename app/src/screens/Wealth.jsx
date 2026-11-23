@@ -1,10 +1,8 @@
 // Wealth tab (was renderWealth, invCard and areaChart in js/wealth.js). The math (perf, invSeries, valueOn, debtNow…)
 // stays in wealth.js.
 import { useLayoutEffect, useRef, useState } from 'react';
-import { tx, } from '../bridge.js';
-import { Gear, CountUp } from '../ui.jsx';
-
-const NmA = ({ a }) => <>{tx(a.institution)} · {tx(a.official || a.name)}{a.mask ? ' ••' + tx(a.mask) : ''}</>;
+import { tx } from '../bridge.js';
+import { Gear, CountUp, NmA } from '../ui.jsx';
 const bigN = { font: "700 24px 'Inter Display',Inter,sans-serif" };
 
 // Investment value over time. Draws at the width the box has once it's on the page (measured before the first paint,

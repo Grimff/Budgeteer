@@ -4,8 +4,10 @@ import { draw, replaceScreen, LEGACY } from './bridge.js';
 import { addParity, runParity, monthsToTry, emptyHousehold, withS, at } from './parity.js';
 import { History } from './screens/History.jsx';
 import { Wealth } from './screens/Wealth.jsx';
+import { Goals } from './screens/Goals.jsx';
 
 replaceScreen('renderHistory', () => draw($('#T-history'), <History />));
+replaceScreen('renderGoals', () => draw($('#T-goals'), <Goals />));
 replaceScreen('renderWealth', () => { const el = $('#T-wealth'); if (el) draw(el, <Wealth />); });
 
 // Parity cases: the same data drawn both ways (self-test only).
@@ -44,6 +46,31 @@ addParity({
     c.push({ label: 'no history at all', set: accts(A => A.map(a => ({ ...a, days: {}, flows: [] }))) });
     c.push({ label: 'no investments or cards', set: accts(A => A.filter(a => a.type === 'depository')) });
     c.push({ label: 'no accounts', set: accts(() => []) });
+    c.push({ label: 'empty household', set: () => withS(emptyHousehold()) });
+    return c;
+  },
+});
+// A changed copy of the budget for one case.
+const tweak = fn => () => { const c = clone(S); fn(c); return withS(c); };
+const goalAccts = () => (BK.accts || []).filter(a => ['depository', 'investment'].includes(a.type));
+addParity({
+  name: 'Goals', fn: 'renderGoals', el: '#T-goals', cases: () => {
+    const c = [];
+    for (const k of monthsToTry()) c.push({ label: k, set: () => at(k) });
+    for (const r of ['1y', '2y', '5y', 'all']) for (const k of [TK, addM(TK, 2)]) c.push({ label: `${k} ${r}`, set: () => at(k, () => { const o = GR; GR = r; return () => { GR = o; }; }) });
+    const shut = v => () => { const had = BCL.has('galloc'), had2 = BCL.has('!galloc'); BCL.delete('galloc'); BCL.delete('!galloc'); BCL.add(v ? 'galloc' : '!galloc'); return () => { BCL.delete('galloc'); BCL.delete('!galloc'); if (had) BCL.add('galloc'); if (had2) BCL.add('!galloc'); }; };
+    c.push({ label: 'accounts card open', set: shut(false) });
+    c.push({ label: 'accounts card shut', set: shut(true) });
+    c.push({ label: 'folds open', set: () => { const ids = S.goals.map(g => 'g-' + g.id); ids.forEach(i => OPEN.add(i)); return () => ids.forEach(i => OPEN.delete(i)); } });
+    for (const k of [addM(TK, -1), TK, addM(TK, 1)]) {
+      c.push({ label: k + ' split by %', set: () => both(shut(false)(), tweak(s => { const A = goalAccts(); s.alloc = {}; A.forEach((a, i) => { s.alloc[a.id] = { mode: i % 2 ? 'order' : 'split', goals: s.goals.map(g => g.id), pct: Object.fromEntries(s.goals.map((g, j) => [g.id, 30 + j * 20])), rest: i % 3 === 2 ? 'none' : 'last' }; }); s.alloc['gone-acct'] = { mode: 'order', goals: [], rest: 'none' }; })(), at(k)) });
+      c.push({ label: k + ' dates, deposits, odd names', set: () => both(tweak(s => { s.goals.forEach((g, i) => { g.by = addM(TK, i % 2 ? 2 : 40); g.name = g.name + (i ? ' & <co>' : '\uFFFD'); if (g.kind === 'emergency') g.auto = !g.auto; }); const m = s.months[k] || (s.months[k] = { act: {}, pay: {}, dep: {} }); m.dep = m.dep || {}; if (s.goals[0]) m.dep[s.goals[0].id] = 123.45; })(), at(k)) });
+    }
+    c.push({ label: 'split over 100%', set: () => both(shut(false)(), tweak(s => { const A = goalAccts(); s.alloc = {}; A.forEach(a => { s.alloc[a.id] = { mode: 'split', goals: s.goals.map(g => g.id), pct: Object.fromEntries(s.goals.map(g => [g.id, 75])) }; }); })()) });
+    c.push({ label: 'one-month override', set: () => both(tweak(s => { const k = addM(TK, 1), m = s.months[k] || (s.months[k] = { act: {}, pay: {}, dep: {} }); m.gplan = {}; s.goals.forEach(g => { m.gplan[g.id] = 77; }); })(), at(addM(TK, 1))) });
+    c.push({ label: 'server unreachable', set: () => { const o = SRV; SRV = false; return () => { SRV = o; }; } });
+    c.push({ label: 'bank loading', set: () => swap(BK, 'accts', null) });
+    c.push({ label: 'no goals', set: tweak(s => { s.goals = []; s.alloc = {}; }) });
     c.push({ label: 'empty household', set: () => withS(emptyHousehold()) });
     return c;
   },

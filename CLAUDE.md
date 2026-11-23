@@ -89,7 +89,7 @@ works (and `npm test` passes) after every step.
   `fmtAll`, open folds and inputs behave as before. Components are pure and read the globals (`S`, `plan`, caches)
   like the old code; buttons keep their `data-act`/`data-*` attributes, so the delegated click/change/input handlers
   in events.js run unchanged. `tx()` = `esc()`'s text rules (React escapes the rest).
-  Done: History, Wealth (its chart is a component with hover state). To do: Goals (+ goal-accounts card), Loans (+ linked-loans), Settings, Bank, Budget
+  Done: History, Wealth, Goals (+ its accounts card); their charts are components with hover state. To do: Loans (+ linked-loans), Settings, Bank, Budget
   (This month, Build, Forecast, flow, compare).
 - **Parity check** (`app/src/parity.js`, part of the self-test, run on the sample as loaded and again at the end):
   every converted screen is drawn by the old function (kept in `LEGACY` until phase 1 is done) and by React for many
