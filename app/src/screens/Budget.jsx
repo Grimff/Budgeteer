@@ -2,20 +2,20 @@
 // js/alerts.js, rcList in js/linked-loans.js). Build budget and Forecast are still drawn by renderBuild /
 // renderForecast. The money-flow chart (#sk) is drawn after this by sankey() in flow.js, as before.
 import { tx } from '../bridge.js';
-import { CountUp, Clh, Html } from '../ui.jsx';
+import { CountUp, Clh, ActBtn } from '../ui.jsx';
 
 // An attribute string like the old cards kept for their buttons (data-act=…, data-v=…) → props.
 const attrs = s => Object.fromEntries([...s.matchAll(/([\w-]+)="([^"]*)"/g)].map(m => [m[1], m[2]]));
 
 export const BudSwitch = () => <div className="seg" style={{ margin: '4px 0 6px' }}><button className={BUDV === 'month' || !['build', 'fc'].includes(BUDV) ? 'on' : ''} data-act="budv" data-v="month">This month</button><button className={BUDV === 'build' ? 'on' : ''} data-act="budv" data-v="build">Build budget</button><button className={BUDV === 'fc' ? 'on' : ''} data-act="budv" data-v="fc">Forecast</button></div>;
 
-// Needs a look (current month only). alertsNow() builds each alert's buttons as HTML, so that row is inserted as HTML.
+// Needs a look (current month only).
 function AlertsCard() {
   if (S.cur !== TK) return null;
   const A = alertsNow().filter(a => !NTH[a.key]);
   if (!A.length) return null;
   const ic = { bad: '×', warn: '!', info: 'i' };
-  return <section className="card nt" style={{ '--i': 1 }}><h2>Needs a look</h2><div className="hcl">{A.map(a => <div className={'hci ' + a.lv} key={a.key}><i>{ic[a.lv]}</i><div><b>{tx(a.t)}</b><p>{tx(a.d)}</p><Html as="div" className="hca" html={(a.a || '') + `<button class="lnk" data-act="ntHide" data-id="${esc(a.key)}">Hide</button>`} /></div></div>)}</div></section>;
+  return <section className="card nt" style={{ '--i': 1 }}><h2>Needs a look</h2><div className="hcl">{A.map(a => <div className={'hci ' + a.lv} key={a.key}><i>{ic[a.lv]}</i><div><b>{tx(a.t)}</b><p>{tx(a.d)}</p><div className="hca">{a.a ? <ActBtn b={a.a} /> : null}<button className="lnk" data-act="ntHide" data-id={a.key}>Hide</button></div></div></div>)}</div></section>;
 }
 
 // Getting set up checklist (current month, until every step is done).

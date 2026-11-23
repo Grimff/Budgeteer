@@ -165,6 +165,24 @@ addParity({
     c.push({ label: 'rule folds open', set: () => { const ids = (S.rules || []).map(r => 'rm-' + r.id); ids.forEach(i => OPEN.add(i)); return both(sv('rules')(), () => ids.forEach(i => OPEN.delete(i))); } });
     c.push({ label: 'odd rules', set: () => both(sv('rules')(), tweak(s => { const r = s.rules || []; if (r[0]) { r[0].v = 'i:gone'; r[0].shift = 'next'; r[0].min = 5; r[0].max = 99.5; } if (r[1]) { r[1].x = ['some store', 'other & co']; r[1].shift = 'prev'; } if (r[2]) r[2].p += ' & <x>'; s.catchAll = 'review'; })()) });
     c.push({ label: 'no rules', set: () => both(sv('rules')(), tweak(s => { s.rules = []; })()) });
+    // Health checks that fail (the sample passes them all): each message and button kind, with odd names.
+    const bkSet = (f) => () => { const o = { st: BK.st, accts: BK.accts, tx: BK.tx }; BK.st = clone(BK.st); BK.accts = (BK.accts || []).slice(); BK.tx = (BK.tx || []).slice(); f(); return () => { Object.assign(BK, o); }; };
+    // the card's bank named like its payments' text, so the payments are matched to it
+    const rwd = C => { BK.accts = BK.accts.map(a => C.includes(a.id) ? { ...a, institution: 'Rwd & <Co>' } : a); };
+    const crd = () => (BK.accts || []).filter(a => a.type === 'credit').map(a => a.id);
+    // card payments from checking that aren't paired: filed Ignore by hand, so the card's own purchases must be there
+    const cardPays = tweak(s => { Object.entries(s.txd).forEach(([id, r]) => { if (r.auto === 'pair' && r.amt > 0) { const t = BK.tx.find(x => x.id === id); if (t && acctType(t.account) === 'depository') { delete r.auto; r.v = 'skip'; } } }); });
+    const H = [
+      ['bank needs sign-in', bkSet(() => { (BK.st.items || []).forEach((it, i) => { if (i === 0) it.error = { code: 'ITEM_LOGIN_REQUIRED' }; it.institution = { ...(it.institution || {}), name: 'Bank & <Co>' }; }); })],
+      ['transfers as spending', tweak(s => { const f = plan().groups.find(g => g.flex).items[0].id; Object.values(s.txd).filter(r => r.auto === 'pair').slice(0, 3).forEach(r => { r.v = 'i:' + f; delete r.auto; }); })],
+      ['card not connected', () => both(cardPays(), bkSet(() => { const C = crd(); BK.accts = BK.accts.filter(a => !C.includes(a.id)); BK.tx = BK.tx.filter(t => !C.includes(t.account)); })())],
+      ['card sends nothing', () => both(cardPays(), bkSet(() => { const C = crd(); rwd(C); BK.tx = BK.tx.filter(t => !C.includes(t.account)); })())],
+      ['card starts late', () => both(cardPays(), bkSet(() => { const C = crd(); rwd(C); BK.tx = BK.tx.filter(t => !C.includes(t.account) || t.date >= TK); })())],
+      ['to review, paycheck and bill missed', tweak(s => { const lm = addM(TK, -1), p = plan(lm), inc = p.income[0], bill = p.groups.find(g => !g.flex).items[0]; p.income[0] && Object.values(s.plans).forEach(q => q.income.forEach(i => { if (i.id === inc.id) i.name = 'Pay & <bonus>'; })); for (const [id, r] of Object.entries(s.txd)) if (r.k === lm && (r.v === 'inc:' + inc.id || r.v === 'i:' + bill.id)) delete s.txd[id]; })],
+      ['split over 100%', tweak(s => { const a = (BK.accts || []).find(x => x.type === 'depository'); s.alloc = { ...(s.alloc || {}), [a.id]: { mode: 'split', goals: s.goals.map(g => g.id), pct: Object.fromEntries(s.goals.map(g => [g.id, 80])), rest: 'last' } }; })],
+    ];
+    for (const [l, f] of H) c.push({ label: 'health: ' + l, set: () => both(sv('data')(), f()) });
+    c.push({ label: 'health: everything at once', set: () => both(sv('data')(), ...H.slice(0, 2).map(([, f]) => f()), H[5][1](), H[6][1]()) });
     for (const b of [null, 'wait', [], [{ id: 'budgeteer-2026-11-01.json', kind: 'daily', at: '2026-11-01' }, { id: 'budgeteer-before-restore-1.json', kind: 'restore', at: '2026-11-02T10:30:00Z' }]]) c.push({ label: 'backups ' + JSON.stringify(b), set: () => both(sv('general')(), bkp(b)()) });
     c.push({ label: 'household named, catch-all set', set: () => both(sv('general')(), tweak(s => { s.hh = { name: 'The <Smiths> & co', sub: '' }; const g = plan().groups.find(g => g.items.length); if (g) s.catchAll = g.items[0].id; })()) });
     c.push({ label: 'catch-all to review', set: () => both(sv('general')(), tweak(s => { s.catchAll = 'review'; })()) });
@@ -228,6 +246,8 @@ addParity({
     const guide = v => () => { const a = BCL.has('guide'), b = BCL.has('!guide'); BCL.delete('guide'); BCL.delete('!guide'); BCL.add(v ? 'guide' : '!guide'); return () => { BCL.delete('guide'); BCL.delete('!guide'); if (a) BCL.add('guide'); if (b) BCL.add('!guide'); }; };
     c.push({ label: 'set-up open, things to sort, alerts', set: () => both(budv('month')(), guide(false)(), unfile(6)(), swap(BK, 'st', { ...BK.st, items: (BK.st.items || []).map((it, i) => i ? it : { ...it, institution: { name: 'Bank & <Co>' }, error: { code: 'X', message: 'Sign <in>' } }) })) });
     c.push({ label: 'set-up shut', set: () => both(budv('month')(), guide(true)(), unfile(2)()) });
+    // the other alert kinds: a linked bill due tomorrow and one due today (not paid yet), a spending line over plan; odd names
+    c.push({ label: 'alerts: due soon, over plan', set: tweak(s => { const d = new Date().getDate(), p = plan(TK), B = p.groups.filter(g => !g.flex).flatMap(g => g.items).filter(i => rulesFor('i:' + i.id).length), F = p.groups.find(g => g.flex).items[0]; Object.values(s.plans).forEach(q => q.groups.forEach(g => g.items.forEach(i => { if (B[0] && i.id === B[0].id) { i.due = Math.min(31, d + 1); i.name += ' & <co>'; } if (B[1] && i.id === B[1].id) i.due = d; if (i.id === F.id) { i.amt = 1; i.name = '"' + i.name + '"'; } }))); for (const [id, r] of Object.entries(s.txd)) if (r.k === TK && B.slice(0, 2).some(b => r.v === 'i:' + b.id)) delete s.txd[id]; }) });
     c.push({ label: 'alerts hidden', set: () => { const o = { ...NTH }; alertsNow().forEach(a => { NTH[a.key] = 1; }); return () => { Object.keys(NTH).forEach(k => delete NTH[k]); Object.assign(NTH, o); }; } });
     c.push({ label: 'review done / swept', set: tweak(s => { const lk = addM(TK, -1), m = s.months[lk] || (s.months[lk] = { act: {}, pay: {}, dep: {} }); m.swept = 321; }) });
     c.push({ label: 'review dismissed', set: tweak(s => { const lk = addM(TK, -1), m = s.months[lk] || (s.months[lk] = { act: {}, pay: {}, dep: {} }); m.rv = 1; }) });

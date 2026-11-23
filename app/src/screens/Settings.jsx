@@ -3,7 +3,7 @@
 // rules search (rulesFilter, still run while typing) stay there.
 import { Fragment } from 'react';
 import { tx } from '../bridge.js';
-import { Html, TxOpts, CatchSel } from '../ui.jsx';
+import { TxOpts, CatchSel, ActBtn } from '../ui.jsx';
 
 const card16 = { marginBottom: '16px' }, note14 = { fontSize: '14px', margin: '4px 0 12px' };
 
@@ -70,7 +70,7 @@ function HealthCard() {
   const H = healthChecks(), n = { ok: 0, warn: 0, bad: 0 }; H.forEach(h => n[h.lv]++);
   const ic = { ok: '✓', warn: '!', bad: '×' }, rank = { bad: 0, warn: 1, ok: 2 };
   return <section className="card hc" style={card16}><div className="bh"><div><h2>Health check</h2><p>{n.bad + n.warn ? `${n.bad + n.warn} thing${n.bad + n.warn === 1 ? '' : 's'} to look at · ${n.ok} passed` : `All ${n.ok} checks passed`}. These run every time you open this page.</p></div>{DEMO ? null : <div className="phact"><a className="btn g sm" href="?demo" target="_blank" rel="noopener">Try sample data</a><a className="btn g sm" href="?selftest" target="_blank" rel="noopener">Run self-test</a></div>}</div>{' '}
-    <div className="hcl">{H.sort((a, b) => rank[a.lv] - rank[b.lv]).map((h, i) => <div className={'hci ' + h.lv} key={i}><i>{ic[h.lv]}</i><div><Html as="b" html={h.t} /><Html as="p" html={h.d} />{h.a ? <Html as="div" className="hca" html={h.a} /> : null}</div></div>)}</div></section>;
+    <div className="hcl">{H.sort((a, b) => rank[a.lv] - rank[b.lv]).map((h, i) => <div className={'hci ' + h.lv} key={i}><i>{ic[h.lv]}</i><div><b>{tx(h.t)}</b><p>{hcParts(h.d).map((p, j) => typeof p === 'string' ? tx(p) : <b key={j}>{tx(p.b)}</b>)}</p>{h.a ? <div className="hca">{h.a.map((b, j) => <Fragment key={j}>{j ? ' ' : null}<ActBtn b={b} /></Fragment>)}</div> : null}</div></div>)}</div></section>;
 }
 
 // Settings → Data & math: each total the app shows, broken into the numbers it adds up, plus what's stored.

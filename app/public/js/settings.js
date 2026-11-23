@@ -47,22 +47,24 @@ function rulesFilter(){const q=RQ.trim().toLowerCase();let any=0;$$('#sec-rules 
 document.addEventListener('input',e=>{if(e.target.id==='rulesq'){RQ=e.target.value;rulesFilter()}});
 // Health check (Settings → Data & math): proves the tabs agree and points at data that would make the budget wrong.
 // Each check: {lv:'ok'|'warn'|'bad', t:title, d:detail, a:optional button}.
-function healthChecks(){const H=[],add=(lv,t,d,a)=>H.push({lv,t,d,a}),near=(a,b)=>Math.abs(a-b)<0.51,MS=histMonths().filter(k=>k<=TK).slice(-7);
+// Each check: {lv: ok|warn|bad, t: title, d: message, a?: buttons}. d is text or a list of text and {b: bold text}; a
+// is a list of {act, label, ...data-* values} (hcHtml/hcText turn them into markup or plain text).
+function healthChecks(){const H=[],add=(lv,t,d,a)=>H.push(a&&a.length?{lv,t,d,a}:{lv,t,d}),near=(a,b)=>Math.abs(a-b)<0.51,MS=histMonths().filter(k=>k<=TK).slice(-7);
  // 1. Budget, History and the money flow use the same totals
  const bad1=MS.filter(k=>{const T=totals(k),M=monthSum(k);return !near(M.ac,T.fixedA+T.flexA+T.loansA+T.saveA)||!near(M.pl,T.fixed+T.flexP+T.loans+T.save)||!near(M.inc,T.incA)});
  add(bad1.length?'bad':'ok','Budget and History agree',bad1.length?'Totals differ in '+bad1.map(labS).join(', '):`Planned, actual and income match for ${MS.length} months (${labS(MS[0]||TK)} – ${labS(TK)})`);
  // 2. Loan balances follow the lenders
  const LL=S.loans.filter(l=>l.acct&&l.live&&row(l,TK)),drift=LL.map(l=>{const r=row(l,TK);return[l,l.live.bal-(r.lg?r.close:r.open)]}).filter(([,d])=>Math.abs(d)>Math.max(5,0.002*Math.abs(d)));
- if(LL.length)add(drift.length?'warn':'ok','Loan balances match your lenders',drift.length?drift.map(([l,d])=>`${esc(l.name)}: lender ${d>0?'higher':'lower'} by ${f2(Math.abs(d))}`).join(' · ')+'. Check its rate and minimum.':`${LL.length} linked loan${LL.length===1?'':'s'} within a few dollars of the lender’s balance`);
+ if(LL.length)add(drift.length?'warn':'ok','Loan balances match your lenders',drift.length?drift.map(([l,d])=>`${l.name}: lender ${d>0?'higher':'lower'} by ${f2(Math.abs(d))}`).join(' · ')+'. Check its rate and minimum.':`${LL.length} linked loan${LL.length===1?'':'s'} within a few dollars of the lender’s balance`);
  // 3. Debt totals agree across Loans, Wealth and Data & math
  const owe=S.loans.reduce((a,l)=>a+debtNow(l),0);add('ok','Total owed is the same everywhere',`${f0(owe)} on Loans, Wealth and here (lender balance when linked, otherwise this month’s opening balance)`);
  // 3b. Extra money: every month's pool = shares + kept, and the budget's left over is what's kept
  if((S.al||[]).length){const bx=[];for(let i=0;i<24;i++){const k=addM(TK,i),x=xsBuild()[k];if(!x)continue;const al=Object.entries(x).filter(([d])=>/^x\|[gl]:/.test(d)).reduce((a,[,v])=>a+v,0);if(Math.abs(al+x.keep-x.pool)>0.02||(x.pool>0.5&&Math.abs(totals(k).left-x.keep)>0.6))bx.push(k)}add(bx.length?'bad':'ok','Extra money adds up',bx.length?'Shares don’t match the budget in '+bx.map(labS).join(', '):'For the next 24 months every dollar left over goes to a rule or is kept, and the budget agrees')}
  if(!SRV)return H;
  // 4. Bank connections working
- const items=(BK.st&&BK.st.items)||[],err=items.filter(it=>it.error);if(items.length)add(err.length?'bad':'ok','Bank connections',err.length?err.map(it=>esc(it.institution.name)).join(', ')+' need you to sign in again':`${items.length} connected, all syncing`,err.length?'<button class="btn g sm" data-act="sview" data-v="connections">Open Connections</button>':'');
+ const items=(BK.st&&BK.st.items)||[],err=items.filter(it=>it.error);if(items.length)add(err.length?'bad':'ok','Bank connections',err.length?err.map(it=>it.institution.name).join(', ')+' need you to sign in again':`${items.length} connected, all syncing`,err.length?[{act:'sview',v:'connections',label:'Open Connections'}]:null);
  // 5. Nothing counted twice: a transfer between your own accounts filed as spending or income
- const pi=pairIssues();add(pi.length?'warn':'ok','No transfers counted as spending',pi.length?`${pi.length} transfer${pi.length===1?'':'s'} between your own accounts ${pi.length===1?'is':'are'} filed as spending or income`:'Money moved between your own accounts is left out of spending',pi.length?'<button class="btn g sm" data-act="bview" data-v="review">Review</button>':'');
+ const pi=pairIssues();add(pi.length?'warn':'ok','No transfers counted as spending',pi.length?`${pi.length} transfer${pi.length===1?'':'s'} between your own accounts ${pi.length===1?'is':'are'} filed as spending or income`:'Money moved between your own accounts is left out of spending',pi.length?[{act:'bview',v:'review',label:'Review'}]:null);
  // 6. Card spending: a payment from checking to a card is ignored because the card's own purchases are counted.
  // That only works while the card's transactions exist: for a card that isn't connected, or months before its
  // transactions begin, the purchases are missing. Offer to count those payments as spending instead.
@@ -73,19 +75,24 @@ function healthChecks(){const H=[],add=(lv,t,d,a)=>H.push({lv,t,d,a}),near=(a,b)
   cardOf=t=>{const x=txt(t);return CR.find(a=>a.mask&&new RegExp('(^|\\D)'+a.mask+'(\\D|$)').test(x))||CR.find(a=>x.includes(String(a.institution||'').toLowerCase().split(' ')[0]))};
  const cmiss={};(BK.tx||[]).forEach(t=>{if(!ign(t)||t.date.slice(0,7)<bs)return;const a=cardOf(t),f=a&&first[a.id];if(a&&f&&t.date>=f)return;const key=a?a.id:'?'+txt(t).replace(/[0-9#*].*$/,'').trim().slice(0,24);(cmiss[key]||(cmiss[key]={a,f,ids:[],amt:0,nm:a?`${a.institution} ••${a.mask}`:titleC(key.slice(1).replace(/^amz\b/,'amazon').replace(/storecrd/,'store').replace(/_/g,' ').replace(/ ?(pmt|payment|e-?payment|autopay)/g,'').trim())+' card'})).ids.push(t.id);cmiss[key].amt+=t.amount});
  const MI=Object.values(cmiss);
- add(MI.length?'warn':'ok','Card purchases are all in the budget',MI.length?MI.map(o=>`<b>${esc(o.nm)}</b>: ${o.a?(o.f?`its transactions only start ${dshort(o.f)}, so`:'connected, but none of its transactions come through, so'):'not connected, so'} ${o.ids.length} payment${o.ids.length===1?'':'s'} to it (${f0(o.amt)}) ${o.a&&o.f?'before then ':''}${o.ids.length===1?'is':'are'} ignored and what you bought on it is missing.`).join(' ')+' Count those payments as spending (your catch-all category) to fill the gap.':'Every card you pay from checking has its purchases counted',MI.length?MI.map(o=>`<button class="btn g sm" data-act="hcCard" data-ids="${o.ids.join(',')}">Count ${esc(o.nm)} payments as spending</button>`).join(' '):'');
+ add(MI.length?'warn':'ok','Card purchases are all in the budget',MI.length?[...MI.flatMap((o,i)=>[i?' ':'',{b:o.nm},`: ${o.a?(o.f?`its transactions only start ${dshort(o.f)}, so`:'connected, but none of its transactions come through, so'):'not connected, so'} ${o.ids.length} payment${o.ids.length===1?'':'s'} to it (${f0(o.amt)}) ${o.a&&o.f?'before then ':''}${o.ids.length===1?'is':'are'} ignored and what you bought on it is missing.`]),' Count those payments as spending (your catch-all category) to fill the gap.']:'Every card you pay from checking has its purchases counted',MI.length?MI.map(o=>({act:'hcCard',ids:o.ids.join(','),label:`Count ${o.nm} payments as spending`})):null);
  // 7. To review
- const ib=inbox().length;add(ib?'warn':'ok','Transactions sorted',ib?`${ib} transaction${ib===1?'':'s'} waiting in Bank → To review aren’t in the budget yet`:'Everything since '+dshort(bankFrom())+' is filed',ib?'<button class="btn g sm" data-act="tab" data-t="bank">Open Bank</button>':'');
+ const ib=inbox().length;add(ib?'warn':'ok','Transactions sorted',ib?`${ib} transaction${ib===1?'':'s'} waiting in Bank → To review aren’t in the budget yet`:'Everything since '+dshort(bankFrom())+' is filed',ib?[{act:'tab',t:'bank',label:'Open Bank'}]:null);
  // 8. Paychecks and bills seen last month
  const lm=addM(TK,-1),pl=plan(lm),miss=pl.income.filter(i=>!i.once&&+i.amt>0&&!incGot(lm,i.id)).map(i=>i.name),bill=pl.groups.filter(g=>!g.flex).flatMap(g=>g.items).filter(i=>+i.amt>0&&isDue(i,lm)&&!billPaid(lm,i.id)).map(i=>i.name);
- add(miss.length?'warn':'ok',`Paychecks in ${mon(lm)}`,miss.length?`No deposit linked for ${miss.map(esc).join(', ')}, so ${mon(lm)} counts the planned amount`:'Every planned paycheck arrived and is linked');
- add(bill.length?'warn':'ok',`Bills in ${mon(lm)}`,bill.length?`Not found in the bank: ${bill.map(esc).join(', ')}. ${mon(lm)} counts them at their planned amount; link their payments in Build budget.`:'Every planned bill was found in the bank');
+ add(miss.length?'warn':'ok',`Paychecks in ${mon(lm)}`,miss.length?`No deposit linked for ${miss.join(', ')}, so ${mon(lm)} counts the planned amount`:'Every planned paycheck arrived and is linked');
+ add(bill.length?'warn':'ok',`Bills in ${mon(lm)}`,bill.length?`Not found in the bank: ${bill.join(', ')}. ${mon(lm)} counts them at their planned amount; link their payments in Build budget.`:'Every planned bill was found in the bank');
  // 9. Goal accounts split sensibly
  const over=Object.entries(S.alloc||{}).filter(([,e])=>e.mode==='split'&&Object.values(e.pct||{}).reduce((a,b)=>a+(+b||0),0)>100.01);if(Object.keys(S.alloc||{}).length)add(over.length?'bad':'ok','Savings accounts shared between goals',over.length?`${over.length} account${over.length===1?' splits':'s split'} more than 100% between goals`:'Every account’s split adds up to 100% or less');
  return H}
+const hcParts=d=>Array.isArray(d)?d:[d];
+const hcText=d=>hcParts(d).map(p=>typeof p==='string'?p:p.b).join('');
+const hcHtml=d=>hcParts(d).map(p=>typeof p==='string'?esc(p):`<b>${esc(p.b)}</b>`).join('');
+// A check's buttons: data-* from every field but label, in the order given.
+const hcBtns=a=>a.map(b=>`<button class="btn g sm" data-act="${b.act}"${Object.entries(b).filter(([k])=>k!=='act'&&k!=='label').map(([k,v])=>` data-${k}="${esc(v)}"`).join('')}>${esc(b.label)}</button>`).join(' ');
 function healthCard(){const H=healthChecks(),n={ok:0,warn:0,bad:0};H.forEach(h=>n[h.lv]++);const ic={ok:'✓',warn:'!',bad:'×'};
  return `<section class="card hc" style="margin-bottom:16px"><div class="bh"><div><h2>Health check</h2><p>${n.bad+n.warn?`${n.bad+n.warn} thing${n.bad+n.warn===1?'':'s'} to look at · ${n.ok} passed`:`All ${n.ok} checks passed`}. These run every time you open this page.</p></div>${DEMO?'':`<div class="phact"><a class="btn g sm" href="?demo" target="_blank" rel="noopener">Try sample data</a><a class="btn g sm" href="?selftest" target="_blank" rel="noopener">Run self-test</a></div>`}</div>
- <div class="hcl">${H.sort((a,b)=>({bad:0,warn:1,ok:2})[a.lv]-({bad:0,warn:1,ok:2})[b.lv]).map(h=>`<div class="hci ${h.lv}"><i>${ic[h.lv]}</i><div><b>${h.t}</b><p>${h.d}</p>${h.a?`<div class="hca">${h.a}</div>`:''}</div></div>`).join('')}</div></section>`}
+ <div class="hcl">${H.sort((a,b)=>({bad:0,warn:1,ok:2})[a.lv]-({bad:0,warn:1,ok:2})[b.lv]).map(h=>`<div class="hci ${h.lv}"><i>${ic[h.lv]}</i><div><b>${esc(h.t)}</b><p>${hcHtml(h.d)}</p>${h.a?`<div class="hca">${hcBtns(h.a)}</div>`:''}</div></div>`).join('')}</div></section>`}
 // Settings -> Data & math: each total the app shows, broken into the numbers it adds up, plus what's stored.
 // Everything here calls the same functions the tabs use, so the numbers always match them.
 function dataView(){const k=S.cur,T=totals(k),live=k>=TK,lm=mon(k),spentA=T.fixedA+T.flexA+T.loansA+T.saveA,planOut=T.fixed+T.flexP+T.loans+T.save,so=soFarOf(k,T);

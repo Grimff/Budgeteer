@@ -27,9 +27,9 @@ export function Clh({ k, shut, title, sum, tag: T = 'h2' }) {
 // "Bank · Account ••1234" (was nmA() in wealth.js).
 export const NmA = ({ a }) => <>{tx(a.institution)} · {tx(a.official || a.name)}{a.mask ? ' ••' + tx(a.mask) : ''}</>;
 
-// Markup that the app's logic still builds as HTML (health-check messages; their own buttons keep data-act).
-// Only for strings the old screens also inserted as HTML. Goes away when that logic returns data (phase 3).
-export const Html = ({ as: T = 'span', html, ...rest }) => <T {...rest} dangerouslySetInnerHTML={{ __html: html }} />;
+// A button described as data ({act, label, ...data-* values}; health checks and alerts): data-act and the rest as
+// data-* attributes, in the order given.
+export const ActBtn = ({ b }) => <button className="btn g sm" {...Object.fromEntries(Object.entries(b).filter(([k]) => k !== 'label').map(([k, v]) => ['data-' + k, v]))}>{tx(b.label)}</button>;
 
 // The "file to" choices for a transaction or rule (was txOptions in linked-loans.js). The select's defaultValue picks
 // the selected one, as the old `selected` attribute did.

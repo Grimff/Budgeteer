@@ -124,7 +124,7 @@ async function selfTest(){const T=[],ok=(c,name,detail='')=>T.push({ok:!!c,name,
   const n0=S.goals.length;document.querySelector('.tabs button[data-t="goals"]').click();document.querySelector('[data-act="addGoal"]').click();const ng=S.goals[n0];
   ok(ng&&goalMon(ng,TK)===200,'A new goal starts at 200 a month',ng&&f0(goalMon(ng,TK)));
   // The app's own health checks.
-  healthChecks().forEach(h=>ok(h.lv==='ok','Health check: '+h.t.replace(/<[^>]+>/g,''),h.lv==='ok'?'':h.d.replace(/<[^>]+>/g,'')));
+  healthChecks().forEach(h=>ok(h.lv==='ok','Health check: '+h.t,h.lv==='ok'?'':hcText(h.d)));
   // Alerts: paid bills never show as missing; a bank that needs signing in and a category over plan do, and Hide works.
   ok(!alertsNow().some(a=>a.key.startsWith('late:')),'Paid bills don’t show as missing',alertsNow().map(a=>a.key).join(', '));
   BK.st.items[0].error={code:'ITEM_LOGIN_REQUIRED',message:'Sign in again to keep syncing.'};
