@@ -119,8 +119,9 @@ works (and `npm test` passes) after every step.
   each part a function wrote is drawn as its own root, so inputs outside those parts (the pop-up's search `#tdq`) keep
   what's typed. Parity screens get `dialog: '#tdlg'` (opened while measured). Done: the line pop-up (`catRenderR`:
   #tds/#tdr/#tdrg/#tdl; catFilter still hides rows for the search) and the trends dialog (`flowRenderR`: #fds/#fdb,
-  also the pop-up's Trends view). To do: link dialog (lnkOpen/lnkList/lnkRule), amount dialog (openD: pay, deposit,
-  …), split form (spRows), the money-flow chart and its card (sankey, skCard, compareView).
+  also the pop-up's Trends view), the link dialog (`lnkListR`/`lnkRuleR` in `popups/Link.jsx`: #lpick and #lrule; the
+  rule options keep their own state, so typing the text or ticking a box recounts without redrawing the field; lnkOpen,
+  the #lpick/#lq listeners and Save stay in bank.js). To do: amount dialog (openD: pay, deposit, …), split form (spRows), the money-flow chart and its card (sankey, skCard, compareView).
 - **Phase 3:** state and events into React (handlers on elements instead of `data-act` switches, `S` in a store with
   a hook, real re-renders instead of remounts); then the math into ES modules; then remove the old draw functions
   and the classic-script globals.

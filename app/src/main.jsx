@@ -12,6 +12,7 @@ import { ThisMonth, RcList } from './screens/Budget.jsx';
 import { Forecast, FcBody } from './screens/Forecast.jsx';
 import { Build } from './screens/Build.jsx';
 import { catRenderR, flowRenderR } from './popups/Category.jsx';
+import { lnkListR, lnkRuleR } from './popups/Link.jsx';
 
 replaceScreen('renderHistory', () => draw($('#T-history'), <History />));
 // Budget: This month is React; Build budget and Forecast are still drawn by renderBuild / renderForecast. The
@@ -23,6 +24,8 @@ replaceScreen('fcBody', () => { const el = $('#fcb'); if (!el) return; draw(el, 
 // Pop-ups (phase 2): drawn into the parts of their dialogs in index.html.
 replaceScreen('catRender', catRenderR);
 replaceScreen('flowRender', flowRenderR);
+replaceScreen('lnkList', lnkListR);
+replaceScreen('lnkRule', lnkRuleR);
 replaceScreen('renderBuild', () => draw($('#T-budget'), <Build />));
 replaceScreen('renderForecast', () => { draw($('#T-budget'), <Forecast />); fcBody(); });
 // bankBadge (the count on the Bank tab) ran at the end of the old renderBank once the bank was set up.
@@ -316,6 +319,31 @@ addParity({
     for (const key of keys) c.push({ label: key, set: fd(key) });
     for (const key of keys.slice(0, 5)) for (const k of [addM(TK, -2), addM(TK, 2)]) c.push({ label: `${key} ${k}`, set: () => both(fd(key)(), at(k)) });
     c.push({ label: 'missing group', set: fd('grp:gone') });
+    return c;
+  },
+});
+// The link dialog for every kind of line, as lnkOpen leaves it (showModal skipped: parity opens it), then with the
+// candidate ticks, text, amount and search changed the way its own listeners change LK.
+const lkOpen = (kind, id, fn) => () => { const d = $('#ldlg'), o = LK, q = $('#lq').value; d.showModal = () => {}; try { lnkOpen(kind, id); } finally { delete d.showModal; } if (LK && fn) fn(LK); return () => { LK = o; $('#lq').value = q; }; };
+const lkLines = () => { const p = plan(), C = []; p.income.forEach(i => C.push(['inc', i.id])); p.groups.forEach(g => g.items.forEach(i => C.push([g.flex ? 'flex' : 'bill', i.id]))); S.loans.forEach(l => C.push(['loan', l.id])); S.goals.forEach(g => C.push(['goal', g.id])); return C; };
+const lkTick = n => L => { const C = lnkCands(); L.sels = C.slice(0, n).map(g => g.p); L.sibOn = false; if (L.sels.length === 1) { const s = L.sels[0]; L.pat = s; L.ref = L.refs[s] || 0; L.amtOn = !!L.wide[s]; } else { L.pat = ''; L.amtOn = false; L.ref = 0; } };
+addParity({
+  name: 'Link dialog', fn: 'lnkList', also: ['lnkRule'], el: '#lform', dialog: '#ldlg', cases: () => {
+    const c = [];
+    for (const [kind, id] of lkLines()) {
+      c.push({ label: `${kind} ${id}`, set: lkOpen(kind, id) });
+      for (const n of [0, 1, 2, 4]) c.push({ label: `${kind} ${id} ${n} ticked`, set: lkOpen(kind, id, lkTick(n)) });
+      c.push({ label: `${kind} ${id} amount on, shift, move`, set: lkOpen(kind, id, L => { lkTick(1)(L); if (!L.ref) L.ref = 42.5; L.amtOn = true; L.shift = true; L.move = false; }) });
+      c.push({ label: `${kind} ${id} move, no shift`, set: lkOpen(kind, id, L => { lkTick(1)(L); L.shift = false; L.move = true; }) });
+      c.push({ label: `${kind} ${id} siblings on`, set: lkOpen(kind, id, L => { lkTick(1)(L); L.sibOn = true; }) });
+    }
+    const [k0, i0] = lkLines().find(x => x[0] === 'flex') || lkLines()[0];
+    for (const pat of ['', 'zzz', 'a', 'co & <x>']) c.push({ label: `text "${pat}"`, set: lkOpen(k0, i0, L => { lkTick(1)(L); L.pat = pat; }) });
+    for (const q of ['zzz', 'a', 'transfer']) c.push({ label: `search ${q}`, set: lkOpen(k0, i0, L => { L.q = q; $('#lq').value = q; }) });
+    // a store filed elsewhere ticked here ("filed as …", the move box); a short name with longer siblings
+    c.push({ label: 'filed elsewhere ticked', set: lkOpen(k0, i0, L => { const g = lnkCands().find(g => Object.keys(g.filed).some(v => v !== L.v)); if (g) { L.sels = [g.p]; L.pat = g.p; L.ref = L.refs[g.p] || 0; } }) });
+    c.push({ label: 'short text with siblings', set: lkOpen(k0, i0, L => { const g = lnkCands()[0]; if (g) { L.sels = [g.p]; L.pat = g.p.split(' ')[0]; } }) });
+    c.push({ label: 'next month', set: () => both(at(addM(TK, 1)), lkOpen(k0, i0)()) });
     return c;
   },
 });
