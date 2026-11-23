@@ -90,8 +90,10 @@ works (and `npm test` passes) after every step.
   like the old code; buttons keep their `data-act`/`data-*` attributes, so the delegated click/change/input handlers
   in events.js run unchanged. `tx()` = `esc()`'s text rules (React escapes the rest).
   Done: History, Wealth, Goals (+ its accounts card), Loans (+ lenders card, extra payment plan); their charts are
-  components with hover state. The px/wi live inputs still patch #pxr/#wp-… with the old string helpers until phase 3.
-  To do: Settings, Bank, Budget
+  components with hover state; Settings (all four views, CSV import, phone alerts). The px/wi live inputs still patch
+  #pxr/#wp-… with the old string helpers, and the rules search still runs rulesFilter while typing, until phase 3.
+  Health-check messages are still HTML strings from healthChecks (inserted by `Html`) until it returns data.
+  To do: Bank, Budget
   (This month, Build, Forecast, flow, compare).
 - **Parity check** (`app/src/parity.js`, part of the self-test, run on the sample as loaded and again at the end):
   every converted screen is drawn by the old function (kept in `LEGACY` until phase 1 is done) and by React for many
@@ -99,7 +101,9 @@ works (and `npm test` passes) after every step.
   and class compared parsed), input values, text, and the text the browser shows (catches a lost space between inline
   elements). Add cases to `main.jsx` for every view switch a screen has. Planted mistakes are caught; whitespace only
   counts where it renders (a grid/flex row ignores it, so that isn't a difference).
-  JSX notes: SVG attributes camelCase (`strokeWidth`), keep attribute strings exact (`fillOpacity=".35"`), lengths
+  `addPiece` compares one component against its old string function in a scratch tab, for parts no screen case
+  reaches (the phone-alerts card is hidden in sample mode).
+  JSX notes: a `<table>` needs an explicit `<tbody>` (the HTML parser added one to the old markup), SVG attributes camelCase (`strokeWidth`), keep attribute strings exact (`fillOpacity=".35"`), lengths
   as strings (`'16px'`), `{' '}` where the old template had a line break between inline elements, `cond ? x : null`
   (never `cond && x`, which prints 0).
 - **Phase 2:** pop-ups and dialogs (`catRender`, Move panel, `#skc`, `fcDetail`, …) the same way.

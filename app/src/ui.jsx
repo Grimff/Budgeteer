@@ -26,3 +26,22 @@ export function Clh({ k, shut, title, sum, tag: T = 'h2' }) {
 
 // "Bank · Account ••1234" (was nmA() in wealth.js).
 export const NmA = ({ a }) => <>{tx(a.institution)} · {tx(a.official || a.name)}{a.mask ? ' ••' + tx(a.mask) : ''}</>;
+
+// Markup that the app's logic still builds as HTML (health-check messages; their own buttons keep data-act).
+// Only for strings the old screens also inserted as HTML. Goes away when that logic returns data (phase 3).
+export const Html = ({ as: T = 'span', html, ...rest }) => <T {...rest} dangerouslySetInnerHTML={{ __html: html }} />;
+
+// The "file to" choices for a transaction or rule (was txOptions in linked-loans.js). The select's defaultValue picks
+// the selected one, as the old `selected` attribute did.
+export function TxOpts({ k, dir }) {
+  const p = plan(k), gs = [...p.groups].sort((a, b) => (b.flex ? 1 : 0) - (a.flex ? 1 : 0));
+  const inc = <optgroup label="Income">{p.income.filter(i => !i.once).map(i => <option key={i.id} value={'inc:' + i.id}>{tx(i.name)}</option>)}<option value="once">One-time income</option></optgroup>;
+  return <>{dir === 'in' ? inc : null}{gs.map(g => <optgroup key={g.id} label={tx(g.name)}>{g.items.map(i => <option key={i.id} value={'i:' + i.id}>{tx(i.name)}</option>)}</optgroup>)}
+    <optgroup label="Loans">{S.loans.map(l => <option key={l.id} value={'l:' + l.id}>{tx(l.name)}</option>)}</optgroup><optgroup label="Savings goals">{S.goals.map(g => <option key={g.id} value={'g:' + g.id}>{tx(g.name)}</option>)}</optgroup>{dir === 'in' ? null : inc}<option value="xfer">Transfer between my accounts</option><option value="skip">Ignore</option></>;
+}
+
+// Where purchases with no store link go (was catchSel in settings.js; also in Build budget → Spending).
+export function CatchSel() {
+  const auto = (allItems(TK).find(x => x.i.id === (S.catchAll && S.catchAll !== 'review' ? '' : flexDefaultAuto(TK))) || { i: { name: 'Flex' } }).i.name;
+  return <div className="catchr"><b>Purchases with no store link go to</b><select className="in" data-catchall="1" aria-label="Where purchases with no store link go" defaultValue={S.catchAll || ''}><option value="">{'Automatic: ' + tx(auto)}</option>{plan().groups.map(g => <optgroup key={g.id} label={tx(g.name)}>{g.items.filter(i => !i.once).map(i => <option key={i.id} value={i.id}>{tx(i.name)}</option>)}</optgroup>)}<option value="review">Leave them in To review</option></select></div>;
+}

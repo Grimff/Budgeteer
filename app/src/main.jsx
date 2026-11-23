@@ -1,13 +1,15 @@
 // The React screens. Loaded by index.html after the other js files (which it uses by name: S, plan, f0, …) and
 // before sample.js / server-sync.js, so the app starts with these screens in place.
 import { draw, replaceScreen, LEGACY } from './bridge.js';
-import { addParity, runParity, monthsToTry, emptyHousehold, withS, at } from './parity.js';
+import { addParity, addPiece, runParity, monthsToTry, emptyHousehold, withS, at } from './parity.js';
 import { History } from './screens/History.jsx';
 import { Wealth } from './screens/Wealth.jsx';
 import { Goals } from './screens/Goals.jsx';
 import { Loans } from './screens/Loans.jsx';
+import { Settings, NtCard } from './screens/Settings.jsx';
 
 replaceScreen('renderHistory', () => draw($('#T-history'), <History />));
+replaceScreen('renderSettings', () => { const el = $('#T-settings'); if (el) draw(el, <Settings />); });
 replaceScreen('renderLoans', () => draw($('#T-loans'), <Loans />));
 replaceScreen('renderGoals', () => draw($('#T-goals'), <Goals />));
 replaceScreen('renderWealth', () => { const el = $('#T-wealth'); if (el) draw(el, <Wealth />); });
@@ -111,6 +113,47 @@ addParity({
     c.push({ label: 'empty household', set: () => withS(emptyHousehold()) });
     return c;
   },
+});
+const setVar = (get, set) => v => () => { const o = get(); set(v); return () => set(o); };
+const sv = setVar(() => SV, v => { SV = v; }), rq = setVar(() => RQ, v => { RQ = v; }), bkp = setVar(() => BKP, v => { BKP = v; }), nt = setVar(() => NOTIFY, v => { NOTIFY = v; });
+const cvSet = (text, more) => () => { const o = CV; CV = {}; cvLoadText(text, 'my bank & co.csv'); if (more) Object.assign(CV, more); return () => { CV = o; }; };
+const CSV = 'Date,Description,Amount,Credit\n01/05/2026,COFFEE & CO,-4.50,\n01/06/2026,PAYROLL,,1200.00\n13/45/2026,BAD DATE,-1,\n01/07/2026,ZERO,0,\n';
+addParity({
+  name: 'Settings', fn: 'renderSettings', el: '#T-settings', cases: () => {
+    const c = [], V = ['general', 'rules', 'connections', 'data', 'bogus'];
+    for (const v of V) c.push({ label: v, set: sv(v) });
+    for (const k of monthsToTry()) for (const v of ['rules', 'data']) c.push({ label: `${k} ${v}`, set: () => both(sv(v)(), at(k)) });
+    for (const q of ['gro', 'ZZZ', 'transfer', ' ']) c.push({ label: 'rules search ' + q, set: () => both(sv('rules')(), rq(q)()) });
+    c.push({ label: 'rule folds open', set: () => { const ids = (S.rules || []).map(r => 'rm-' + r.id); ids.forEach(i => OPEN.add(i)); return both(sv('rules')(), () => ids.forEach(i => OPEN.delete(i))); } });
+    c.push({ label: 'odd rules', set: () => both(sv('rules')(), tweak(s => { const r = s.rules || []; if (r[0]) { r[0].v = 'i:gone'; r[0].shift = 'next'; r[0].min = 5; r[0].max = 99.5; } if (r[1]) { r[1].x = ['some store', 'other & co']; r[1].shift = 'prev'; } if (r[2]) r[2].p += ' & <x>'; s.catchAll = 'review'; })()) });
+    c.push({ label: 'no rules', set: () => both(sv('rules')(), tweak(s => { s.rules = []; })()) });
+    for (const b of [null, 'wait', [], [{ id: 'budgeteer-2026-11-01.json', kind: 'daily', at: '2026-11-01' }, { id: 'budgeteer-before-restore-1.json', kind: 'restore', at: '2026-11-02T10:30:00Z' }]]) c.push({ label: 'backups ' + JSON.stringify(b), set: () => both(sv('general')(), bkp(b)()) });
+    c.push({ label: 'household named, catch-all set', set: () => both(sv('general')(), tweak(s => { s.hh = { name: 'The <Smiths> & co', sub: '' }; const g = plan().groups.find(g => g.items.length); if (g) s.catchAll = g.items[0].id; })()) });
+    c.push({ label: 'catch-all to review', set: () => both(sv('general')(), tweak(s => { s.catchAll = 'review'; })()) });
+    c.push({ label: 'catch-all removed item', set: () => both(sv('general')(), tweak(s => { s.catchAll = 'gone'; })()) });
+    for (const v of ['general', 'rules', 'connections', 'data']) c.push({ label: v + ' server unreachable', set: () => both(sv(v)(), (() => { const o = SRV; SRV = false; return () => { SRV = o; }; })()) });
+    c.push({ label: 'connections loading', set: () => both(sv('connections')(), swap(BK, 'st', null)) });
+    c.push({ label: 'connections error', set: () => both(sv('connections')(), swap(BK, 'st', null), swap(BK, 'err', 'Couldn’t reach the bank service on the server.')) });
+    c.push({ label: 'connections no keys', set: () => both(sv('connections')(), swap(BK, 'st', { ...BK.st, configured: false })) });
+    c.push({ label: 'connections no keys, csv open', set: () => both(sv('connections')(), swap(BK, 'st', { ...BK.st, configured: false }), cvSet(CSV)()) });
+    c.push({ label: 'csv open', set: () => both(sv('connections')(), cvSet(CSV)()) });
+    c.push({ label: 'csv two columns, new account', set: () => both(sv('connections')(), cvSet(CSV, { two: '1', oc: '2', ic: '3', acct: 'new', nname: 'Credit <union>', ntype: 'credit', bal: '12.5' })()) });
+    c.push({ label: 'csv day first, positive out, no name', set: () => both(sv('connections')(), cvSet(CSV, { df: 'dmy', sign: 'pos', acct: 'new', nname: ' ' })()) });
+    c.push({ label: 'syncing, items with errors', set: () => both(sv('connections')(), swap(BK, 'busy', true), swap(BK, 'st', { ...BK.st, items: [...(BK.st.items || []).map((it, i) => i ? it : { ...it, error: { code: 'ITEM_LOGIN_REQUIRED' } }), { item_id: 'e2', institution: { name: 'Other & <Bank>' }, accounts: [], error: { code: 'X', message: 'Something <broke>' } }, { item_id: 'csv', kind: 'csv', institution: { name: 'Imported' }, accounts: [{ name: 'CU', mask: '' }], count: 3 }, { item_id: 'n1', institution: { name: 'New' }, accounts: [{ name: 'Chk', mask: '1' }], count: 0 }] })) });
+    for (const rf of [null, { hours: 5, open: false, last: null, next: null }, { hours: 0, open: true, last: '2026-11-20T10:00:00Z', next: null }, { hours: 24, open: false, last: '2026-11-20T10:00:00Z', next: '2026-11-21T10:00:00Z' }]) c.push({ label: 'refresh ' + JSON.stringify(rf), set: () => both(sv('connections')(), swap(BK, 'st', { ...BK.st, refresh: rf })) });
+    c.push({ label: 'no banks', set: () => both(sv('connections')(), swap(BK, 'st', { ...BK.st, items: [] })) });
+    c.push({ label: 'data, things to look at', set: () => both(sv('data')(), swap(BK, 'st', { ...BK.st, items: (BK.st.items || []).map((it, i) => i ? it : { ...it, institution: { name: 'Bank & Trust' }, error: { code: 'ITEM_LOGIN_REQUIRED' } }) }), tweak(s => { const ids = Object.keys(s.txd || {}).slice(0, 3); ids.forEach(id => delete s.txd[id]); s.alloc = { x: { mode: 'split', goals: [], pct: { a: 80, b: 40 } } }; })()) });
+    c.push({ label: 'data, no bank data', set: () => both(sv('data')(), swap(BK, 'accts', null), swap(BK, 'tx', [])) });
+    c.push({ label: 'data, linked loan, goals, removed', set: () => both(sv('data')(), tweak(s => { s.loans.forEach(l => { l.name += ' & <b>'; }); s.goals.forEach(g => { g.target = 0; }); })()) });
+    c.push({ label: 'empty household', set: () => withS(emptyHousehold()) });
+    c.push({ label: 'empty household data', set: () => both(sv('data')(), withS(emptyHousehold())) });
+    return c;
+  },
+});
+// The phone-alerts card is hidden in sample mode; compared on its own with sample mode off.
+addPiece({
+  name: 'Phone alerts card', html: () => (0, eval)('(function(DEMO){return (' + ntCard.toString() + ')()})')(false), node: () => <NtCard demo={false} />,
+  cases: () => [null, { configured: false }, { configured: true, target: 'ntfy.sh/our-topic & <x>' }, { configured: true }].map(n => ({ label: JSON.stringify(n), set: nt(n) })),
 });
 window.reactParity = runParity;
 if (DEMO) window.LEGACY_SCREENS = LEGACY;   // sample mode only: the old draw functions, for comparing by hand

@@ -4,7 +4,7 @@
 //     checked/selected states, and text (whitespace collapsed);
 //  2. the text as the browser shows it (innerText, all folds opened), which catches a missing space between inline
 //     elements that 1 can't see.
-import { LEGACY } from './bridge.js';
+import { LEGACY, draw } from './bridge.js';
 
 const SCREENS = [];
 // screen: {name, fn: 'renderX', el: '#T-x', cases(): [{label, set?(): undo?}]}
@@ -74,6 +74,32 @@ function diff(A, B) {
 // The caches renderAll clears before every draw.
 function fresh() { LP = {}; GP = {}; XS = null; PC = {}; TXI = null; ALC = {}; loanSync(); }
 
+// A piece of a screen that a whole-screen case can't reach (e.g. hidden in sample mode): its old string function and
+// its component are each drawn into a scratch tab and compared the same way. piece: {name, html(): string,
+// node(): element, cases(): [{label, set?}]}
+const PIECES = [];
+export const addPiece = p => PIECES.push(p);
+function runPieces(out) {
+  for (const pc of PIECES) {
+    let n = 0; const fails = [];
+    const el = document.createElement('section'); el.className = 'tab parity-scratch'; document.querySelector('main').appendChild(el);
+    for (const c of pc.cases()) {
+      let undo;
+      try {
+        undo = c.set && c.set();
+        fresh(); el.innerHTML = pc.html(); const A = snap(el);
+        fresh(); draw(el, pc.node()); const B = snap(el);
+        n++;
+        const d = diff(A, B);
+        if (d) fails.push(c.label + ' ' + d);
+      } catch (e) { fails.push(c.label + ' crashed: ' + (e.stack || e.message)); }
+      finally { try { if (undo) undo(); } catch (_) { } }
+    }
+    el.remove();
+    out.push({ ok: !fails.length && n > 0, name: `React ${pc.name} draws what the old one did (${n} cases)`, detail: fails.length ? fails.length + ' differ: ' + fails.slice(0, 3).join(' ‖ ') : '' });
+  }
+}
+
 export function runParity() {
   const out = [], keep = { S, cur: S.cur };
   for (const sc of SCREENS) {
@@ -95,6 +121,7 @@ export function runParity() {
     }
     out.push({ ok: !fails.length && n > 0, name: `React ${sc.name} screen draws what the old one did (${n} cases)`, detail: fails.length ? fails.length + ' differ: ' + fails.slice(0, 3).join(' ‖ ') : '' });
   }
+  runPieces(out);
   S = keep.S; S.cur = keep.cur;
   fresh(); renderAll();
   return out;
