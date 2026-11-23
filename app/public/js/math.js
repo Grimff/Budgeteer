@@ -172,3 +172,8 @@ function bcSet(k,shut){BCL.delete(k);BCL.delete('!'+k);BCL.add(shut?k:'!'+k);try
 // Header of a collapsible card: title, a one-line summary shown while closed, and a chevron.
 const clh=(k,shut,title,sum,tag='h2')=>`<${tag} class="clh" data-act="bcol" data-v="${k}" role="button" tabindex="0" aria-expanded="${!shut}">${title}<small class="bsm">${sum||''}</small><i class="chev" aria-hidden="true"></i></${tag}>`;
 const ring=(pct,c,sz=118)=>{const R=sz/2-10,L=2*Math.PI*R,p=Math.max(0,Math.min(1,pct));return `<svg class="ring" viewBox="0 0 ${sz} ${sz}" aria-hidden="true"><circle cx="${sz/2}" cy="${sz/2}" r="${R}" fill="none" stroke="var(--s3)" stroke-width="12"/><circle cx="${sz/2}" cy="${sz/2}" r="${R}" fill="none" stroke="${c}" stroke-width="12" stroke-linecap="round" stroke-dasharray="${p*L} ${L}" transform="rotate(-90 ${sz/2} ${sz/2})" opacity="${p>0.004?1:0}"/><text x="50%" y="53%" text-anchor="middle" dominant-baseline="middle" fill="var(--text)" font-family="Inter Display,Inter" font-weight="800" font-size="24" letter-spacing="-.5">${Math.round(p*100)}%</text></svg>`};
+// An item with no planned amount ($0 or blank) is tracked only: what it spends (or a bill it pays) counts in Spent and
+// Left over like anything else, but it's never "over plan". unplannedA(k) = what those items spent in month k, which
+// every over/under comparison leaves out (Budget summary, ledger, Compare, review, History, alerts).
+const hasPlan=i=>(+i.amt||0)>0.5;
+function unplannedA(k){let u=0;plan(k).groups.forEach(g=>g.items.forEach(i=>{if(hasPlan(i))return;if(g.flex)u+=flexAct(k,i.id)||0;else{const pd=billPaid(k,i.id);if(pd)u+=pd.amt}}));return u}

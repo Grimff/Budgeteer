@@ -300,11 +300,24 @@ server against a real `data/` folder while testing; use `tools/realtest.js`.
 - **Split a transaction** (v4, Move panel → Split between categories…, `spRows`/`spSave`): parts are normal filings
   `<tx>~n` with `sp:<tx>`; the parent keeps `{v:'split', parts}` (amt 0) so it isn't to-review; Undo on a part
   (`byUser`) undoes the whole split; the Filed list hides parts; `catMove` keeps `sp`.
+- **No plan** (`hasPlan`, `unplannedA(k)` in math.js): an item whose amount is $0/blank is tracked only. It counts in Spent
+  and Left over, but every over/under comparison leaves it out: the Budget summary's Under/Over plan (bills + spending
+  only, never savings or loan extras), ledger rows (**No plan**) and card headers ("$x with no plan"), Compare
+  (`cmpRows` → No plan), the monthly review, History (`spU`/`spX`) and alerts. Build shows "No plan" in empty amount
+  boxes and offers **Fill in from what you usually spend** (`usualAmt`: average of the last 3 months with spending,
+  spending rounded up to $5; `fillAvg`). Compare treats a set-aside bill in a month it isn't due as set aside.
+- **Order and grouping in Build** (end of build.js): each row and group has a ⋮⋮ handle (`.grip`, `data-drag` i/g):
+  pointer drag moves it live among `.bitems` / `.bgrps` (an item can go to another group of its kind), ↑/↓ on a
+  focused handle moves it one place; `orderRead` → `orderApply(fx,gO,iO)` saves with the Build scope (`INB`).
+  **Not in a group** = one loose group per kind (`g.loose`, ids `LOOSE.fixed`/`LOOSE.flex`, names Bills/Spending,
+  `ensureLoose`, listed first). It's an ordinary group to totals, filing and pop-ups; the Budget page labels its card
+  "Not in a group", the money flow shows each of its items as its own node (`g<loose>~<item>`, `nodeKey` → `i:`), and
+  History skips it when empty. **Ungroup** (`grpUngroup`) moves a group's items into it.
 - **Budget → Build budget** (`renderBuild`, `BUDV`): (v4: step 3 bills have a frequency/due-month select, step 4
   items a Roll over box, step 5 goal monthly amounts are versions from `xStart()`, new step 6 Schedule (`xmStep` → `alList`), step 7
   Just for <month>, whose savings/loan extras show only for this month and later) scope bar (all months | from this month;
   elements under `[data-build]` set `INB` so edits start at `scopeStart()` and `commit()` re-files),
-  Start, Income (+ `recurringIn` suggestions), Bills, Spending (+ catch-all choice, `topStores`),
+  Start, Income (+ `recurringIn` suggestions), Bills, Spending (+ catch-all choice, `topStores`; steps 3 and 4 render through `bGroups(fx)` with `billRow`/`flexRow`),
   Loans and savings (incl. goal monthly amounts), 6 Just for {month} (one-time income/bills and
   goal amounts for the viewed month only, outside `[data-build]`; **Plan ahead** adds a one-time item to any of the next 24 months (`onceAdd` → `extras(k)`) and lists upcoming ones with remove/Open). "Fill in past months"
   (`fillPast`) copies newer items into older versions.

@@ -4,7 +4,9 @@ let K=null,Z=null,ZW=0,ZH=0,SEL=null,PN=null,zt;
 function sankey(){const el=$('#sk');if(!el)return;el.classList.toggle('cmpv',S.flow==='compare');if(S.flow==='compare'){K=null;return compareView(el)}const p=plan(),m=MO(S.cur),act=S.flow==='actual';
  const IC=[C.pink,C.butter,C.aqua,C.lilac];
  const inc=p.income.map((i,ix)=>{const pv=+i.amt||0,av=chartInc(S.cur,i);return{id:'i'+i.id,name:i.name,v:act?av:pv,pv,av,c:IC[ix%IC.length]}}).filter(x=>x.v>0),groups=[];
- p.groups.forEach(g=>{const its=g.items.map(i=>{const pv=+i.amt||0,av=chartItem(g,i,S.cur);return{id:'t'+i.id,name:i.name,v:act?av:pv,pv,av,c:g.color}}).filter(x=>x.v>0);if(its.length)groups.push({id:'g'+g.id,name:g.name,c:g.color,go:g.flex?'#sec-flex':'#sec-fixed',its})});
+ p.groups.forEach(g=>{const its=g.items.map(i=>{const pv=+i.amt||0,av=chartItem(g,i,S.cur);return{id:'t'+i.id,name:i.name,v:act?av:pv,pv,av,c:g.color}}).filter(x=>x.v>0);if(!its.length)return;
+  if(g.loose)its.forEach(x=>groups.push({id:'g'+g.id+'~'+x.id.slice(1),name:x.name,c:g.color,go:g.flex?'#sec-flex':'#sec-fixed',its:[x]}));   // not in a group: each item stands alone
+  else groups.push({id:'g'+g.id,name:g.name,c:g.color,go:g.flex?'#sec-flex':'#sec-fixed',its})});
  const li=S.loans.map(l=>{const r=S.cur<l.start?null:row(l,S.cur),pv=loanPlan(l,S.cur),av=r&&r.lg?r.pay:(l.acct&&l.link&&S.cur>=TK?0:pv);return{id:'t'+l.id,name:l.name,v:act?av:pv,pv,av,c:C.sky}}).filter(x=>x.v>0);if(li.length)groups.push({id:'gL',name:'Loans',c:C.sky,tab:'loans',its:li});
  const gi=S.goals.map(g=>{const pv=goalPlan(g,S.cur),av=Math.max(0,savedIn(g,S.cur));return{id:'t'+g.id,name:g.name,v:act?av:pv,pv,av,c:C.lilac}}).filter(x=>x.v>0);if(gi.length)groups.push({id:'gS',name:'Savings',c:C.lilac,tab:'goals',its:gi});
  const sum=(a,f)=>a.reduce((t,x)=>t+(x[f]||0),0);groups.forEach(g=>{g.v=sum(g.its,'v');g.pv=sum(g.its,'pv');g.av=sum(g.its,'av')});
@@ -36,7 +38,7 @@ function zset(v,anim){const s=$('#sk svg');if(!s)return;if(!anim){Z={...Z,...v};
 function zz(f,px,py,anim){if(!Z)return;const w=Math.max(ZW/8,Math.min(ZW,Z.w*f)),h=w*ZH/ZW,cx=px??Z.x+Z.w/2,cy=py??Z.y+Z.h/2;SEL=null;zbar(null);zset({x:Math.max(0,Math.min(ZW-w,cx-(cx-Z.x)*(w/Z.w))),y:Math.max(0,Math.min(ZH-h,cy-(cy-Z.y)*(h/Z.h))),w,h},anim)}
 function zfit(){SEL=null;zbar(null);zset({x:0,y:0,w:ZW,h:ZH},1)}
 // Which details a chart node opens: an item, loan, goal, income source, or (for a group) the whole group.
-function nodeKey(n){if(!n||!n.id)return null;const id=n.id;if(id==='left'||id==='b'||id==='over')return null;if(id[0]==='i')return 'inc:'+id.slice(1);if(id==='gL'||id==='gS')return null;
+function nodeKey(n){if(!n||!n.id)return null;const id=n.id;if(id==='left'||id==='b'||id==='over')return null;if(id[0]==='i')return 'inc:'+id.slice(1);if(id==='gL'||id==='gS')return null;if(id[0]==='g'&&id.includes('~'))return 'i:'+id.split('~')[1];
  if(id[0]==='g')return n.solo&&K?(()=>{const kid=plan().groups.find(g=>'g'+g.id===id);return kid&&kid.items.length===1?'i:'+kid.items[0].id:'grp:'+id.slice(1)})():'grp:'+id.slice(1);
  if(id[0]==='t'){const x=id.slice(1);if(S.loans.some(l=>l.id===x))return 'l:'+x;if(S.goals.some(g=>g.id===x))return 'g:'+x;return 'i:'+x}return null}
 function zbar(g){const e=$('#zb');if(!e)return;e.innerHTML=g?`<span>Showing <b>${esc(g.name)}</b></span>${nodeKey(g)&&nodeKey(g).startsWith('grp:')?`<button class="btn sm" data-act="flowDet" data-v="${nodeKey(g)}">Details</button>`:''}${g.go?`<button class="btn g sm" data-act="budv" data-v="build">Edit in Build budget</button>`:g.tab?`<button class="btn g sm" data-act="tab" data-t="${g.tab}">Open ${g.tab==='loans'?'Loans':'Goals'}</button>`:''}<button class="btn sm" data-act="zfit">Zoom out</button>`:''}

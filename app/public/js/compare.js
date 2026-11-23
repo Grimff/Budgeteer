@@ -3,13 +3,13 @@
 // Every budget line this month: planned vs what really happened so far. pend = not paid yet (not a saving).
 function cmpRows(k=S.cur){const p=plan(k),rows=[];
  p.groups.forEach(g=>g.items.forEach(i=>{const pl=+i.amt||0;if(g.flex){const a=flexAct(k,i.id);rows.push({key:'i:'+i.id,name:i.name,grp:g.name,c:g.color,pl,a:a||0,none:a==null})}
-  else{const pd=billPaid(k,i.id);rows.push({key:'i:'+i.id,name:i.name,grp:g.name,c:g.color,pl,a:pd?pd.amt:0,pend:!pd})}}));
+  else{const pd=billPaid(k,i.id),aside=+i.freq>1&&!pd&&!isDue(i,k);rows.push({key:'i:'+i.id,name:i.name,grp:g.name,c:g.color,pl,a:pd?pd.amt:aside?pl:0,pend:!pd&&!aside})}}));   // a set-aside bill in a month it isn't due is set aside, not unpaid
  S.loans.forEach(l=>{const r=k<l.start?null:row(l,k);if(!r)return;rows.push({key:'l:'+l.id,name:l.name,grp:'Loans',c:C.sky,pl:loanPlan(l,k),a:r.lg?r.pay:0,pend:!r.lg,good:true})});
  S.goals.forEach(g=>{const pl=goalPlan(g,k),a=savedIn(g,k);rows.push({key:'g:'+g.id,name:g.name,grp:'Savings',c:C.lilac,pl,a,good:true})});
  return rows.filter(r=>r.pl>0.5||Math.abs(r.a)>0.5)}
 function compareView(el){const k=S.cur,R=cmpRows(k),M=Math.max(1,...R.map(r=>Math.max(r.pl,r.a)));
  // "good" lines (loans, savings) are fine above plan; spending lines are not.
- const st=r=>{const d=r.a-r.pl;if(r.pend||r.none)return{cls:'pend',t:r.pend?(k<TK?'Not seen':'Not paid yet'):'Nothing yet',bad:0};if(Math.abs(d)<0.5)return{cls:'ok',t:'On plan',bad:0};if(r.good)return d>0?{cls:'ok',t:`${f0(d)} extra`,bad:0}:{cls:'bad',t:`${f0(-d)} short`,bad:-d};return d>0?{cls:'bad',t:`${f0(d)} over`,bad:d}:{cls:'ok',t:`${f0(-d)} under`,bad:0}};
+ const st=r=>{const d=r.a-r.pl;if(r.pend||r.none)return{cls:'pend',t:r.pend?(k<TK?'Not seen':'Not paid yet'):'Nothing yet',bad:0};if(!r.good&&r.pl<=0.5)return{cls:'pend',t:'No plan',bad:0};if(Math.abs(d)<0.5)return{cls:'ok',t:'On plan',bad:0};if(r.good)return d>0?{cls:'ok',t:`${f0(d)} extra`,bad:0}:{cls:'bad',t:`${f0(-d)} short`,bad:-d};return d>0?{cls:'bad',t:`${f0(d)} over`,bad:d}:{cls:'ok',t:`${f0(-d)} under`,bad:0}};
  const S2=R.map(r=>({...r,s:st(r)})).sort((a,b)=>b.s.bad-a.s.bad||(b.pl-b.a)-(a.pl-a.a));
  const over=S2.filter(r=>r.s.cls==='bad'),overT=over.reduce((x,r)=>x+r.s.bad,0),under=S2.filter(r=>r.s.cls==='ok'&&!r.good&&r.a<r.pl-0.5).reduce((x,r)=>x+(r.pl-r.a),0),pend=S2.filter(r=>r.pend).reduce((x,r)=>x+r.pl,0);
  el.innerHTML=`<div class="cmp"><div class="cmph"><div><small>Over plan</small><b class="neg">${f0(overT)}</b><span>${over.length} line${over.length===1?'':'s'}</span></div><div><small>Under plan</small><b class="pos">${f0(under)}</b></div><div><small>Not paid yet</small><b>${f0(pend)}</b></div></div>

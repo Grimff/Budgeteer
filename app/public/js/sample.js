@@ -144,6 +144,29 @@ async function selfTest(){const T=[],ok=(c,name,detail='')=>T.push({ok:!!c,name,
   ok(bis&&S.txd[bis.id]&&S.txd[bis.id].v==='i:dining','An imported purchase is filed by an existing rule',bis&&S.txd[bis.id]&&S.txd[bis.id].v);
   cvLoadText(csv,'test.csv');CV.acct=ia.id;await cvImport();ok(BK.tx.filter(t=>t.item==='csv').length===3,'Importing the same file again adds nothing');
   {const cf=window.confirm;window.confirm=()=>true;try{await cvDel(ia.id)}finally{window.confirm=cf}}ok(!BK.tx.some(t=>t.item==='csv')&&!BK.accts.some(a=>a.item==='csv'),'Removing an imported account removes its transactions');
+  // No plan: an item with no planned amount is tracked (counted in Spent) but never over plan — row, summary, alerts.
+  const first=Object.keys(S.plans).sort()[0],setAmt=(id,v)=>editPlan(p=>p.groups.forEach(g=>g.items.forEach(i=>{if(i.id===id)i.amt=v})),first);
+  setAmt('dining',0);S.cur=past;document.querySelector('.tabs button[data-t="budget"]').click();renderBudget();
+  const T1=totals(past),u1=unplannedA(past),dRow=[...document.querySelectorAll('#T-budget .lr')].find(r=>r.textContent.includes('Dining out'));
+  ok(near(u1,flexAct(past,'dining'))&&near(T1.flexA,T0.flexA),'Spending with no plan still counts as spent',`${f2(u1)} with no plan, ${f2(T1.flexA)} spent`);
+  ok(dRow&&/No plan/.test(dRow.textContent)&&!/over/.test(dRow.textContent),'A line with no plan says No plan, not over',dRow&&dRow.textContent.replace(/\s+/g,' '));
+  // (an unpaid bill counts at its plan, so it adds nothing either way; a set-aside bill in a month it isn't due is set aside)
+  const planned=cmpRows(past).filter(r=>!r.good&&r.pl>0.5&&!r.pend).reduce((a,r)=>a+(r.pl-r.a),0);
+  ok(!cmpRows(past).some(r=>r.key==='i:ins'&&r.pend),'A set-aside bill isn’t “not paid” in a month it isn’t due');
+  ok(near((T1.fixed+T1.flexP)-(T1.fixedA+T1.flexA-u1),planned),'Over/under plan leaves out lines with no plan',f2((T1.fixed+T1.flexP)-(T1.fixedA+T1.flexA-u1)));
+  S.cur=TK;ok(!alertsNow().some(a=>a.key===`over:${TK}:dining`),'No over-plan alert for a line with no plan');
+  // Fill in from what you usually spend: the average of the last 3 months, rounded up to $5.
+  const want=Math.ceil([1,2,3].map(n=>flexAct(addM(TK,-n),'dining')||0).reduce((a,b)=>a+b,0)/3/5)*5;
+  BSCOPE='all';fillAvg(true);ok(plan(TK).groups.flatMap(g=>g.items).find(i=>i.id==='dining').amt===want,'Fill in uses the 3-month average',f0(want));
+  // Order: move Gas out of its group, put Flex spending first, reorder its items; spending totals don't change.
+  orderApply(true,['flex','food'],{[LOOSE.flex]:['gas'],flex:['flex','dining'],food:['groc']});
+  const fg=plan(TK).groups.filter(g=>g.flex),fp=plan(past).groups.filter(g=>g.flex),desc=G=>G.map(g=>(g.loose?'*':'')+g.id+':'+g.items.map(i=>i.id).join('/')).join(' ');
+  ok(desc(fg)==='*loose-f:gas flex:flex/dining food:groc'&&desc(fp)===desc(fg),'Items and groups reorder and move out of a group (all months)',desc(fg));
+  ok(near(totals(past).flexA,T0.flexA),'Moving items keeps what was spent');
+  ok(nodeKey({id:'g'+LOOSE.flex+'~gas',solo:true})==='i:gas','An item not in a group opens its own pop-up from the money flow');
+  BUDV='build';renderBudget();const ug=document.querySelector('[data-act="grpUngroup"][data-g="food"]');if(ug)ug.click();BUDV='month';
+  ok(plan(TK).groups.find(g=>g.loose&&g.flex).items.some(i=>i.id==='groc')&&!plan(TK).groups.some(g=>g.id==='food'),'Ungroup moves a group’s items out of it');
+  renderBudget();ok([...document.querySelectorAll('#T-budget .lsec small')].some(s=>s.textContent==='Not in a group'),'The Budget page shows items not in a group');
   // Daily copies: the list loads, and restoring one reloads the budget from the server.
   await bkList();ok(Array.isArray(BKP)&&BKP.length===3&&document.querySelectorAll('.bkr').length>=0,'Daily copies are listed',Array.isArray(BKP)?BKP.length+' copies':'not loaded');
   {const cf=window.confirm;window.confirm=()=>true;try{await bkRestore(BKP[0].id)}finally{window.confirm=cf}}ok(D.restored===1&&FS.state==='ok'&&S.goals.some(g=>g.id==='trip'),'Restoring a daily copy reloads the budget');
