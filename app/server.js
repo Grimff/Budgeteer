@@ -29,6 +29,12 @@ const AUTH = process.env.BASIC_AUTH || ''; // optional "user:password"
 const PUBLIC = path.join(__dirname, 'public');   // the app: index.html, css/, js/, fonts/, icons/
 const MAX_BODY = 20 * 1024 * 1024;
 
+// DATA_REQUIRED=1: refuse to start when there's no budget file yet, instead of starting empty. For a data folder on a
+// network share: if the share isn't mounted yet (say, after a reboot), the server exits and Docker restarts it until it is.
+if (/^(1|true|yes)$/i.test(process.env.DATA_REQUIRED || '') && !fs.existsSync(FILE)) {
+  console.error(`No budget file at ${FILE}. DATA_REQUIRED is set, so not starting (is the data folder mounted?).`);
+  process.exit(1);
+}
 fs.mkdirSync(BACKUP_DIR, { recursive: true });
 
 const log = (...a) => console.log(new Date().toISOString(), ...a);

@@ -50,7 +50,8 @@ docker compose up -d --build
 ```
 
 Open `http://localhost:8095` (or `http://YOUR-SERVER-IP:8095` from other devices). Data is saved
-in `./data` next to the compose file. Change the port with `HOST_PORT` in `.env`.
+in `./data` next to the compose file, or wherever `DATA_PATH` in `.env` points (a NAS share, say; add
+`DATA_REQUIRED=1` so it waits for the share instead of starting empty). Change the port with `HOST_PORT` in `.env`.
 
 ## 3. Use it
 

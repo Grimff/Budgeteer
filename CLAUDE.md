@@ -18,7 +18,8 @@ Docker (`docker compose up -d --build`) on port 8095. Bank data comes from Plaid
 - **Settings and secrets:** `.env` (git-ignored; template `.env.example`) holds `PLAID_CLIENT_ID`, `PLAID_SECRET`,
   `PLAID_ENV`, `BASIC_AUTH` and the rest. `data/` is git-ignored and never committed.
 - **Docker:** `docker-compose.yml` builds the `Dockerfile` (node:22-alpine + `app/`), loads `.env` with `env_file`,
-  forces `DATA_DIR=/data`, `PORT=8080`, and mounts `./data:/data`.
+  forces `DATA_DIR=/data`, `PORT=8080`, and mounts `${DATA_PATH:-./data}:/data`. `DATA_REQUIRED=1` makes the server exit at
+  start when there's no budget file (a NAS share not mounted yet), so Docker's restart policy retries until it is.
 - **Release:** run `node tools/check.js` (must say OK), bump the footer "Version N" in index.html (`fsUI`) and the
   README, commit, push main, then tag `vN` and push the tag. Current: **Version 1**. "Version N"/"vN" mentions below are
   from the app's earlier history and use the old numbering.
