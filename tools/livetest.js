@@ -5,16 +5,18 @@
 // No Plaid tokens are involved. Run: node tools/livetest.js   then open http://localhost:18096 (set NAS=http://your-server:8095 first)
 'use strict';
 const fs = require('fs'), path = require('path'), http = require('http');
-const NAS = process.env.NAS || 'http://localhost:8095', PORT = 18096, INDEX = path.join(__dirname, '..', 'app', 'public', 'index.html');
+const NAS = process.env.NAS || 'http://localhost:8095', PORT = 18096, PUB = path.join(__dirname, '..', 'app', 'public');
+const TYPES = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.svg': 'image/svg+xml', '.png': 'image/png', '.woff': 'font/woff', '.webmanifest': 'application/manifest+json' };
 const get = p => new Promise((ok, no) => http.get(NAS + p, r => { let b = ''; r.on('data', d => b += d); r.on('end', () => ok({ code: r.statusCode, body: b })); }).on('error', no));
 const send = (res, code, body, type) => { res.writeHead(code, { 'Content-Type': type || 'application/json; charset=utf-8', 'Cache-Control': 'no-store' }); res.end(typeof body === 'string' || Buffer.isBuffer(body) ? body : JSON.stringify(body)); };
 const READ = ['/api/bank/status', '/api/bank/transactions', '/api/bank/loans', '/api/bank/accounts'];
 (async () => {
   let cur = JSON.parse((await get('/api/data')).body);
   http.createServer(async (req, res) => {
-    const url = new URL(req.url, 'http://x'), p = url.pathname.replace(/\/+$/, '') || '/';
+    let url, p; try { url = new URL(req.url, 'http://x'); p = url.pathname.replace(/\/+$/, '') || '/'; } catch (_) { return send(res, 400, 'Bad request', 'text/plain'); }
     try {
-      if (p === '/' || p === '/index.html') return send(res, 200, fs.readFileSync(INDEX), 'text/html; charset=utf-8');
+      // The app's files come from this checkout (so you test your local edits); only api/ calls go to the server.
+      if (!p.startsWith('/api/')) { const f = path.resolve(PUB, p === '/' ? 'index.html' : p.slice(1)), t = TYPES[path.extname(f)]; if (t && f.startsWith(PUB + path.sep) && fs.existsSync(f)) return send(res, 200, fs.readFileSync(f), t); }
       if (p === '/api/health') return send(res, 200, { ok: true, app: 'budgeteer' });
       if (p === '/api/rev') return send(res, 200, { rev: cur.rev });
       if (p === '/api/data' && req.method === 'GET') return send(res, 200, cur);

@@ -26,7 +26,7 @@ const FILE = path.join(DATA_DIR, process.env.DATA_FILE || 'budgeteer-data.json')
 const BACKUP_DIR = path.join(DATA_DIR, 'backups');
 const BACKUPS_KEEP = Number(process.env.BACKUPS_KEEP) || 90;
 const AUTH = process.env.BASIC_AUTH || ''; // optional "user:password"
-const INDEX = path.join(__dirname, 'public', 'index.html');
+const PUBLIC = path.join(__dirname, 'public');   // the app: index.html, css/, js/, fonts/, icons/
 const MAX_BODY = 20 * 1024 * 1024;
 
 fs.mkdirSync(BACKUP_DIR, { recursive: true });
@@ -394,16 +394,25 @@ function send(res, code, body, headers = {}) {
   res.writeHead(code, h);
   res.end(out);
 }
-// The app page, kept in memory with a gzipped copy and an ETag until the file changes, so editing index.html
-// still takes effect on the next reload (no restart), and browsers re-download it only when it changed.
-let PAGE = null;
-function page() {
-  const st = fs.statSync(INDEX);
-  if (!PAGE || PAGE.m !== st.mtimeMs || PAGE.s !== st.size) {
-    const raw = fs.readFileSync(INDEX);
-    PAGE = { m: st.mtimeMs, s: st.size, raw, gz: zlib.gzipSync(raw, { level: 9 }), etag: '"' + crypto.createHash('sha1').update(raw).digest('base64url').slice(0, 20) + '"' };
+// The app's files, each kept in memory (text ones also gzipped) with an ETag until the file changes on disk, so an
+// edit takes effect on the next reload (no restart) and browsers re-download only files that changed (304 otherwise).
+// Only these file types are served, and only from inside app/public.
+const TYPES = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.svg': 'image/svg+xml',
+  '.png': 'image/png', '.woff': 'font/woff', '.webmanifest': 'application/manifest+json' };
+const FILES = new Map();
+function staticFile(p) {
+  let rel; try { rel = p === '/' ? 'index.html' : decodeURIComponent(p.slice(1)); } catch (_) { return null; }
+  const f = path.resolve(PUBLIC, rel), type = TYPES[path.extname(f)];
+  if (!type || !f.startsWith(PUBLIC + path.sep)) return null;
+  let st; try { st = fs.statSync(f); } catch (_) { return null; }
+  if (!st.isFile()) return null;
+  let c = FILES.get(f);
+  if (!c || c.m !== st.mtimeMs || c.s !== st.size) {
+    const raw = fs.readFileSync(f), text = /^(text|application)\/|svg/.test(type);
+    c = { m: st.mtimeMs, s: st.size, raw, type, gz: text ? zlib.gzipSync(raw, { level: 9 }) : null, etag: '"' + crypto.createHash('sha1').update(raw).digest('base64url').slice(0, 20) + '"' };
+    FILES.set(f, c);
   }
-  return PAGE;
+  return c;
 }
 function authorized(req) {
   if (!AUTH) return true;
@@ -426,7 +435,7 @@ const server = http.createServer(async (req, res) => {
   try {
     if (!authorized(req)) return send(res, 401, 'Password required', { 'WWW-Authenticate': 'Basic realm="Budgeteer", charset="UTF-8"' });
     res.gz = /\bgzip\b/.test(req.headers['accept-encoding'] || '');
-    const url = new URL(req.url, 'http://x');
+    let url; try { url = new URL(req.url, 'http://x'); } catch (_) { return send(res, 400, 'Bad request'); }
     const p = url.pathname.replace(/\/+$/, '') || '/';
 
     if (p === '/api/health') return send(res, 200, { ok: true, app: 'budgeteer' });
@@ -459,10 +468,11 @@ const server = http.createServer(async (req, res) => {
       return send(res, 200, { rev, savedAt: out.savedAt });
     }
 
-    if ((p === '/' || p === '/index.html') && (req.method === 'GET' || req.method === 'HEAD')) {
-      const pg = page(), h = { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-cache', ETag: pg.etag, 'Vary': 'Accept-Encoding', 'X-Content-Type-Options': 'nosniff' };
-      if (req.headers['if-none-match'] === pg.etag) { res.writeHead(304, h); return res.end(); }
-      const body = res.gz ? pg.gz : pg.raw; if (res.gz) h['Content-Encoding'] = 'gzip';
+    const sf = !p.startsWith('/api/') && (req.method === 'GET' || req.method === 'HEAD') && staticFile(p);
+    if (sf) {
+      const h = { 'Content-Type': sf.type, 'Cache-Control': 'no-cache', ETag: sf.etag, 'Vary': 'Accept-Encoding', 'X-Content-Type-Options': 'nosniff' };
+      if (req.headers['if-none-match'] === sf.etag) { res.writeHead(304, h); return res.end(); }
+      const gz = res.gz && sf.gz, body = gz ? sf.gz : sf.raw; if (gz) h['Content-Encoding'] = 'gzip';
       h['Content-Length'] = body.length; res.writeHead(200, h);
       return res.end(req.method === 'HEAD' ? undefined : body);
     }

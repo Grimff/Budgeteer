@@ -5,8 +5,14 @@ Docker (`docker compose up -d --build`) on port 8095. Bank data comes from Plaid
 
 ## Deploy
 
-- `app/public/index.html` – the whole front end in one file (HTML, CSS, JS, base64 Inter fonts).
-  No build step, no frameworks; the only CDN is Plaid Link (`cdn.plaid.com`), loaded on demand.
+- `app/public/` – the front end. No build step, no frameworks; the only CDN is Plaid Link (`cdn.plaid.com`),
+  loaded on demand. `index.html` (markup only) loads `css/app.css` (with `fonts/` Inter woff files), `icons/`, and
+  the `js/` files as **classic scripts, in the order listed**: core, math, budget, loans, goals, history, flow,
+  events, bank, build, goal-accounts, compare, settings, wealth, linked-loans, sample, server-sync. They share one
+  global scope (top-level `let`/`const`/functions are visible across files), exactly like the single script they
+  were split from. Function declarations are only hoisted within their own file, so code that runs at load must
+  not call a function from a later file; calls inside functions and handlers are fine. `server-sync.js` is last
+  and starts the app (`renderAll` + `fsInit`). A new js file must be added to index.html (check.js fails otherwise).
 - `app/server.js` – Node 18+, no npm dependencies. Reads `.env` (project folder or cwd) at start;
   real environment variables win. Relative `DATA_DIR` is resolved from the project folder.
 - **Settings and secrets:** `.env` (git-ignored; template `.env.example`) holds `PLAID_CLIENT_ID`, `PLAID_SECRET`,
@@ -33,7 +39,7 @@ server against a real `data/` folder while testing; use `tools/realtest.js`.
   employers or lenders in code, comments or docs. The starting budget (`seedPlan`/`seedLoans`/`seedGoals`) is
   empty on purpose. Use generic examples.
 
-- `index.html` is mostly long one-line functions. Make edits with small Python scripts that do
+- The js files are mostly long one-line functions. Make edits with small Python scripts that do
   exact `str.replace` with a count assertion (write the script with the Write tool, run with
   `python -I`). Keep new code in the same compact style, with a short comment on anything non-obvious.
 - **Shell pitfall:** passing code through Bash heredocs can collapse `\\` → `\`, which turned `\b`
@@ -41,11 +47,15 @@ server against a real `data/` folder while testing; use `tools/realtest.js`.
   duplicate click actions (a second `case'x':` never runs; v6 shipped with the schedule's `alDel`/`alMode`
   shadowed by the Goals accounts card's, so Remove did nothing), buttons with no handler, repeated
   data-k/data-c/data-live keys, and change handlers after `if(!d.c)return;`. Name new actions with a prefix no
-  other feature uses (schedule = `sc*`, accounts card = `al*`). The quick syntax-only check is:
-  ```
-  node -e "const s=require('fs').readFileSync('app/public/index.html','utf8');const i=s.indexOf('<script>')+8,j=s.lastIndexOf('</script>');new Function(s.slice(i,j));console.log('ok',[...s].filter(c=>c.charCodeAt(0)<32&&!'\n\r\t'.includes(c)).length)"
-  ```
-  Use the Write tool for JSON/launch files.
+  other feature uses (schedule = `sc*`, accounts card = `al*`). check.js reads the js files in index.html order and
+  also checks each file parses alone and starts with `'use strict';`. Use the Write tool for JSON/launch files.
+- **`npm test`** before every push: check.js, `tools/test-server.js` (server vs a fake Plaid, twice), and the in-app
+  self-test in headless Chrome (`--dump-dom` of `/?selftest`; skipped with a note if no Chrome/Chromium/Edge).
+- **Sample household / self-test** (`js/sample.js`): `?demo` installs `demoFetch` over `window.fetch`, answering every
+  `api/` call in the page from `sampleData()` (seeded, 7 months, 5 accounts, rules that file everything), and uses
+  `KEY+'_demo'` for localStorage, so real data is never read or written. `?selftest` = demo + `selfTest()` (35+
+  checks: totals against the raw sample transactions, transfers, set-asides, loans, goals, health checks, saving, every
+  tab and view). Add a check there for any new feature or bug fix. A new `api/` route needs a `demoFetch` answer.
 - **Testing recipe** (`node tools/realtest.js` does all of this; port 18096): copy the 5 JSON files from `data/` to a temp folder, replace every
   `access_token` with `fake-<item_id>`, run a tiny fake Plaid (replays accounts from that copy;
   `/transactions/sync` returns nothing new unless `<temp copy>/fake-sync.json` holds a scripted
@@ -68,7 +78,8 @@ server against a real `data/` folder while testing; use `tools/realtest.js`.
 - **Efficiency:** GET routes read JSON through `readCached` (`viewBank/viewTx/viewLoans/viewInv`, cached until the
   file's size or mtime changes; never mutate what they return). Code that edits a file uses `loadX()` (fresh read)
   and `writeJ`/`writeAtomic`, which update/clear the cache. Responses over 1 KB are gzipped when accepted (`res.gz`);
-  the page is cached in memory with a gzipped copy and an ETag (304 on repeat visits; edits still apply on reload).
+  app files (`staticFile`: only listed types, only inside app/public) are cached in memory, text ones gzipped, with an
+  ETag (304 on repeat visits; edits still apply on reload).
   Liabilities and Investments refresh only every `BANK_DETAIL_HOURS` (default 24, `item.detailAt`) on automatic
   syncs; `syncAll(true)` (Sync now, exchange, reconnected) always refreshes them, and a Sync now during an
   automatic sync waits for it, then runs once in full (`fullNext`).
@@ -341,9 +352,10 @@ after typing started. Amounts (`input.in[inputmode="decimal"]`) get thousands se
 ## Design
 
 - **Logo** (`brand/logo.svg`, source; `brand/icon-32|180|512.png` rendered from it): rounded tile cut into
-  pink/butter/lime/aqua/lilac wedges, dark center with a white "B". It's built into `index.html`: the
-  `<head>` has the SVG favicon, a 32px PNG fallback, the 180px `apple-touch-icon` and `theme-color`, and
-  the header `.mark` holds the same SVG inline (clip id `lgclip`). If the logo changes, update all four.
+  pink/butter/lime/aqua/lilac wedges, dark center with a white "B". `index.html`'s `<head>` links the SVG favicon,
+  a 32px PNG fallback, the 180px `apple-touch-icon` and `theme-color`, and
+  the header `.mark` holds the same SVG inline (clip id `lgclip`). `app/public/icons/` holds copies of the `brand/`
+  files that the page and manifest use. If the logo changes, update `brand/`, `icons/` and the inline SVG.
 
 Dark plum background, pink primary (`--pink #ffb6d9`) with lime, butter, coral, lilac, aqua, sky.
 Inter for text, Inter Display for headings and numbers. Big rounded cards. Must work at phone
@@ -379,5 +391,5 @@ width (375px) with no sideways scrolling.
   first sync after connecting.
 - Liabilities covers student loans, mortgages and cards only; enter APR/minimum for auto and
   personal loans by hand.
-- **Ideas not built yet** (the plan's v7): health-check dot on the gear, `?selftest` regression run, phone install
+- **Ideas not built yet** (the plan's v7): health-check dot on the gear, phone install
   (Tailscale HTTPS + manifest), in-app alerts, restore a backup in the app.

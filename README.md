@@ -11,9 +11,9 @@ transactions come in automatically through [Plaid](https://plaid.com).
 budgeteer/
 ├── app/
 │   ├── server.js               tiny server (Node 18+), reads settings from .env
-│   └── public/index.html       the whole app
+│   └── public/                 the app: index.html, css/, js/ (one file per area), fonts/, icons/
 ├── brand/                      logo and icons
-├── tools/                      checks and local test servers (see CLAUDE.md)
+├── tools/                      npm test, checks and local test servers (see CLAUDE.md)
 ├── .env.example                copy to .env and add your Plaid keys
 ├── docker-compose.yml          run it with Docker
 ├── Dockerfile
@@ -116,8 +116,15 @@ account in the Plaid dashboard (both are paid add-ons). Then:
 
 ## Updating
 
-Edit `app/public/index.html` and reload the page; no restart needed. If you change `server.js`,
-restart (`npm start` again, or `docker compose up -d --build`). Run `npm run check` after every edit.
+Edit files in `app/public/` and reload the page; no restart needed. If you change `server.js`,
+restart (`npm start` again, or `docker compose up -d --build`). Run `npm test` after every change.
+
+## Trying things out and checking the math
+
+- **Sample data:** open `http://YOUR-SERVER:8095/?demo` (or Settings → Data & math → **Try sample data**) for a
+  made-up household with seven months of bank activity. Nothing is saved and your real budget isn't touched.
+- **Self-test:** `?selftest` loads the same household and checks the budget math, filing, loans, goals and every
+  screen, then lists the results. `npm test` runs it too (needs Chrome, Chromium or Edge installed).
 
 ## Notes
 

@@ -39,6 +39,12 @@ const det = () => (calls['/liabilities/get'] || 0) + '/' + (calls['/investments/
   ok(b.code === 304 && b.raw === 0, 'repeat visit gets 304 with no body');
   const plain = await req('GET', '/');
   ok(plain.code === 200 && !plain.h['content-encoding'] && plain.body === a.body, 'browser without gzip gets the plain page');
+  // the app's other files: scripts gzipped, fonts sent as they are, nothing outside app/public
+  const js = await req('GET', '/js/core.js', null, { 'accept-encoding': 'gzip' }), font = await req('GET', '/fonts/inter-400.woff', null, { 'accept-encoding': 'gzip' });
+  ok(js.code === 200 && js.h['content-encoding'] === 'gzip' && /javascript/.test(js.h['content-type']) && js.body.startsWith("'use strict'"), 'scripts are served gzipped');
+  ok(font.code === 200 && !font.h['content-encoding'] && font.h['content-type'] === 'font/woff', 'fonts are served as they are');
+  const esc = await Promise.all(['/../server.js', '/js/../../server.js', '/%2e%2e/server.js', '/.env', '/../.env', '/js/nope.js'].map(u => req('GET', u)));
+  ok(esc.every(x => x.code === 404), 'nothing outside the app folder is served (' + esc.map(x => x.code).join(',') + ')');
   // budget save / rev / conflict / outside edit
   const d0 = await req('GET', '/api/data'); ok(d0.code === 404, 'no budget yet → 404');
   const p1 = await req('PUT', '/api/data', { data: { plans: {}, loans: [], n: 1 } }); const r1 = JSON.parse(p1.body).rev;

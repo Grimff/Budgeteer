@@ -1,4 +1,4 @@
-// Static checks for app/public/index.html. Run after every edit and before every release:
+// Static checks for the app (app/public: index.html and the js/ files it loads). Run after every edit and before every release:
 //   node tools/check.js
 // Catches the mistakes that have slipped through before:
 //  - syntax errors and stray control characters (a heredoc once turned \b into a backspace)
@@ -9,12 +9,23 @@
 //  - change handlers placed after `if(!d.c)return;`, which never run (v5: schedule dropdowns didn't save)
 'use strict';
 const fs = require('fs'), path = require('path');
-const s = fs.readFileSync(path.join(__dirname, '..', 'app', 'public', 'index.html'), 'utf8');
-const js = s.slice(s.indexOf('<script>') + 8, s.lastIndexOf('</script>'));
+// The app's scripts are the js/ files index.html lists, run in that order in one shared scope; checked as one.
+const PUB = path.join(__dirname, '..', 'app', 'public'), html = fs.readFileSync(path.join(PUB, 'index.html'), 'utf8');
+const files = [...html.matchAll(/<script src="([^"]+)"><\/script>/g)].map(m => m[1]);
 const bad = [];
-try { new Function(js); } catch (e) { bad.push('Syntax: ' + e.message); }
-const ctl = [...s].filter(c => c.charCodeAt(0) < 32 && !'\n\r\t'.includes(c)).length;
-if (ctl) bad.push(`${ctl} control character(s) in the file`);
+if (!files.length) bad.push('No <script src> files found in index.html');
+const onDisk = fs.readdirSync(path.join(PUB, 'js')).filter(f => f.endsWith('.js')).map(f => 'js/' + f);
+const unlisted = onDisk.filter(f => !files.includes(f));
+if (unlisted.length) bad.push('js/ files not loaded by index.html: ' + unlisted.join(', '));
+const src = {}; files.forEach(f => { src[f] = fs.readFileSync(path.join(PUB, f), 'utf8'); });
+const js = files.map(f => src[f].replace(/^'use strict';\n/, '')).join('\n'), s = html + js;
+try { new Function("'use strict';\n" + js); } catch (e) { bad.push('Syntax: ' + e.message); }
+for (const f of files) try { new Function(src[f]); } catch (e) { bad.push(`Syntax in ${f}: ${e.message}`); }
+for (const f of files) if (!src[f].startsWith("'use strict';")) bad.push(`${f} must start with 'use strict';`);
+for (const [f, t] of [['index.html', html], ['css/app.css', fs.readFileSync(path.join(PUB, 'css', 'app.css'), 'utf8')], ...files.map(f => [f, src[f]])]) {
+  const ctl = [...t].filter(c => c.charCodeAt(0) < 32 && !'\n\r\t'.includes(c)).length;
+  if (ctl) bad.push(`${ctl} control character(s) in ${f}`);
+}
 
 const sw = js.indexOf('switch(d.act){');
 const cases = [...js.slice(sw).matchAll(/case'([A-Za-z0-9_]+)':/g)].map(m => m[1]), count = {};
