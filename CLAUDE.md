@@ -127,7 +127,9 @@ works (and `npm test` passes) after every step.
   `popups/Split.jsx`, swapped in for `spForm`/`spAddPart`, which the spOpen/spAdd clicks call): one root per `.spf` box, so
   Add a part keeps what's typed; spLeft/spSave still read the boxes. The money-flow card's Compare view (`compareViewR`
   in `flow/Compare.jsx`; cmpRows stays), and its zoom bar, hover tip and click card (`zbarR`/`skTipR`/`skCardR` in
-  `flow/Card.jsx`: #zb, #skt, #skc; skPos/skPlace still place them). To do: the chart itself (sankey). The self-test now
+  `flow/Card.jsx`: #zb, #skt, #skc; skPos/skPlace still place them), and the chart itself (`sankeyR` in `flow/Sankey.jsx`;
+  the layout code is the old one; hl/zset still set classes and the viewBox on the drawn svg). `fsUI` moved from
+  server-sync.js to linked-loans.js (before the bundle) with a `demo` parameter. To do: bankBadge and fsUI. The self-test now
   takes about 40 s (parity runs twice); tools/test.js allows 90 s.
 - **Phase 3:** state and events into React (handlers on elements instead of `data-act` switches, `S` in a store with
   a hook, real re-renders instead of remounts); then the math into ES modules; then remove the old draw functions

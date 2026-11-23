@@ -17,6 +17,7 @@ import { openDR } from './popups/Amount.jsx';
 import { spFormR, spAddPartR } from './popups/Split.jsx';
 import { compareViewR } from './flow/Compare.jsx';
 import { zbarR, skTipR, skCardR } from './flow/Card.jsx';
+import { sankeyR } from './flow/Sankey.jsx';
 
 replaceScreen('renderHistory', () => draw($('#T-history'), <History />));
 // Budget: This month is React; Build budget and Forecast are still drawn by renderBuild / renderForecast. The
@@ -37,6 +38,7 @@ replaceScreen('compareView', compareViewR);
 replaceScreen('zbar', zbarR);
 replaceScreen('skTip', skTipR);
 replaceScreen('skCard', skCardR);
+replaceScreen('sankey', sankeyR);
 replaceScreen('renderBuild', () => draw($('#T-budget'), <Build />));
 replaceScreen('renderForecast', () => { draw($('#T-budget'), <Forecast />); fcBody(); });
 // bankBadge (the count on the Bank tab) ran at the end of the old renderBank once the bank was set up.
@@ -447,6 +449,23 @@ addParity({
     const c = [];
     for (const [f, k] of skViews().slice(0, 3)) { const u = skSet(f, k)(); const ids = K ? K.all.map((x, j) => j) : []; u(); for (const j of ids) c.push({ label: `${f} ${k} node ${j}`, set: skSet(f, k), call: () => zbar(K.all[j]) }); }
     c.push({ label: 'none', set: skSet('plan', TK), call: () => zbar(null) });
+    return c;
+  },
+});
+// The chart itself: every month planned, actual and Compare, over budget, odd names, items not in a group, zoomed in,
+// and a household with nothing planned.
+addParity({
+  name: 'Money-flow chart', fn: 'sankey', el: '#sk', also: ['compareView'], cases: () => {
+    const c = [];
+    for (const k of monthsToTry()) for (const f of ['plan', 'actual', 'compare']) c.push({ label: `${f} ${k}`, set: skSet(f, k) });
+    for (const [f, k, tw] of skViews().slice(4)) c.push({ label: 'over budget ' + f, set: skSet(f, k, tw) });
+    c.push({ label: 'odd names, loose items', set: skSet('plan', TK, tweak(s => { Object.values(s.plans).forEach(p => { p.income.forEach(i => { i.name += ' & <i>'; }); p.groups.forEach((g, n) => { g.name = '"' + g.name + '" <g>'; if (n === 1) { g.loose = true; } }); }); })) });
+    c.push({ label: 'zoomed in', set: () => { const u = skSet('plan', TK)(), o = { Z, SEL }; Z = { ...Z, x: 120.5, y: 40, w: Z.w / 2, h: Z.h / 2 }; SEL = K.all.find(n => n.ci === 2).id; return () => { Z = o.Z; SEL = o.SEL; u(); }; } });
+    // $10 over budget: income cut by what was left plus $10
+    const by10 = () => { const u = skSet('plan', TK)(), d = K.I - K.O; u(); return tweak(s => { Object.values(s.plans).forEach(p => { if (p.income[0]) p.income[0].amt = (+p.income[0].amt || 0) - d - 10; }); })(); };
+    c.push({ label: '$10 over budget', set: skSet('plan', TK, by10) });
+    c.push({ label: 'empty household', set: () => both(skSet('plan', TK)(), withS(emptyHousehold())) });
+    c.push({ label: 'empty household actual', set: () => both(skSet('actual', TK)(), withS(emptyHousehold())) });
     return c;
   },
 });

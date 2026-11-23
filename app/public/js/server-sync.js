@@ -35,11 +35,6 @@ async function fsInit(){if(FS.initing)return;FS.initing=true;let first=false;
   await fsLoad()}
  catch(e){setFS('err',fsErrMsg(e))}finally{FS.initing=false}
  if(first){bankLoad();openSync()}}
-function fsUI(){const b=$('#sync'),pill=$('#spill'),sv=$('#saved');
- b.innerHTML=(DEMO?`<div class="sync warn"><i></i><div><b>Sample household</b><p>Made-up numbers to try things out. Nothing you change here is saved, and your real budget isn’t touched.</p></div><div class="sacts"><a class="btn g sm" href="./">Back to my budget</a></div></div>`:'')+(FS.state==='err'?`<div class="sync bad"><i></i><div><b>Not saved to the server</b><p>${esc(FS.err)} Your changes are safe in this browser. The app keeps retrying every 10 seconds.${FS.detail?`<br><span class="dim" style="font-size:13px">Details: ${esc(FS.detail)}</span>`:''}</p></div><div class="sacts"><button class="btn sm" data-act="fsRetry">Try again</button></div></div>`:'');
- const st=FS.state==='wait'?['','Connecting…']:FS.state==='ok'?['ok',FS.dirty||FS.busy?'Saving to the server…':`Saved to the server${FS.last?' at '+FS.last.toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'}):''}`]:['bad','Not saved to the server. Saved in this browser only'];
- sv.innerHTML=`<span class="dim">Version 1</span> · <i class="sdot ${st[0]}"></i>${DEMO?'Sample data · nothing is saved':st[1]}`;
- pill.hidden=FS.state==='wait';pill.className='sp '+st[0];pill.innerHTML=`<i class="sdot ${st[0]}"></i>${FS.state==='ok'?(FS.dirty||FS.busy?'Saving…':'Synced'):'Not synced'}`}
 setInterval(fsPoll,10000);addEventListener('focus',fsPoll);document.addEventListener('visibilitychange',()=>{if(!document.hidden){fsPoll();openSync()}});
 addEventListener('beforeunload',e=>{if(FS.dirty&&FS.state==='ok'){fsFlush();e.preventDefault();e.returnValue=''}});
 
