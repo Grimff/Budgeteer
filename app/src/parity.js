@@ -83,8 +83,10 @@ export function runParity() {
       try {
         undo = c.set && c.set();
         const el = document.querySelector(sc.el);
+        // count-ups (cu) remember what they showed last; both draws start from the same memory
+        const pv = { ...PV }, back = () => { for (const k of Object.keys(PV)) delete PV[k]; Object.assign(PV, pv); };
         fresh(); LEGACY[sc.fn](); const A = snap(el);
-        fresh(); window[sc.fn](); const B = snap(el);
+        back(); fresh(); window[sc.fn](); const B = snap(el);
         n++;
         const d = diff(A, B);
         if (d) fails.push(c.label + ' ' + d);
