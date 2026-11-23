@@ -29,14 +29,19 @@ export function replaceScreen(name, fn) {
   window[name] = fn;
 }
 
-// Click handlers on elements (phase 3). on('x') runs ACT.x (actions.js) with the element's data-* values, the element
+// Click handlers on elements (phase 3). onAct('x') runs ACT.x (actions.js) with the element's data-* values, the element
 // and the native click, setting INB (inside Build budget) as the delegated listener did, and marks the click so the old
 // click switch in events.js skips it. REACT_EVENTS = false (only the action parity check) leaves the click to the old
 // switch instead, to compare the two.
 import { ACT } from './actions.js';
 window.REACT_EVENTS = true;
-export const on = name => e => {
-  if (!window.REACT_EVENTS) return;
+export const onAct = name => e => {
+  // only the innermost element with an action handles a click (a Delete button inside a row that opens), as the
+  // old switch did with closest('[data-act]'); the click still reaches document (clicking elsewhere closes the flow card)
+  if (!window.REACT_EVENTS || e.nativeEvent.rx) return;
   const b = e.currentTarget; e.nativeEvent.rx = true; INB = !!b.closest('[data-build]');
+  // a click outside the money-flow card closes it before the action runs (the action may redraw the card)
+  if (!b.closest('#skc') && !b.closest('dialog') && $('#skc:not([hidden])')) skClose();
+  e.nativeEvent.skDone = true;
   ACT[name](b.dataset, b, e.nativeEvent);
 };

@@ -94,7 +94,9 @@ async function selfTest(){const T=[],ok=(c,name,detail='')=>T.push({ok:!!c,name,
  const D=DEMOD,past=addM(TK,-1),near=(a,b)=>Math.abs(a-b)<0.01,sumTx=(k,re,acct)=>r2(D.tx.filter(t=>t.date.startsWith(k)&&re.test(t.name)&&(!acct||t.account===acct)).reduce((a,t)=>a+t.amount,0));
  // The React screens must draw what the old screens drew (app/src/parity.js): checked on the sample as loaded and again at the end.
  const parity=when=>{if(window.reactParity)reactParity().forEach(r=>ok(r.ok,r.name+' · '+when,r.detail));else ok(false,'React screens loaded')};
- try{parity('sample as loaded');if(window.reactActParity)reactActParity().forEach(r=>ok(r.ok,r.name,r.detail));
+ // ?selftest&act (a second run of npm test): only the click-handler comparison (app/src/actparity.js), which takes a while.
+ const AP=location.search.match(/[?&]act(?:=(\d+)\/(\d+))?(&|$)/);
+ try{if(AP){if(window.reactActParity)reactActParity(AP[1]?[+AP[1],+AP[2]]:null).forEach(r=>ok(r.ok,r.name,r.detail));else ok(false,'React click handlers loaded')}else{parity('sample as loaded');
   ok(BK.tx.length===D.tx.length&&BK.accts.length===5,'Sample bank data loaded',`${BK.tx.length} transactions, ${BK.accts.length} accounts`);
   ok(inbox().length===0,'Every sample transaction is filed',`${inbox().length} left to review`);
   // Income, a fixed bill, groceries and dining for last month, straight from the transactions.
@@ -187,7 +189,7 @@ async function selfTest(){const T=[],ok=(c,name,detail='')=>T.push({ok:!!c,name,
   // A loan whose payment never covers its interest: the extra payment plan says Never instead of crashing.
   {const keep=S.loans;S.loans=[...keep,{id:'stk',name:'Stuck',apr:30,bal:100000,min:50,due:0,start:TK,color:'#abc'}];LP={};let txt='',err='';try{renderLoans();txt=$('#T-loans').textContent}catch(e){err=e.message}S.loans=keep;LP={};renderAll();
    ok(!err&&/Never/.test(txt)&&/not paid off at this rate/.test(txt),'A loan that never gets paid off shows Never in the extra payment plan',err)}
-  parity('after the other checks');
+  parity('after the other checks')}
   ok(!errs.length,'No errors while drawing',errs.slice(0,3).join(' · '))}
  catch(e){ok(false,'Self-test crashed',e.stack||e.message)}
  removeEventListener('error',onErr);removeEventListener('unhandledrejection',onErr);

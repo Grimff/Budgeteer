@@ -135,7 +135,18 @@ works (and `npm test` passes) after every step.
 - **Phase 3 (in progress).** Step 1 (done): no logic builds HTML any more. Rich text is data (`rtParts`/`rtText`/
   `rtHtml` in core.js, `Rich` in ui.jsx): a string or a list of strings and `{b}`; buttons are `{act, label, ...data}`
   (`hcBtns` / `ActBtn`). healthChecks (`d`, `a[]`), alertsNow (`a`), DLG.prev (#dp, `dprevR`). The live sentences
-  while typing / dragging are `pxLive` / `wiLive` (loans.js, React `pxLiveR`/`wiLiveR`). Then: state and events into React (handlers on elements instead of `data-act` switches, `S` in a store with
+  while typing / dragging are `pxLive` / `wiLive` (loans.js, React `pxLiveR`/`wiLiveR`).
+  Step 2 (in progress): handlers on elements. Every click action is a function in `app/src/actions.js` (`ACT`, the
+  old switch's case bodies moved there unchanged by a script, `(d = data-*, b = element, e = click)`); every React
+  element with `data-act` has `onClick={onAct('x')}` (bridge.js), which sets INB, closes the flow card on a click
+  outside it first (as the old listener did), runs the action and marks the click (`rx`, `skDone`) so the old
+  listener skips it; an inner element's action wins over its row's. The old switch in events.js stays, only for
+  index.html's static buttons and as the reference for the **action parity** check (`app/src/actparity.js`): screens
+  registered in main.jsx (`addActScreen`, ~45 states incl. open cards, editors, pop-ups, failing checks) have every
+  React-handled element (2 per action) clicked once with the old switch (`REACT_EVENTS=false`) and once with its
+  handler; S, the screen globals, folds, dialogs, toast, page text and focus must match. Seeded ids, confirm() =
+  yes, no scrolling/downloads; server actions are skipped. It runs as `?selftest&act=n/4` (four page loads in npm test;
+  one long run stalls Chrome's --dump-dom). Then: change/input handlers, the static buttons, then state into React (handlers on elements instead of `data-act` switches, `S` in a store with
   a hook, real re-renders instead of remounts); then the math into ES modules; then remove the old draw functions
   and the classic-script globals.
 

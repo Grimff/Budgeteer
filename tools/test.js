@@ -37,15 +37,19 @@ function findChrome() {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'budgeteer-test-')), port = 18299;
   const srv = spawn(process.execPath, [path.join(ROOT, 'app', 'server.js')], { env: { ...process.env, DATA_DIR: dir, PORT: String(port), PLAID_CLIENT_ID: '', PLAID_SECRET: '', BASIC_AUTH: '' }, stdio: 'ignore' });
   await new Promise(r => { const t0 = Date.now(), tryIt = () => http.get(`http://127.0.0.1:${port}/api/health`, () => r()).on('error', () => Date.now() - t0 < 5000 ? setTimeout(tryIt, 100) : r()); tryIt(); });
-  const args = ['--headless=new', '--disable-gpu', '--virtual-time-budget=30000', '--dump-dom', `http://127.0.0.1:${port}/?selftest`];
-  if (process.getuid && process.getuid() === 0) args.unshift('--no-sandbox');
-  const r = spawnSync(chrome, args, { encoding: 'utf8', timeout: 90000 });
+  // Two page loads: the self-test, then (?selftest&act) the click-handler comparison of the move to React.
+  // The click-handler comparison is long, so it runs in four page loads (act=1/4 … 4/4).
+  for (const [q, what, ms] of [['selftest', 'self-test', 90000], ...[1, 2, 3, 4].map(n => [`selftest&act=${n}/4`, `click handlers ${n}/4 (React vs the old switch)`, 90000])]) {
+    const args = ['--headless=new', '--disable-gpu', '--virtual-time-budget=30000', '--dump-dom', `http://127.0.0.1:${port}/?${q}`];
+    if (process.getuid && process.getuid() === 0) args.unshift('--no-sandbox');
+    const r = spawnSync(chrome, args, { encoding: 'utf8', timeout: ms });
+    const m = (r.stdout || '').match(/<pre id="selftest-result"[^>]*>([^<]*)<\/pre>/);
+    if (!m) { console.log(`  FAIL ${what}: no result in the page` + (r.error ? ' (' + r.error.message + ')' : '')); failed++; continue; }
+    const res = JSON.parse(m[1].replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&'));
+    if (res.pass) console.log(`  PASS ${what}: all ${res.total} checks`);
+    else { failed++; (res.failed || []).forEach(f => console.log(`  FAIL ${f.name}${f.detail ? ' · ' + f.detail : ''}`)); }
+  }
   srv.kill(); fs.rmSync(dir, { recursive: true, force: true });
-  const m = (r.stdout || '').match(/<pre id="selftest-result"[^>]*>([^<]*)<\/pre>/);
-  if (!m) { console.log('  FAIL: no self-test result in the page' + (r.error ? ' (' + r.error.message + ')' : '')); failed++; return finish(); }
-  const res = JSON.parse(m[1].replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&'));
-  if (res.pass) console.log(`  PASS all ${res.total} checks`);
-  else { failed++; (res.failed || []).forEach(f => console.log(`  FAIL ${f.name}${f.detail ? ' · ' + f.detail : ''}`)); }
   finish();
 })();
 function finish() { console.log(failed ? `\n${failed} part(s) FAILED` : '\nAll tests passed'); process.exit(failed ? 1 : 0); }

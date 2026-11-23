@@ -1,7 +1,7 @@
 // The React screens. Loaded by index.html after the other js files (which it uses by name: S, plan, f0, …) and
 // before sample.js / server-sync.js, so the app starts with these screens in place.
 import { draw, replaceScreen, LEGACY } from './bridge.js';
-import { addActScreen, runActParity } from './actparity.js';
+import { addActScreen, runActParity, COVERED } from './actparity.js';
 import { addParity, addPiece, runParity, monthsToTry, emptyHousehold, withS, at } from './parity.js';
 import { History } from './screens/History.jsx';
 import { Wealth } from './screens/Wealth.jsx';
@@ -528,6 +528,50 @@ const show = (tab, more) => () => { const o = { tab: S.tab, budv: BUDV }; S.tab 
 addActScreen({ name: 'History', set: show('history') });
 addActScreen({ name: 'History, 12 months, older month', set: show('history', () => both(setHR('12'), at(addM(TK, -2)))) });
 addActScreen({ name: 'History, starting later', set: show('history', tweak(s => { s.histFrom = addM(TK, -3); })) });
+// …every tab and view, with folds open (steps(false)) and the parts that only show after a click: the flow card,
+// a schedule editor, a Forecast month, the Move panel and split form, each pop-up view.
+const then = (f, ...u) => () => { const un = u.map(x => x()); f(); return () => un.reverse().forEach(x => x && x()); };
+const openAll = () => { document.querySelectorAll('main details').forEach(d => { d.open = true; }); };
+const card = id => () => { const n = K && K.all.find(x => x.id === id || (id === 'grp' && x.ci === 2 && !x.solo)); if (n) skCard(n); };
+for (const [f, k] of [['plan', TK], ['actual', addM(TK, -1)], ['compare', TK], ['plan', addM(TK, 2)]]) addActScreen({ name: `This month: ${f} ${k}`, set: show('budget', () => both(budv('month')(), flow(f)(), at(k), steps(false)())) });
+for (const id of ['b', 'left', 'grp']) addActScreen({ name: 'Money-flow card ' + id, set: then(card(id), show('budget', () => both(budv('month')(), flow('plan')()))) });
+addActScreen({ name: 'This month: alerts, set-up, review', set: show('budget', () => both(budv('month')(), steps(false)(), tweak(s => { const f = plan().groups.find(g => g.flex).items[0]; Object.values(s.plans).forEach(q => q.groups.forEach(g => g.items.forEach(i => { if (i.id === f.id) i.amt = 1; }))); Object.entries(s.txd).slice(0, 4).forEach(([id]) => delete s.txd[id]); const m = s.months[addM(TK, -1)]; if (m) delete m.rv; })())) });
+for (const sc of ['all', 'from']) addActScreen({ name: 'Build budget ' + sc, set: then(openAll, show('budget', () => both(budv('build')(), bscope(sc)(), steps(false)(), sched()))) });
+addActScreen({ name: 'Build budget, editing a schedule item', set: then(openAll, show('budget', () => { const u = [budv('build')(), steps(false)(), sched()]; const v = ale((S.al || [])[0] && S.al[0].id)(); return () => { v(); u.reverse().forEach(x => x()); }; })) });
+addActScreen({ name: 'Forecast', set: then(openAll, show('budget', () => both(budv('fc')(), sched()))) });
+addActScreen({ name: 'Forecast, a month and an item open', set: then(openAll, show('budget', () => { const u = [budv('fc')(), sched()]; const v = [ale(S.al[1] && S.al[1].id)(), fdk(addM(TK, 3))()]; return () => { v.forEach(x => x()); u.reverse().forEach(x => x()); }; })) });
+addActScreen({ name: 'Loans', set: then(openAll, show('loans', () => steps(false)())) });
+addActScreen({ name: 'Loans, a hand-added loan', set: then(openAll, show('loans', tweak(s => { s.loans.push({ id: 'hand1', name: 'Hand loan', apr: 7, bal: 3000, min: 150, due: 3, start: addM(TK, -2), color: '#abc' }); }))) });
+addActScreen({ name: 'Goals', set: then(openAll, show('goals', () => { BCL.delete('galloc'); BCL.add('!galloc'); return () => { BCL.delete('!galloc'); }; })) });
+addActScreen({ name: 'Wealth', set: show('wealth') });
+for (const v of ['review', 'filed']) addActScreen({ name: 'Bank ' + v, set: then(openAll, show('bank', () => both(bv(v)(), v === 'review' ? tweak(s => { Object.keys(s.txd).slice(0, 6).forEach(id => delete s.txd[id]); })() : null))) });
+addActScreen({ name: 'Bank: Move panel and split form open', set: then(() => { const b = $('#T-bank [data-act="mvShow"]'); if (b) { b.click(); const p = b.closest('.trow, .txr, div').parentElement.querySelector('.mvp:not([hidden]) [data-act="spOpen"]') || $('#T-bank .mvp:not([hidden]) [data-act="spOpen"]'); if (p) p.click(); } }, show('bank', () => bv('filed')())) });
+for (const v of ['general', 'rules', 'connections', 'data']) addActScreen({ name: 'Settings ' + v, set: then(openAll, show('settings', () => sv(v)())) });
+addActScreen({ name: 'Settings data, checks failing', set: then(openAll, show('settings', () => both(sv('data')(), tweak(s => { Object.values(s.txd).filter(r => r.auto === 'pair').slice(0, 2).forEach(r => { r.v = 'i:' + plan().groups.find(g => g.flex).items[0].id; delete r.auto; }); Object.keys(s.txd).slice(0, 3).forEach(id => delete s.txd[id]); })()))) });
+for (const r of ['month', 'all', 'trend']) addActScreen({ name: 'Line pop-up ' + r, set: then(() => { const v = allLines().find(x => x.startsWith('i:')); catOpen(v); CR = r; catRender(); }, show('budget', () => budv('month')())) });
+addActScreen({ name: 'Line pop-up, a loan', set: then(() => { catOpen('l:' + S.loans[0].id); }, show('budget', () => budv('month')())) });
+addActScreen({ name: 'Trends dialog', set: then(() => flowOpen('grp:' + plan().groups.find(g => g.flex).id), show('budget', () => budv('month')())) });
+// …and the states that show the remaining buttons (bank, backup, CSV import/delete, alert test and file import
+// buttons talk to the server and aren't clicked).
+const stub = (name, f) => () => { const o = window[name]; window[name] = f; return () => { window[name] = o; }; };
+const mo = (s, k) => s.months[k] || (s.months[k] = { act: {}, pay: {}, dep: {} });
+const linked = tweak(s => { const a = (BK.loans || []).find(x => x.type === 'loan'); if (a) s.loans.push({ id: 'lk1', name: 'Linked loan', apr: 5, bal: openBal(a), min: 200, due: 10, start: TK, color: '#8fc9ff', acct: a.id, anch: { k: TK, eob: openBal(a) } }); s.loans.push({ id: 'hand1', name: 'Hand loan', apr: 7, bal: 3000, min: 150, due: 3, start: addM(TK, -2), color: '#abc' }); mo(s, addM(TK, -1)).pay = { ...(mo(s, addM(TK, -1)).pay || {}), hand1: 150 }; });
+addActScreen({ name: 'Bank filed, short list', set: show('bank', () => both(bv('filed')(), fln(5)())) });
+addActScreen({ name: 'Bank review, many to sort, double counts', set: show('bank', () => both(bv('review')(), tweak(s => { Object.keys(s.txd).filter(id => !s.txd[id].auto || s.txd[id].auto !== 'pair').slice(0, 60).forEach(id => delete s.txd[id]); Object.values(s.txd).filter(r => r.auto === 'pair').slice(0, 2).forEach(r => { r.v = 'i:' + plan().groups.find(g => g.flex).items[0].id; delete r.auto; }); })())) });
+addActScreen({ name: 'Settings connections, a CSV file read', set: show('settings', () => both(sv('connections')(), cvSet('date,name,amount\n2026-11-01,Coffee & co,4.50\n2026-11-02,Refund,-12')())) });
+addActScreen({ name: 'Build: one-time items, no-plan line, gaps, suggestions', set: then(openAll, show('budget', () => both(budv('build')(), steps(false)(),
+  stub('recurring', () => [{ p: 'streamco', label: 'StreamCo & <Plus>', amt: 15.99, day: 3, months: 4 }])(), stub('recurringIn', () => [{ p: 'side gig', label: 'Side Gig', amt: 420, months: 3 }])(),
+  tweak(s => { const k = addM(TK, 2), g = plan().groups.find(x => !x.flex); mo(s, k).extra = [{ id: 'ex1', kind: 'item', gid: g.id, name: 'Car repair', amt: 300, due: 5 }]; s.notBill = { oldsub: 1 };
+    const f = plan().groups.find(x => x.flex).items[0]; Object.values(s.plans).forEach(q => q.groups.forEach(gg => gg.items.forEach(i => { if (i.id === f.id) i.amt = 0; })));
+    const ks = Object.keys(s.plans).sort(), pk = addM(TK, -1); s.plans[pk] = clone(s.plans[ks[ks.length - 1]]); s.plans[pk].income.push({ id: 'ni', name: 'Side job', amt: 300 }); })()))) });
+addActScreen({ name: 'This month: purchases by hand, monthly review with rules', set: show('budget', () => both(budv('month')(), sched(), tweak(s => { mo(s, TK).rc = [{ id: 'h1', store: 'Corner shop', amt: 9.5, item: plan().groups.find(g => g.flex).items[0].id, date: TK + '-02' }]; const m = s.months[addM(TK, -1)]; if (m) { delete m.rv; delete m.swept; } Object.values(s.plans).forEach(q => q.income.forEach(i => { i.amt = (+i.amt || 0) + 3000; })); })())) });
+addActScreen({ name: 'Forecast over budget, what-if moved', set: then(openAll, show('budget', () => both(budv('fc')(), wfs({ inc: -2500, cost: 100, extra: 0 })(), tweak(s => { Object.values(s.plans).forEach(q => q.income.forEach(i => { i.amt = (+i.amt || 0) / 3; })); })()))) });
+for (const id of ['ss', 'sd']) addActScreen({ name: 'Forecast, editing schedule item ' + id, set: then(openAll, show('budget', () => { const u = [budv('fc')(), sched()]; const v = ale(id)(); return () => { v(); u.reverse().forEach(x => x()); }; })) });
+addActScreen({ name: 'Loans: linked and hand loans, plan in use', set: then(openAll, show('loans', () => both(linked(), sched(), (() => { const L = ['l-lk1', 'l-hand1', ...S.loans.map(l => 'l-' + l.id)]; L.forEach(i => OPEN.add(i)); return () => L.forEach(i => OPEN.delete(i)); })()))) });
+addActScreen({ name: 'Goals: deposits logged', set: then(openAll, show('goals', tweak(s => { s.goals.forEach(g => { mo(s, TK).dep = { ...(mo(s, TK).dep || {}), [g.id]: 50 }; mo(s, addM(TK, -1)).dep = { ...(mo(s, addM(TK, -1)).dep || {}), [g.id]: 25 }; }); }))) });
+addActScreen({ name: 'Line pop-up: same payee filed elsewhere', set: then(() => { const E = Object.entries(S.txd).filter(([, r]) => r.v.startsWith('i:') && r.auto && r.auto !== 'pair' && r.auto !== 'rest'); const v = E[0][1].v; catOpen(v); CR = 'all'; catRender(); }, show('budget', () => both(budv('month')(), tweak(s => { const E = Object.entries(s.txd).filter(([, r]) => r.v.startsWith('i:') && r.auto && r.auto !== 'pair' && r.auto !== 'rest'); const v = E[0][1].v; Object.values(s.txd).filter(r => r.v === v).slice(1, 3).forEach(r => { r.v = 'skip'; delete r.auto; }); })()))) });
+addActScreen({ name: 'Settings connections, an imported CSV account', set: show('settings', () => { const o = BK.st; BK.st = { ...o, items: [...(o.items || []), { item_id: 'csv', kind: 'csv', institution: { name: 'Imported & co' }, accounts: [{ id: 'csv1', name: 'My card', type: 'credit', mask: '' }], count: 3 }] }; const u = sv('connections')(); return () => { u(); BK.st = o; }; }) });
 window.reactActParity = runActParity;
+if (DEMO) window.ACT_COVERED = COVERED;
 window.reactParity = runParity;
 if (DEMO) window.LEGACY_SCREENS = LEGACY;   // sample mode only: the old draw functions, for comparing by hand

@@ -1,6 +1,6 @@
 // Small pieces shared by the React screens.
 import { useLayoutEffect, useRef } from 'react';
-import { tx } from './bridge.js';
+import { tx, onAct } from './bridge.js';
 
 // The gear icon on header buttons that open a page's setup (was the GEAR string in loans.js).
 export const Gear = () => <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3" /><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09a1.65 1.65 0 0 0-1-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09a1.65 1.65 0 0 0 1.51-1 1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" /></svg>;
@@ -21,7 +21,7 @@ export function Ring({ pct, c, sz = 118 }) {
 
 // Header of a collapsible card (was clh() in math.js); click/Enter handled by the bcol action.
 export function Clh({ k, shut, title, sum, tag: T = 'h2' }) {
-  return <T className="clh" data-act="bcol" data-v={k} role="button" tabIndex="0" aria-expanded={`${!shut}`}>{title}<small className="bsm">{sum || ''}</small><i className="chev" aria-hidden="true"></i></T>;
+  return <T className="clh" data-act="bcol" onClick={onAct('bcol')} data-v={k} role="button" tabIndex="0" aria-expanded={`${!shut}`}>{title}<small className="bsm">{sum || ''}</small><i className="chev" aria-hidden="true"></i></T>;
 }
 
 // "Bank · Account ••1234" (was nmA() in wealth.js).
@@ -32,7 +32,7 @@ export const Rich = ({ d }) => rtParts(d).map((p, j) => typeof p === 'string' ? 
 
 // A button described as data ({act, label, ...data-* values}; health checks and alerts): data-act and the rest as
 // data-* attributes, in the order given.
-export const ActBtn = ({ b }) => <button className="btn g sm" {...Object.fromEntries(Object.entries(b).filter(([k]) => k !== 'label').map(([k, v]) => ['data-' + k, v]))}>{tx(b.label)}</button>;
+export const ActBtn = ({ b }) => <button className="btn g sm" {...Object.fromEntries(Object.entries(b).filter(([k]) => k !== 'label').map(([k, v]) => ['data-' + k, v]))} onClick={onAct(b.act)}>{tx(b.label)}</button>;
 
 // The "file to" choices for a transaction or rule (was txOptions in linked-loans.js). The select's defaultValue picks
 // the selected one, as the old `selected` attribute did.

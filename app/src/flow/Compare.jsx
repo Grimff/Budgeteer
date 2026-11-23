@@ -1,7 +1,7 @@
 // The money-flow card's Compare view (was compareView in js/compare.js): every budget line this month, what's happened
 // so far against the plan, worst first. cmpRows (the numbers) stays in compare.js; the Budget tab and the monthly
 // review use it too.
-import { draw, tx } from '../bridge.js';
+import { draw, tx, onAct } from '../bridge.js';
 
 // "good" lines (loans, savings) are fine above plan; spending lines are not.
 function cmpSt(r, k) {
@@ -20,7 +20,7 @@ export function Compare() {
   return <div className="cmp"><div className="cmph"><div><small>Over plan</small><b className="neg">{f0(overT)}</b><span>{over.length} line{over.length === 1 ? '' : 's'}</span></div><div><small>Under plan</small><b className="pos">{f0(under)}</b></div><div><small>Not paid yet</small><b>{f0(pend)}</b></div></div>{' '}
     {S2.map(r => {
       const aw = Math.min(100, r.a / M * 100), pw = r.pl / M * 100;
-      return <button key={r.key} type="button" className="cmr" data-act="catTx" data-v={r.key}><span className="nm"><b>{tx(r.name)}</b><small>{tx(r.grp)}</small></span><span className="bar"><i className={'a ' + r.s.cls} style={{ width: `${Math.max(0, aw)}%`, '--c': r.c }}></i>{r.pl > 0.5 ? <i className="p" style={{ left: `${pw}%` }} title={`Planned ${f0(r.pl)}`}></i> : null}</span><span className="nums"><b>{f0(r.a)}</b><small>of {f0(r.pl)}</small></span><span className={'df ' + r.s.cls}>{r.s.t}</span></button>;
+      return <button key={r.key} type="button" className="cmr" data-act="catTx" onClick={onAct('catTx')} data-v={r.key}><span className="nm"><b>{tx(r.name)}</b><small>{tx(r.grp)}</small></span><span className="bar"><i className={'a ' + r.s.cls} style={{ width: `${Math.max(0, aw)}%`, '--c': r.c }}></i>{r.pl > 0.5 ? <i className="p" style={{ left: `${pw}%` }} title={`Planned ${f0(r.pl)}`}></i> : null}</span><span className="nums"><b>{f0(r.a)}</b><small>of {f0(r.pl)}</small></span><span className={'df ' + r.s.cls}>{r.s.t}</span></button>;
     })}{' '}
     <p className="dim" style={{ fontSize: '13px', marginTop: '10px' }}>The bar is what’s happened so far; the white mark is the plan. Click a line for its transactions and trends.</p></div>;
 }

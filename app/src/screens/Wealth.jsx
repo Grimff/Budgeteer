@@ -1,7 +1,7 @@
 // Wealth tab (was renderWealth, invCard and areaChart in js/wealth.js). The math (perf, invSeries, valueOn, debtNow…)
 // stays in wealth.js.
 import { useLayoutEffect, useRef, useState } from 'react';
-import { tx } from '../bridge.js';
+import { tx, onAct } from '../bridge.js';
 import { Gear, CountUp, NmA } from '../ui.jsx';
 const bigN = { font: "700 24px 'Inter Display',Inter,sans-serif" };
 
@@ -39,7 +39,7 @@ function InvCard({ a }) {
 }
 
 export function Wealth() {
-  const head = <div className="phead"><div><h1>Wealth</h1><p className="mut">Bank balances, investments and debts in one place. Updates after each bank sync.</p></div>{SRV ? <div className="phact"><button className="btn g sm ib" data-act="sview" data-v="connections" title="Connect banks and brokerages"><Gear />Connections</button></div> : null}</div>;
+  const head = <div className="phead"><div><h1>Wealth</h1><p className="mut">Bank balances, investments and debts in one place. Updates after each bank sync.</p></div>{SRV ? <div className="phact"><button className="btn g sm ib" data-act="sview" onClick={onAct('sview')} data-v="connections" title="Connect banks and brokerages"><Gear />Connections</button></div> : null}</div>;
   if (!SRV) return <>{head}<section className="card"><p>Balances come from bank sync on the server, which can’t be reached right now. It reconnects on its own.</p></section></>;
   if (!BK.st || !BK.accts) return <>{head}<section className="card"><p className="mut">{BK.err || 'Loading…'}</p></section></>;
   if (!BK.st.configured) return <>{head}<section className="card"><p>Add your Plaid keys first. The Bank tab shows how.</p></section></>;
@@ -50,11 +50,11 @@ export function Wealth() {
     <div className="hero" style={{ '--i': 0 }}><div><p className="lbl">Net worth</p><CountUp className="big" id="wNet" k="wNet" to={net} /><p className="note">Cash and investments, minus what you owe on loans{cards.length ? ' and credit cards' : ''}.</p></div>{' '}
       <div className="kpis"><div className="kpi"><small>Cash</small><b>{f0(cashT)}</b><span>{cash.length} account{cash.length === 1 ? '' : 's'}</span></div>{' '}
         <div className="kpi"><small>Investments</small><b>{f0(invT)}</b><span className={pm.ok && pm.g >= 0 ? 'up' : ''}>{pm.ok ? `${sg(pm.g)} market this month` : inv.length ? 'Gains show after a few days of tracking' : 'None connected'}</span></div>{' '}
-        <div className="kpi"><small>Loans</small><b>{f0(loanT)}</b><span>{S.loans.length} loan{S.loans.length === 1 ? '' : 's'} · <button className="lnk" data-act="tab" data-t="loans" style={{ padding: 0, fontSize: 'inherit' }}>Loans tab</button></span></div>{' '}
+        <div className="kpi"><small>Loans</small><b>{f0(loanT)}</b><span>{S.loans.length} loan{S.loans.length === 1 ? '' : 's'} · <button className="lnk" data-act="tab" onClick={onAct('tab')} data-t="loans" style={{ padding: 0, fontSize: 'inherit' }}>Loans tab</button></span></div>{' '}
         <div className="kpi"><small>Credit cards</small><b>{f0(cardT)}</b><span>{cards.length ? cards.length + ' card' + (cards.length === 1 ? '' : 's') : 'None connected'}</span></div></div></div>
-    <section className="card" style={{ '--i': 1 }}><div className="bh"><div><h2>Investments</h2><p>{inv.length ? 'Gains leave out money you deposited or withdrew, so they show how your investments actually did.' : 'Connect Fidelity, Schwab or another brokerage to see balances, holdings and performance.'}</p></div>{inv.length ? null : <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}><button className="btn sm" data-act="bankConnect" data-kind="invest">Connect a brokerage</button></div>}</div>{' '}
-      {need.map(it => <div className="bki" key={it.item_id}><div className="nm"><b>{tx(it.institution.name)}</b><small>Allow investment details (holdings and cost basis) from this connection. It takes one quick sign-in through Plaid.</small></div><button className="btn g sm" data-act="invAllow" data-id={tx(it.item_id)}>Allow</button></div>)}{' '}
-      {inv.length ? <><div className="wtools"><div className="seg" role="group" aria-label="Time range">{RANGES.map(([k, l]) => <button key={k} className={WR === k ? 'on' : ''} data-act="wr" data-r={k}>{l}</button>)}</div>{from > rangeFrom(WR, '') ? <span className="dim" style={{ fontSize: '13px' }}>Since {dshort(from)}, when tracking started</span> : null}</div>{' '}
+    <section className="card" style={{ '--i': 1 }}><div className="bh"><div><h2>Investments</h2><p>{inv.length ? 'Gains leave out money you deposited or withdrew, so they show how your investments actually did.' : 'Connect Fidelity, Schwab or another brokerage to see balances, holdings and performance.'}</p></div>{inv.length ? null : <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}><button className="btn sm" data-act="bankConnect" onClick={onAct('bankConnect')} data-kind="invest">Connect a brokerage</button></div>}</div>{' '}
+      {need.map(it => <div className="bki" key={it.item_id}><div className="nm"><b>{tx(it.institution.name)}</b><small>Allow investment details (holdings and cost basis) from this connection. It takes one quick sign-in through Plaid.</small></div><button className="btn g sm" data-act="invAllow" onClick={onAct('invAllow')} data-id={tx(it.item_id)}>Allow</button></div>)}{' '}
+      {inv.length ? <><div className="wtools"><div className="seg" role="group" aria-label="Time range">{RANGES.map(([k, l]) => <button key={k} className={WR === k ? 'on' : ''} data-act="wr" onClick={onAct('wr')} data-r={k}>{l}</button>)}</div>{from > rangeFrom(WR, '') ? <span className="dim" style={{ fontSize: '13px' }}>Since {dshort(from)}, when tracking started</span> : null}</div>{' '}
         <div className="wperf">{rp.ok ? <><div><small>Market gain</small><b className={pn(rp.g)}>{sg(rp.g)}</b></div><div><small>Return</small><b className={pn(rp.g)}>{rp.g >= 0 ? '+' : '−'}{Math.abs(rp.pct * 100).toFixed(2)}%</b></div><div><small>Deposits</small><b>{sg(rp.fl)}</b></div><div><small>Value now</small><b>{f0(invT)}</b></div></> : <p className="dim" style={{ fontSize: '14px' }}>Performance shows once there are two days of values.</p>}</div>{' '}
         <AreaChart pts={invSeries(inv, from)} col={C.aqua} />{inv.map(a => <InvCard key={a.id} a={a} />)}</> : null}</section>
     <section className="card" style={{ '--i': 2, marginTop: '16px' }}><div className="bh"><div><h2>Bank balances</h2><p>Checking and savings across your banks.</p></div><b className="n" style={bigN}>{f2(cashT)}</b></div>{cash.length ? cash.map(a => {
