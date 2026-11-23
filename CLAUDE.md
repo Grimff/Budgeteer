@@ -115,7 +115,7 @@ works (and `npm test` passes) after every step.
   JSX notes: a `<table>` needs an explicit `<tbody>` (the HTML parser added one to the old markup), SVG attributes camelCase (`strokeWidth`), keep attribute strings exact (`fillOpacity=".35"`), lengths
   as strings (`'16px'`), `{' '}` where the old template had a line break between inline elements, `cond ? x : null`
   (never `cond && x`, which prints 0).
-- **Phase 2 (in progress): pop-ups and dialogs**, the same way (`app/src/popups/`). Their frames stay in index.html;
+- **Phase 2 (done): pop-ups, dialogs and the page frame**, the same way (`app/src/popups/`). Their frames stay in index.html;
   each part a function wrote is drawn as its own root, so inputs outside those parts (the pop-up's search `#tdq`) keep
   what's typed. Parity screens get `dialog: '#tdlg'` (opened while measured). Done: the line pop-up (`catRenderR`:
   #tds/#tdr/#tdrg/#tdl; catFilter still hides rows for the search) and the trends dialog (`flowRenderR`: #fds/#fdb,
@@ -129,7 +129,10 @@ works (and `npm test` passes) after every step.
   in `flow/Compare.jsx`; cmpRows stays), and its zoom bar, hover tip and click card (`zbarR`/`skTipR`/`skCardR` in
   `flow/Card.jsx`: #zb, #skt, #skc; skPos/skPlace still place them), and the chart itself (`sankeyR` in `flow/Sankey.jsx`;
   the layout code is the old one; hl/zset still set classes and the viewBox on the drawn svg). `fsUI` moved from
-  server-sync.js to linked-loans.js (before the bundle) with a `demo` parameter. To do: bankBadge and fsUI. The self-test now
+  server-sync.js to linked-loans.js (before the bundle) with a `demo` parameter; it and bankBadge are `chrome.jsx`
+  (#sync, #spill, #saved, #tbank). Still HTML strings, until their logic returns data in phase 3: health-check
+  messages (healthChecks), alert buttons (alertsNow), the amount dialog's #dp line (DLG.prev), and the px/what-if
+  live text patched while typing (events.js). The old draw functions stay in LEGACY only for the parity check. The self-test now
   takes about 40 s (parity runs twice); tools/test.js allows 90 s.
 - **Phase 3:** state and events into React (handlers on elements instead of `data-act` switches, `S` in a store with
   a hook, real re-renders instead of remounts); then the math into ES modules; then remove the old draw functions

@@ -18,6 +18,7 @@ import { spFormR, spAddPartR } from './popups/Split.jsx';
 import { compareViewR } from './flow/Compare.jsx';
 import { zbarR, skTipR, skCardR } from './flow/Card.jsx';
 import { sankeyR } from './flow/Sankey.jsx';
+import { bankBadgeR, fsUIR } from './chrome.jsx';
 
 replaceScreen('renderHistory', () => draw($('#T-history'), <History />));
 // Budget: This month is React; Build budget and Forecast are still drawn by renderBuild / renderForecast. The
@@ -39,6 +40,8 @@ replaceScreen('zbar', zbarR);
 replaceScreen('skTip', skTipR);
 replaceScreen('skCard', skCardR);
 replaceScreen('sankey', sankeyR);
+replaceScreen('bankBadge', bankBadgeR);
+replaceScreen('fsUI', fsUIR);
 replaceScreen('renderBuild', () => draw($('#T-budget'), <Build />));
 replaceScreen('renderForecast', () => { draw($('#T-budget'), <Forecast />); fcBody(); });
 // bankBadge (the count on the Bank tab) ran at the end of the old renderBank once the bank was set up.
@@ -469,5 +472,20 @@ addParity({
     return c;
   },
 });
+// The Bank tab's count (none, some, 100+, no bank) and the save status in every state, as the sample and as a real
+// budget (fsUI's demo parameter): connecting, saved (with and without a time), saving, unreachable (with details).
+addParity({
+  name: 'Bank tab count', fn: 'bankBadge', el: '#tbank', cases: () => {
+    const many = tweak(s => { s.txd = {}; }), some = tweak(s => { Object.keys(s.txd).slice(0, 7).forEach(k => delete s.txd[k]); });
+    return [{ label: 'as loaded' }, { label: 'some to sort', set: some }, { label: 'many to sort', set: many }, { label: 'no bank', set: () => { const o = SRV; SRV = false; return () => { SRV = o; }; } }];
+  },
+});
+const fsCases = () => {
+  const c = [], at10 = new Date(2026, 3, 5, 10, 7);
+  const st = { wait: { state: 'wait' }, ok: { state: 'ok', last: null }, 'ok at time': { state: 'ok', last: at10 }, saving: { state: 'ok', dirty: true, last: at10 }, busy: { state: 'ok', busy: true }, err: { state: 'err', err: 'Can’t reach the server.' }, 'err details': { state: 'err', err: 'Save failed <500>.', detail: 'HTTP 500 & "oops"' } };
+  for (const [l, v] of Object.entries(st)) for (const demo of [true, false]) c.push({ label: `${l}${demo ? ' sample' : ''}`, set: () => { const o = { ...FS }; Object.assign(FS, { dirty: false, busy: false, detail: '', err: '' }, v); return () => { Object.assign(FS, o); }; }, call: () => fsUI(demo) });
+  return c;
+};
+for (const [n, el] of [['banner', '#sync'], ['footer', '#saved'], ['header pill', '#spill']]) addParity({ name: 'Save status ' + n, fn: 'fsUI', el, cases: fsCases });
 window.reactParity = runParity;
 if (DEMO) window.LEGACY_SCREENS = LEGACY;   // sample mode only: the old draw functions, for comparing by hand
