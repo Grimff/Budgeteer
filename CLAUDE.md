@@ -121,7 +121,9 @@ works (and `npm test` passes) after every step.
   #tds/#tdr/#tdrg/#tdl; catFilter still hides rows for the search) and the trends dialog (`flowRenderR`: #fds/#fdb,
   also the pop-up's Trends view), the link dialog (`lnkListR`/`lnkRuleR` in `popups/Link.jsx`: #lpick and #lrule; the
   rule options keep their own state, so typing the text or ticking a box recounts without redrawing the field; lnkOpen,
-  the #lpick/#lq listeners and Save stay in bank.js). To do: amount dialog (openD: pay, deposit, …), split form (spRows), the money-flow chart and its card (sankey, skCard, compareView).
+  the #lpick/#lq listeners and Save stay in bank.js), the amount dialog (`openDR` in `popups/Amount.jsx`: #dsel and #dc;
+  the #dp line is still the HTML string `DLG.prev` returns, via dprev). A parity screen or case can give `call` to draw
+  through an opener called by name (payDialog/depDialog → openD). To do: split form (spRows), the money-flow chart and its card (sankey, skCard, compareView).
 - **Phase 3:** state and events into React (handlers on elements instead of `data-act` switches, `S` in a store with
   a hook, real re-renders instead of remounts); then the math into ES modules; then remove the old draw functions
   and the classic-script globals.

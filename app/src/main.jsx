@@ -13,6 +13,7 @@ import { Forecast, FcBody } from './screens/Forecast.jsx';
 import { Build } from './screens/Build.jsx';
 import { catRenderR, flowRenderR } from './popups/Category.jsx';
 import { lnkListR, lnkRuleR } from './popups/Link.jsx';
+import { openDR } from './popups/Amount.jsx';
 
 replaceScreen('renderHistory', () => draw($('#T-history'), <History />));
 // Budget: This month is React; Build budget and Forecast are still drawn by renderBuild / renderForecast. The
@@ -26,6 +27,7 @@ replaceScreen('catRender', catRenderR);
 replaceScreen('flowRender', flowRenderR);
 replaceScreen('lnkList', lnkListR);
 replaceScreen('lnkRule', lnkRuleR);
+replaceScreen('openD', openDR);
 replaceScreen('renderBuild', () => draw($('#T-budget'), <Build />));
 replaceScreen('renderForecast', () => { draw($('#T-budget'), <Forecast />); fcBody(); });
 // bankBadge (the count on the Bank tab) ran at the end of the old renderBank once the bank was set up.
@@ -344,6 +346,32 @@ addParity({
     c.push({ label: 'filed elsewhere ticked', set: lkOpen(k0, i0, L => { const g = lnkCands().find(g => Object.keys(g.filed).some(v => v !== L.v)); if (g) { L.sels = [g.p]; L.pat = g.p; L.ref = L.refs[g.p] || 0; } }) });
     c.push({ label: 'short text with siblings', set: lkOpen(k0, i0, L => { const g = lnkCands()[0]; if (g) { L.sels = [g.p]; L.pat = g.p.split(' ')[0]; } }) });
     c.push({ label: 'next month', set: () => both(at(addM(TK, 1)), lkOpen(k0, i0)()) });
+    return c;
+  },
+});
+// The amount dialog as payDialog / depDialog open it (showModal skipped: parity opens it): each loan and goal, with a
+// suggested amount, an amount already logged, other months, odd names, a typed amount, and one with no choices.
+const noModal = () => { const d = $('#dlg'); d.showModal = () => {}; return () => { delete d.showModal; }; };
+addParity({
+  name: 'Amount dialog', fn: 'openD', el: '#dform', dialog: '#dlg', cases: () => {
+    const c = [], add = (label, call, ...set) => c.push({ label, call, set: () => both(noModal(), ...set.map(f => f())) });
+    for (const l of S.loans) {
+      add('pay ' + l.id, () => payDialog(l.id));
+      add('pay ' + l.id + ' + left over', () => payDialog(l.id, 321.5));
+      add('pay ' + l.id + ' logged', () => payDialog(l.id), tweak(s => { const m = s.months[TK] || (s.months[TK] = { act: {}, pay: {}, dep: {} }); (m.pay || (m.pay = {}))[l.id] = 777; }));
+      add('pay ' + l.id + ' typed', () => { payDialog(l.id); $('#da').value = '1,234.5'; dprev(); });
+      for (const k of [addM(TK, -2), addM(TK, 3)]) add(`pay ${l.id} ${k}`, () => payDialog(l.id), () => at(k));
+    }
+    for (const g of S.goals) {
+      add('dep ' + g.id, () => depDialog(g.id));
+      add('dep ' + g.id + ' amount', () => depDialog(g.id, 50));
+      add('dep ' + g.id + ' saved', () => depDialog(g.id), tweak(s => { const m = s.months[TK] || (s.months[TK] = { act: {}, pay: {}, dep: {} }); (m.dep || (m.dep = {}))[g.id] = 0; }));
+      add('dep ' + g.id + ' typed', () => { depDialog(g.id); $('#da').value = '99999'; dprev(); });
+      add(`dep ${g.id} next month`, () => depDialog(g.id), () => at(addM(TK, 1)));
+    }
+    add('odd names', () => { payDialog(S.loans[0] && S.loans[0].id); depDialog(S.goals[0] && S.goals[0].id); }, tweak(s => { s.loans.forEach(l => { l.name += ' & <co>'; }); s.goals.forEach(g => { g.name = '"' + g.name + '" & <x>'; }); }));
+    add('no choices or chips', () => openD({ title: 'Plain', amt: null, save: () => {} }));
+    add('choice matching none', () => openD({ title: 'Plain', sel: [{ v: 'a', l: 'A' }, { v: 'b', l: 'B & <b>' }], selV: 'zz', chips: [{ l: 'x', v: 0 }], amt: 0, ok: 'Go', del: () => {}, save: () => {} }));
     return c;
   },
 });

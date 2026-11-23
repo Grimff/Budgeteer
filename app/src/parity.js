@@ -7,7 +7,8 @@
 import { LEGACY, draw } from './bridge.js';
 
 const SCREENS = [];
-// screen: {name, fn: 'renderX', el: '#T-x', also?: ['renderY'], dialog?: '#dlg' (opened while measured), cases(): [{label, set?(): undo?}]}
+// screen: {name, fn: 'renderX', el: '#T-x', also?: ['renderY'], dialog?: '#dlg' (opened while measured), call?(),
+//          cases(): [{label, set?(): undo?, call?()}]; call draws (by name, fn swapped for the old one), default fn()
 export const addParity = s => SCREENS.push(s);
 
 function attrsOf(n) {
@@ -115,10 +116,12 @@ export function runParity() {
         // count-ups (cu) remember what they showed last; both draws start from the same memory
         const pv = { ...PV }, back = () => { for (const k of Object.keys(PV)) delete PV[k]; Object.assign(PV, pv); };
         // also: old functions the old screen calls by name (renderForecast → fcBody) are the old ones while it draws
-        const sw = (sc.also || []).map(n => [n, window[n]]); sw.forEach(([n]) => { window[n] = LEGACY[n]; });
-        try { fresh(); LEGACY[sc.fn](); } finally { sw.forEach(([n, f]) => { window[n] = f; }); }
+        // call: how a case draws (a dialog opener called by name with its options); default sc.fn()
+        const call = c.call || sc.call || (() => window[sc.fn]());
+        const sw = [sc.fn, ...(sc.also || [])].map(n => [n, window[n]]); sw.forEach(([n]) => { window[n] = LEGACY[n]; });
+        try { fresh(); call(); } finally { sw.forEach(([n, f]) => { window[n] = f; }); }
         const A = snap(el);
-        back(); fresh(); window[sc.fn](); const B = snap(el);
+        back(); fresh(); call(); const B = snap(el);
         n++;
         const d = diff(A, B);
         if (d) fails.push(c.label + ' ' + d);
