@@ -10,6 +10,7 @@ import { Settings, NtCard } from './screens/Settings.jsx';
 import { Bank } from './screens/Bank.jsx';
 import { ThisMonth, RcList } from './screens/Budget.jsx';
 import { Forecast, FcBody } from './screens/Forecast.jsx';
+import { Build } from './screens/Build.jsx';
 
 replaceScreen('renderHistory', () => draw($('#T-history'), <History />));
 // Budget: This month is React; Build budget and Forecast are still drawn by renderBuild / renderForecast. The
@@ -18,6 +19,7 @@ replaceScreen('renderBudget', () => { if (BUDV === 'build') return renderBuild()
 // Forecast: the frame, then the body into #fcb (the what-if sliders, range and month buttons redraw only the body);
 // FSC: scroll the open schedule editor or the month detail into view after adding/opening.
 replaceScreen('fcBody', () => { const el = $('#fcb'); if (!el) return; draw(el, <FcBody />); if (FSC) { FSC = false; const t = $('.fcle') || ($('.fcd') && FDK ? $('.fcd') : null); if (t) t.scrollIntoView({ block: 'nearest', behavior: RM ? 'auto' : 'smooth' }); } });
+replaceScreen('renderBuild', () => draw($('#T-budget'), <Build />));
 replaceScreen('renderForecast', () => { draw($('#T-budget'), <Forecast />); fcBody(); });
 // bankBadge (the count on the Bank tab) ran at the end of the old renderBank once the bank was set up.
 replaceScreen('renderBank', () => { const el = $('#T-bank'); if (!el) return; draw(el, <Bank />); if (SRV && BK.st && BK.st.configured) bankBadge(); });
@@ -253,6 +255,34 @@ addParity({
     c.push({ label: 'no loans', set: tweak(s => { s.loans = []; s.al = (s.al || []).filter(a => !a.to.startsWith('l:') && a.to !== 'snow'); }) });
     c.push({ label: 'no goal targets', set: tweak(s => { s.goals.forEach(g => { g.target = 0; delete g.by; }); }) });
     c.push({ label: 'empty household', set: () => withS(emptyHousehold()) });
+    return c;
+  },
+});
+const bscope = setVar(() => BSCOPE, v => { BSCOPE = v; });
+const steps = shut => () => { const K = ['b1', 'b2', 'b3', 'b4', 'b5', 'b6', 'bx'], had = K.map(k => [BCL.has(k), BCL.has('!' + k)]); K.forEach(k => { BCL.delete(k); BCL.delete('!' + k); BCL.add(shut ? k : '!' + k); }); return () => K.forEach((k, i) => { BCL.delete(k); BCL.delete('!' + k); if (had[i][0]) BCL.add(k); if (had[i][1]) BCL.add('!' + k); }); };
+addParity({
+  name: 'Budget (Build)', fn: 'renderBuild', el: '#T-budget', cases: () => {
+    const c = [];
+    for (const k of monthsToTry()) c.push({ label: k, set: () => both(steps(false)(), at(k)) });
+    c.push({ label: 'steps shut', set: steps(true) });
+    c.push({ label: 'from this month', set: () => both(steps(false)(), bscope('from')()) });
+    c.push({ label: 'items missing from earlier months', set: () => both(steps(false)(), tweak(s => { const ks = Object.keys(s.plans).sort(), k = addM(TK, -1); s.plans[k] = clone(s.plans[ks[ks.length - 1]]); s.plans[k].income.push({ id: 'ni', name: 'Side job', amt: 300 }); const g = s.plans[k].groups.find(g => !g.flex); if (g) g.items.push({ id: 'nb', name: 'New bill & co', amt: 45, due: 9 }); })()) });
+    c.push({ label: 'set-aside bills, due days, no plan', set: () => both(steps(false)(), tweak(s => { Object.values(s.plans).forEach(p => { const b = p.groups.filter(g => !g.flex).flatMap(g => g.items), f = p.groups.filter(g => g.flex).flatMap(g => g.items); if (b[0]) { b[0].freq = 12; b[0].dm = 2; } if (b[1]) { b[1].freq = 3; b[1].dm = 11; } if (b[2]) { b[2].due = 1; } if (b[3]) b[3].amt = 0; f.forEach((i, j) => { if (j % 2) i.amt = ''; }); }); })()) });
+    c.push({ label: 'ignored suggestions, schedule open', set: () => both(steps(false)(), sched(), ale('sl0')(), tweak(s => { s.notBill = { 'streaming co': 1, 'gym & spa': 1 }; s.notInc = { 'side pay': 1 }; })()) });
+    c.push({ label: 'only ignored suggestions', set: () => both(steps(false)(), tweak(s => { s.notBill = Object.fromEntries(recurring().map(x => [x.p, 1]).concat([['old thing', 1]])); })()) });
+    c.push({ label: 'one-time items, plan ahead, overrides', set: () => both(steps(false)(), tweak(s => { const m = s.months[TK] || (s.months[TK] = { act: {}, pay: {}, dep: {} }); const g = plan(TK).groups[0]; m.extra = [{ id: 'o1', kind: 'inc', name: 'Bonus', amt: 250 }, g && { id: 'o2', kind: 'item', gid: g.id, name: 'Repair & parts', amt: 120, due: 4 }].filter(Boolean); const m2 = s.months[addM(TK, 3)] || (s.months[addM(TK, 3)] = { act: {}, pay: {}, dep: {} }); m2.extra = [{ id: 'o3', kind: 'item', gid: g && g.id, name: 'Vet', amt: 300 }, { id: 'o4', kind: 'inc', name: 'Refund', amt: 80 }, { id: 'o5', kind: 'item', gid: 'gone', name: 'Old', amt: 5 }]; m.gplan = s.goals[0] ? { [s.goals[0].id]: 75 } : {}; m.lxp = s.loans[0] ? { [s.loans[0].id]: 40 } : {}; })()) });
+    c.push({ label: 'loans paid off, linked, hand with rules', set: () => both(steps(false)(), tweak(s => { s.loans.push({ id: 'done1', name: 'Old card', apr: 20, bal: 300, min: 100, due: 5, start: addM(TK, -10), color: '#fff' }); s.loans.push({ id: 'h3', name: 'Hand & loan', apr: 4, bal: 2000, min: 150, due: 1, start: addM(TK, -2), color: '#abc' }); s.rules = [...(s.rules || []), { id: 'rh3', p: 'HAND LENDER PAY', dir: 'out', v: 'l:h3' }]; const a = (BK.loans || []).find(x => x.type === 'loan'); if (a) s.loans.push({ id: 'lk1', name: 'Linked loan', apr: 5, bal: openBal(a), min: 200, due: 10, start: TK, color: '#8fc9ff', acct: a.id, anch: { k: TK, eob: openBal(a) } }); })()) });
+    c.push({ label: 'loose items', set: () => both(steps(false)(), tweak(s => { Object.values(s.plans).forEach(p => { const fx = p.groups.find(g => g.flex && !g.loose), b = p.groups.find(g => !g.flex && !g.loose); const L1 = ensureLoose(p, true), L2 = ensureLoose(p, false); if (fx && fx.items.length) L1.items.push(fx.items.shift()); if (b && b.items.length) L2.items.push(b.items.shift()); }); })()) });
+    c.push({ label: 'late linked bill, short paycheck, subscriptions group, early start', set: () => both(steps(false)(), tweak(s => {
+      Object.values(s.plans).forEach(p => { const g = p.groups.find(g => !g.flex && !g.loose); if (g) g.items.push({ id: 'lateb', name: 'Late bill', amt: 60, due: 1 }); p.groups.push({ id: 'subs', name: 'Subscriptions', color: '#abc', flex: false, items: [] }); p.income.forEach(i => { i.amt = (+i.amt || 0) * 3; }); });
+      s.rules = [...(s.rules || []), { id: 'rlate', p: 'LATE BILL CO', dir: 'out', v: 'i:lateb' }]; s.bankFrom = '2020-01-01'; s.notBill = {}; })()) });
+    // suggestions as recurring() finds them (the sample files everything, so it finds none on its own)
+    const fakeRec = () => { const o = window.recurring; window.recurring = () => [{ p: 'streamco', label: 'StreamCo & <Plus>', amt: 15.99, day: 3, months: 4 }, { p: 'gymx', label: 'Gym X', amt: 40, day: 21, months: 6 }]; return () => { window.recurring = o; }; };
+    c.push({ label: 'bill suggestions, subscriptions group', set: () => both(steps(false)(), fakeRec(), tweak(s => { Object.values(s.plans).forEach(p => p.groups.push({ id: 'subs', name: 'Subscriptions', color: '#abc', flex: false, items: [] })); s.notBill = { old: 1 }; })()) });
+    c.push({ label: 'bill suggestions, no subscriptions group', set: () => both(steps(false)(), fakeRec()) });
+    c.push({ label: 'next month', set: () => both(steps(false)(), at(addM(TK, 1))) });
+    c.push({ label: 'no bank', set: () => both(steps(false)(), (() => { const o = SRV; SRV = false; return () => { SRV = o; }; })()) });
+    c.push({ label: 'empty household', set: () => both(steps(false)(), withS(emptyHousehold())) });
     return c;
   },
 });

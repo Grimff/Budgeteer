@@ -82,7 +82,7 @@ server against a real `data/` folder while testing; use `tools/realtest.js`.
 
 Goal: the whole front end in React with no feature added, removed or changed. Done screen by screen so the app
 works (and `npm test` passes) after every step.
-- **Phase 1 (in progress): the tab screens.** Each `renderX` that built a tab with an HTML string becomes a component
+- **Phase 1 (done): the tab screens.** Each `renderX` that built a tab with an HTML string becomes a component
   in `app/src/screens/`; `main.jsx` swaps it in by name (`replaceScreen('renderX', …)`, so every caller, including
   `renderAll`/`TABR` and click handlers, draws the React one). `draw(el, <X/>)` (bridge.js) renders with a fresh root
   and `flushSync`, i.e. exactly like `innerHTML=`: rebuilt each time, synchronous, so focus restore by `data-key`,
@@ -99,8 +99,10 @@ works (and `npm test` passes) after every step.
   alertsNow() as HTML. Forecast (`Forecast` frame + `FcBody` into #fcb, both swapped in by name, so the what-if
   sliders and range/month buttons redraw only the body; the chart's month click keeps its marker on that month, which
   the old fcChart meant to do but threw on). The schedule editor is `schedule.jsx` (`AlForm`, `AlList`, `AlAdds`;
-  loan names in descriptions are now escaped text). To do: Budget → Build budget (renderBuild, with its drag
-  handles); `renderBudget`'s React version hands that view to the old function.
+  loan names in descriptions are now escaped text). Build budget (`Build`, with `BillLine`, `IncLine`, `RecCard`,
+  `XmStep`); its ⋮⋮ drag/keyboard reordering still moves rows on the page and saves through orderRead/orderApply
+  (build.js), which redraws. Every tab is now drawn by React; the old draw functions stay (in `LEGACY`) only for the
+  parity check and for the pieces other code still calls (pop-ups, sankey, px/wi live text).
 - **Parity check** (`app/src/parity.js`, part of the self-test, run on the sample as loaded and again at the end):
   every converted screen is drawn by the old function (kept in `LEGACY` until phase 1 is done) and by React for many
   cases (every month, each range/view setting, an empty household) and must match: same elements, attributes (style
