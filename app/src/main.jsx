@@ -105,7 +105,8 @@ addParity({
     c.push({ label: 'loans changed by hand', set: () => both(folds(), tweak(s => { s.loans.forEach((l, i) => { l.name += i ? ' & <b>' : '\uFFFD'; if (i % 2) { l.orig = l.bal * 1.5; l.origStart = addM(l.start, -12); } else { l.due = 28; } if (i === 0) l.paySrc = 'bank'; }); const k = TK, m = s.months[k] || (s.months[k] = { act: {}, pay: {}, dep: {} }); m.pay = m.pay || {}; if (s.loans[0]) m.pay[s.loans[0].id] = s.loans[0].min + 100; m.lxp = { [s.loans[0] && s.loans[0].id]: 50 }; })()) });
     c.push({ label: 'a loan paid off, paid-off card open', set: () => both(shutK('lpaid', false)(), tweak(s => { s.loans.push({ id: 'done1', name: 'Old card', apr: 20, bal: 300, min: 100, due: 5, start: addM(TK, -10), color: '#fff' }); })()) });
     c.push({ label: 'every loan paid off', set: tweak(s => { s.loans = [{ id: 'done1', name: 'Old card', apr: 20, bal: 300, min: 100, due: 5, start: addM(TK, -10), color: '#fff' }]; s.al = []; }) });
-    // (A loan whose minimum never covers its interest isn't a case: the old pxText already throws on it, labS(null).)
+    c.push({ label: 'never paid off', set: tweak(s => { s.loans.push({ id: 'big1', name: 'Huge', apr: 30, bal: 100000, min: 50, due: 0, start: TK, color: '#abc' }); }) });
+    c.push({ label: 'never paid off, plan pays it', set: () => both(tweak(s => { s.loans.push({ id: 'big2', name: 'Big', apr: 20, bal: 5000, min: 50, due: 0, start: TK, color: '#abc' }); })(), (() => { const o = PX; PX = 500; return () => { PX = o; }; })()) });
     c.push({ label: 'starts later', set: () => both(folds(), tweak(s => { s.loans.push({ id: 'late1', name: 'Later', apr: 4, bal: 2000, min: 100, due: 1, start: addM(TK, 3), color: '#abc' }); })()) });
     const linkedIds = () => new Set(S.loans.map(l => l.acct).filter(Boolean));
     // a loan linked to the sample's student-loan account, as Track does (linkLoan)
@@ -201,13 +202,12 @@ addParity({
     c.push({ label: 'review done / swept', set: tweak(s => { const lk = addM(TK, -1), m = s.months[lk] || (s.months[lk] = { act: {}, pay: {}, dep: {} }); m.swept = 321; }) });
     c.push({ label: 'review dismissed', set: tweak(s => { const lk = addM(TK, -1), m = s.months[lk] || (s.months[lk] = { act: {}, pay: {}, dep: {} }); m.rv = 1; }) });
     c.push({ label: 'left-over rules', set: tweak(s => { const g = s.goals[0], l = s.loans[0]; s.al = [...(s.al || []), g && { id: 'x1', to: 'g:' + g.id, src: 'extra', mode: '%', v: 50, from: addM(TK, -2) }, l && { id: 'x2', to: 'l:' + l.id, src: 'extra', mode: '%', v: 30, from: addM(TK, -2) }].filter(Boolean); }) });
-    for (const k of [addM(TK, -1), TK, addM(TK, 1)]) c.push({ label: k + ' one-time items, overrides, set-asides, rollover', set: () => both(at(k), tweak(s => {
-      // a plan version from two months back, so roll-over has a month where it starts (the old carry() recurses forever
-      // when the earliest plan version rolls over: an existing bug, not something the parity check is for)
+    for (const k of [addM(TK, -1), TK, addM(TK, 1)]) c.push({ label: k + ' one-time items, overrides, set-asides', set: () => both(at(k), tweak(s => {
+      // the changes go in a new plan version from two months back
       const m = s.months[k] || (s.months[k] = { act: {}, pay: {}, dep: {} }), k0 = addM(k, -2), P = s.plans[k0] = clone(s.plans[Object.keys(s.plans).sort().filter(x => x <= k0).pop() || Object.keys(s.plans).sort()[0]]);
       m.extra = [{ id: 'oi1', kind: 'inc', name: 'Bonus & <tip>', amt: 400 }]; const fx = P.groups.find(g => !g.flex), fl = P.groups.find(g => g.flex);
       if (fx) { m.extra.push({ id: 'oi2', kind: 'item', gid: fx.id, name: 'Repair', amt: 150 }); if (fx.items[0]) { fx.items[0].freq = 6; fx.items[0].dm = 3; } if (fx.items[1]) fx.items[1].due = 2; if (fx.items[2]) fx.items[2].amt = 0; }
-      if (fl && fl.items[0]) { fl.items[0].roll = true; if (fl.items[1]) fl.items[1].amt = 0; }
+      if (fl && fl.items[1]) fl.items[1].amt = 0;
       if (s.goals[0]) { m.gplan = { [s.goals[0].id]: 90 }; } if (s.loans[0]) { m.lxp = { [s.loans[0].id]: 60 }; s.loans[0].due = 3; } })()) });
     c.push({ label: 'pending payments, hand purchases', set: () => both(tweak(s => { const m = s.months[TK] || (s.months[TK] = { act: {}, pay: {}, dep: {} }); const it = plan(TK).groups.find(g => g.flex); m.rc = [{ id: 'rc1', store: 'Corner & <shop>', amt: 12.5, item: it && it.items[0] && it.items[0].id, date: TK + '-05' }, { id: 'rc2', amt: 3, item: 'gone' }, { id: 'rc3', store: 'Bank one', amt: 9, bank: true }]; })(), (() => { const ids = Object.keys(S.txd || {}).filter(id => S.txd[id].k === TK); ids.forEach(i => PSET.add(i)); OPEN.add('rcl'); return () => { ids.forEach(i => PSET.delete(i)); OPEN.delete('rcl'); }; })()) });
     c.push({ label: 'linked loan', set: () => (tweak(s => { const a = (BK.loans || []).find(x => x.type === 'loan'); if (a) s.loans.push({ id: 'lk1', name: 'Linked loan', apr: 5, bal: openBal(a), min: 200, due: 10, start: TK, color: '#8fc9ff', acct: a.id, anch: { k: TK, eob: openBal(a) } }); s.loans.push({ id: 'h2', name: 'Hand & loan', apr: 3, bal: 900, min: 100, due: 0, start: addM(TK, -2), color: '#abc' }); }))() });

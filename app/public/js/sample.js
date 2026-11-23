@@ -184,6 +184,9 @@ async function selfTest(){const T=[],ok=(c,name,detail='')=>T.push({ok:!!c,name,
   const clickAll=sel=>[...document.querySelectorAll(sel)].filter(b=>b.offsetParent).forEach(b=>b.click());
   for(const t of['budget','loans','goals','wealth','history','bank','settings']){document.querySelector(`.tabs button[data-t="${t}"]`).click();const el=document.querySelector('#T-'+t);ok(!el.hidden&&el.innerHTML.length>200,`${t[0].toUpperCase()+t.slice(1)} tab draws`,`${el.innerHTML.length} characters`);
    ['budv','sview','bview','hrng','bfilt'].forEach(a=>clickAll(`#T-${t} [data-act="${a}"]`))}
+  // A loan whose payment never covers its interest: the extra payment plan says Never instead of crashing.
+  {const keep=S.loans;S.loans=[...keep,{id:'stk',name:'Stuck',apr:30,bal:100000,min:50,due:0,start:TK,color:'#abc'}];LP={};let txt='',err='';try{renderLoans();txt=$('#T-loans').textContent}catch(e){err=e.message}S.loans=keep;LP={};renderAll();
+   ok(!err&&/Never/.test(txt)&&/not paid off at this rate/.test(txt),'A loan that never gets paid off shows Never in the extra payment plan',err)}
   parity('after the other checks');
   ok(!errs.length,'No errors while drawing',errs.slice(0,3).join(' · '))}
  catch(e){ok(false,'Self-test crashed',e.stack||e.message)}

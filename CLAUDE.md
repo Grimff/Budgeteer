@@ -190,9 +190,8 @@ works (and `npm test` passes) after every step.
 - **Plan as totals see it** (`plan(k)` over `plan0(k)`, v4): a bill with `freq` 3/6/12 and due month `dm` becomes a
   monthly set-aside (`amt/freq`, `base` = bill amount); `billPaid` returns the set-aside as the paid amount (`real`
   = actual payment), so the due month never spikes; `sinkFund(id,k)` = set-asides − payments while it's a
-  set-aside bill; not-due months show **Set aside**. A spending item with `roll` adds `carry(gid,i,k)` = last
-  month's plan − spent, capped at ±one month's amount, completed months only (cache `PC`, cleared by
-  `editPlan`/`renderAll`). Build shows `i.base ?? i.amt` in amount boxes.
+  set-aside bill; not-due months show **Set aside**. Build shows `i.base ?? i.amt` in amount boxes. (Spending
+  roll-over, `i.roll`/`carry`, was removed; an old `roll` flag in saved data is ignored.)
 - `loans[{…,acct,anch,xp}]` – balance path from `start`/`bal`; unlogged months assume the minimum, plus the
   **planned extra** from this month on. `l.xp{YYYY-MM: amount}` = usual extra in versions, each in force from its
   month (`loanUsual`, `setUsual(l,m,v)` drops later versions), set from `xStart()` = the viewed month or the
@@ -358,8 +357,7 @@ works (and `npm test` passes) after every step.
   `ensureLoose`, listed first). It's an ordinary group to totals, filing and pop-ups; the Budget page labels its card
   "Not in a group", the money flow shows each of its items as its own node (`g<loose>~<item>`, `nodeKey` → `i:`), and
   History skips it when empty. **Ungroup** (`grpUngroup`) moves a group's items into it.
-- **Budget → Build budget** (`renderBuild`, `BUDV`): (v4: step 3 bills have a frequency/due-month select, step 4
-  items a Roll over box, step 5 goal monthly amounts are versions from `xStart()`, new step 6 Schedule (`xmStep` → `alList`), step 7
+- **Budget → Build budget** (`renderBuild`, `BUDV`): (v4: step 3 bills have a frequency/due-month select, step 5 goal monthly amounts are versions from `xStart()`, new step 6 Schedule (`xmStep` → `alList`), step 7
   Just for <month>, whose savings/loan extras show only for this month and later) scope bar (all months | from this month;
   elements under `[data-build]` set `INB` so edits start at `scopeStart()` and `commit()` re-files),
   Start, Income (+ `recurringIn` suggestions), Bills, Spending (+ catch-all choice, `topStores`; steps 3 and 4 render through `bGroups(fx)` with `billRow`/`flexRow`),

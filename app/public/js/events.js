@@ -1,7 +1,7 @@
 'use strict';
 /* ---------- render all ---------- */
 const TABR={budget:()=>renderBudget(),loans:()=>renderLoans(),goals:()=>renderGoals(),wealth:()=>renderWealth(),history:()=>renderHistory(),bank:()=>renderBank(),settings:()=>renderSettings()};
-function renderAll(enter){LP={};GP={};XS=null;PC={};TXI=null;ALC={};loanSync();const lm=lab(S.cur);$('#mlab').textContent=lm;$('#mp').value=S.cur;$('#tbtn').hidden=S.cur===TK;
+function renderAll(enter){LP={};GP={};XS=null;TXI=null;ALC={};loanSync();const lm=lab(S.cur);$('#mlab').textContent=lm;$('#mp').value=S.cur;$('#tbtn').hidden=S.cur===TK;
  // Only the visible tab is drawn; the others are redrawn when switched to (every tab switch goes through commit → renderAll).
  // Shown before it's drawn, so charts that size themselves to the tab (History) measure its real width.
  $$('.tabs button').forEach(b=>b.classList.toggle('on',b.dataset.t===S.tab));document.body.className='tab-'+S.tab;$$('.tab').forEach(t=>{t.hidden=t.dataset.tab!==S.tab;t.classList.remove('enter')});
@@ -56,7 +56,6 @@ document.addEventListener('change',e=>{const t=e.target,d=t.dataset;INB=!!(t.clo
  if(!d.c)return;
  if(d.c==='loan'){const l=S.loans.find(x=>x.id===d.id);if(!l)return;if(d.f==='start'){if(t.value)l.start=t.value}else if(d.f==='origStart'){l.origStart=t.value||''}else if(d.f==='due')l.due=Math.min(31,Math.round(num(t.value)));else if(d.f==='xtra')setUsual(l,xStart(),Math.max(0,num(t.value)));else l[d.f]=num(t.value)}
  if(d.c==='hh'){S.hh={...(S.hh||{}),[d.f]:t.value.trim()};brandSet();return commit()}
- if(d.c==='roll'){editPlan(p=>{const g=p.groups.find(x=>x.id===d.g),i=g&&g.items.find(x=>x.id===d.id);if(i){if(t.checked)i.roll=true;else delete i.roll}});toast(t.checked?'Unspent money now carries into next month':'Rollover off');return commit()}
  if(d.c==='bankfrom'){S.bankFrom=t.value||'';save();bankLoad();return}
  if(d.c==='refresh'){const b=d.f==='open'?{open:t.checked}:{hours:+t.value};fetch('api/bank/settings',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify(b)}).then(async r=>{const j=await r.json().catch(()=>({}));if(!r.ok)throw new Error(j.error||'Couldn’t save');if(BK.st)BK.st.refresh=j.refresh;toast(syncWord(j.refresh));renderSettings()}).catch(e=>{toast(e.message);renderSettings()});return}
  if(d.c==='goal'){const g=S.goals.find(x=>x.id===d.id);if(!g)return;if(d.f==='auto')g.auto=t.checked;else if(d.f==='monthly')verSet(g,'mp',xStart(),Math.max(0,num(t.value)));else if(d.f==='by'){if(t.value)g.by=t.value;else delete g.by}else g[d.f]=num(t.value)}

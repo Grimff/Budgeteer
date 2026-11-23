@@ -115,7 +115,7 @@ export function ThisMonth() {
       const amt = +i.amt || 0, fa = flexAct(k, i.id), nr = SRV ? rulesFor('i:' + i.id).length : 0; pl += amt; a += fa || 0; if (amt <= 0.5) ua += fa || 0; else if (fa > amt + 0.5) ov += fa - amt;
       const s = fa == null ? stp('Nothing yet', 'dim') : amt <= 0.5 ? stp('No plan', 'dim') : fa <= amt + 0.5 ? stp(f0(amt - fa) + ' left', 'ok') : stp(f0(fa - amt) + ' over', 'bad');
       const inp = SRV ? null : <input className="in a" data-k="act" data-id={i.id} data-key={'fa-' + i.id} inputMode="decimal" defaultValue={m.act[i.id] != null ? m.act[i.id] : ''} placeholder="—" aria-label={`${tx(i.name)} actual`} />;
-      return { v: 'i:' + i.id, name: i.name, tag: once1(i), meta: [i.carry ? `${i.carry > 0 ? '+' : '−'}${f0(Math.abs(i.carry))} rolled over from ${mon(addM(k, -1)).slice(0, 3)}` : i.roll ? 'rolls over' : '', nr ? nr + ' store' + (nr === 1 ? '' : 's') + ' linked' : '', i.id === fdf ? 'unlinked purchases land here' : ''].filter(Boolean).join(' · '), pl: amt, a: fa, s, inp };
+      return { v: 'i:' + i.id, name: i.name, tag: once1(i), meta: [nr ? nr + ' store' + (nr === 1 ? '' : 's') + ' linked' : '', i.id === fdf ? 'unlinked purchases land here' : ''].filter(Boolean).join(' · '), pl: amt, a: fa, s, inp };
     });
     LG.push({ kind: gr.loose ? 'Not in a group' : 'Spending', name: gr.name, c: gr.color, pl, a, ua, rows, over: ov > 0.5, ah: 'Spent' });
   });

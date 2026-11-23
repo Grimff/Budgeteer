@@ -72,7 +72,7 @@ function diff(A, B) {
   return '';
 }
 // The caches renderAll clears before every draw.
-function fresh() { LP = {}; GP = {}; XS = null; PC = {}; TXI = null; ALC = {}; loanSync(); }
+function fresh() { LP = {}; GP = {}; XS = null; TXI = null; ALC = {}; loanSync(); }
 
 // A piece of a screen that a whole-screen case can't reach (e.g. hidden in sample mode): its old string function and
 // its component are each drawn into a scratch tab and compared the same way. piece: {name, html(): string,

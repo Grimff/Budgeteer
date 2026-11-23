@@ -53,9 +53,10 @@ function DebtChart() {
 function PxText() {
   const X = Math.max(0, PX ?? pxNow()), a = pxSim(0, pxHow(), true), b = pxSim(X, pxHow());
   if (!b.L.length) return <p className="mut">No loans left to pay off.</p>;
-  const sn = mdiff(b.end, a.end), fin = [...b.L].sort((x, y) => (x.end || '9999').localeCompare(y.end || '9999'));
-  return <><div className="pxk"><div><small>Debt free</small><b>{labS(b.end)}</b><span className={sn > 0 ? 'up' : ''}>{sn > 0 ? mo(sn) + ' sooner than minimums' : 'same as minimums'}</span></div><div><small>Interest saved</small><b className="g">{f0(Math.max(0, a.int - b.int))}</b><span>vs paying only minimums</span></div><div><small>Total interest left</small><b>{f0(b.int)}</b><span>from {labS(b.m0)} on</span></div></div>{' '}
-    <ol className="pxo">{fin.map((o, j) => { const f = Object.keys(o.x).sort()[0]; return <li key={j}><b>{tx(o.l.name)}</b> <span className="dim">{`${o.l.apr}`}% · {f0(o.b0 ?? 0)}</span><span>{f ? `extra from ${labS(f)}, ` : ''}paid off {labS(o.end)}</span></li>; })}</ol></>;
+  // never: a loan this plan doesn't pay off (its payment doesn't cover its interest); aNo: one that minimums alone don't
+  const never = b.L.some(o => !o.end), aNo = a.L.some(o => !o.end), sn = never || aNo ? 0 : mdiff(b.end, a.end), fin = [...b.L].sort((x, y) => (x.end || '9999').localeCompare(y.end || '9999'));
+  return <><div className="pxk"><div><small>Debt free</small><b>{never ? 'Never' : labS(b.end)}</b><span className={sn > 0 || (aNo && !never) ? 'up' : ''}>{never ? 'a loan isn’t paid off at this rate' : aNo ? 'minimums alone never pay it off' : sn > 0 ? mo(sn) + ' sooner than minimums' : 'same as minimums'}</span></div><div><small>Interest saved</small><b className="g">{f0(Math.max(0, a.int - b.int))}</b><span>vs paying only minimums</span></div><div><small>Total interest left</small><b>{f0(b.int)}</b><span>from {labS(b.m0)} on</span></div></div>{' '}
+    <ol className="pxo">{fin.map((o, j) => { const f = Object.keys(o.x).sort()[0]; return <li key={j}><b>{tx(o.l.name)}</b> <span className="dim">{`${o.l.apr}`}% · {f0(o.b0 ?? 0)}</span><span>{f ? `extra from ${labS(f)}, ` : ''}{o.end ? 'paid off ' + labS(o.end) : 'not paid off at this rate'}</span></li>; })}</ol></>;
 }
 
 function PxCard() {
