@@ -206,8 +206,8 @@ document.addEventListener('click',e=>{const nd=e.target.closest('#sk .nd'),lk=nd
   MOW(lk).swept=amt;toast(done.length?'Sent: '+done.join(', '):'Nothing to send: your rules keep it');return commit()}
  case'frng':FR=d.r;try{localStorage.setItem('pfb_fr',FR)}catch(_){}return fcBody();
  case'wfReset':WFS={inc:0,cost:0,extra:0};return renderForecast();
- case'spOpen':{const sc=b.closest('dialog')||b.closest('section')||document,box=sc.querySelector(`[data-spf="${CSS.escape(d.id)}"]`);if(!box)return;box.hidden=!box.hidden;if(!box.hidden){box.innerHTML=spRows(d.id)+'<div class="spa"><button class="lnk" data-act="spAdd">Add a part</button><span class="spl dim"></span><button class="btn sm" data-act="spSave">Save split</button></div>';spLeft(box)}return}
- case'spAdd':{const box=b.closest('.spf');if(!box)return;box.querySelector('.spa').insertAdjacentHTML('beforebegin',spRows(box.dataset.spf).split('</div>').slice(1).join('</div>'));spLeft(box);return}
+ case'spOpen':{const sc=b.closest('dialog')||b.closest('section')||document,box=sc.querySelector(`[data-spf="${CSS.escape(d.id)}"]`);if(!box)return;box.hidden=!box.hidden;if(!box.hidden)spForm(box,d.id);return}
+ case'spAdd':{const box=b.closest('.spf');if(!box)return;spAddPart(box);return}
  case'spSave':{const box=b.closest('.spf');if(box)spSave(box);return}
  case'rvDone':{MOW(addM(TK,-1)).rv=1;return commit()}
  case'ps':PS=d.v;return renderLoans();

@@ -77,6 +77,10 @@ function txAssign(t,v,auto,km){S.txd||(S.txd={});S.merchantMap||(S.merchantMap={
 // Split one bank transaction between categories (Costco → Food + Household). Each part is filed like a normal
 // transaction ("<id>~n", sp = the bank transaction); Undo on any part puts the whole transaction back to review.
 function spRows(id){const r=S.txd[id],dir=r.amt<0?'in':'out';return [[r.v,Math.abs(r.amt)],['','']].map(([v,a])=>`<div class="spr"><select class="in" aria-label="Category">${txOptions(r.k,v,dir)}</select><input class="in a" data-live="sp" inputmode="decimal" value="${a}" placeholder="$0" aria-label="Amount"></div>`).join('')}
+// The form in a Move panel's .spf box: the transaction's current category and amount plus one empty part; Add a part adds
+// another empty one below what's typed.
+function spForm(box,id){box.innerHTML=spRows(id)+'<div class="spa"><button class="lnk" data-act="spAdd">Add a part</button><span class="spl dim"></span><button class="btn sm" data-act="spSave">Save split</button></div>';spLeft(box)}
+function spAddPart(box){box.querySelector('.spa').insertAdjacentHTML('beforebegin',spRows(box.dataset.spf).split('</div>').slice(1).join('</div>'));spLeft(box)}
 function spLeft(box){const id=box.dataset.spf,r=S.txd[id],tot=Math.abs(+r.amt||0),used=[...box.querySelectorAll('.spr input')].reduce((a,i)=>a+num(i.value||0),0);const o=box.querySelector('.spl');if(o)o.textContent=Math.abs(tot-used)<0.005?'Adds up':(tot-used>0?f2(tot-used)+' left to assign':f2(used-tot)+' too much');return tot-used}
 function spSave(box){const id=box.dataset.spf,r=S.txd[id];if(!r)return;const parts=[...box.querySelectorAll('.spr')].map(x=>({v:x.querySelector('select').value,a:r2(num(x.querySelector('input').value||0))})).filter(x=>x.v&&x.a>0.004);
  const tot=r2(Math.abs(+r.amt||0));if(parts.length<2)return toast('Pick at least two categories');if(Math.abs(parts.reduce((a,x)=>a+x.a,0)-tot)>0.005)return toast('The parts need to add up to '+f2(tot));

@@ -123,7 +123,9 @@ works (and `npm test` passes) after every step.
   rule options keep their own state, so typing the text or ticking a box recounts without redrawing the field; lnkOpen,
   the #lpick/#lq listeners and Save stay in bank.js), the amount dialog (`openDR` in `popups/Amount.jsx`: #dsel and #dc;
   the #dp line is still the HTML string `DLG.prev` returns, via dprev). A parity screen or case can give `call` to draw
-  through an opener called by name (payDialog/depDialog → openD). To do: split form (spRows), the money-flow chart and its card (sankey, skCard, compareView).
+  through an opener called by name (payDialog/depDialog → openD). The split form (`spFormR`/`spAddPartR` in
+  `popups/Split.jsx`, swapped in for `spForm`/`spAddPart`, which the spOpen/spAdd clicks call): one root per `.spf` box, so
+  Add a part keeps what's typed; spLeft/spSave still read the boxes. To do: the money-flow chart and its card (sankey, skCard, compareView).
 - **Phase 3:** state and events into React (handlers on elements instead of `data-act` switches, `S` in a store with
   a hook, real re-renders instead of remounts); then the math into ES modules; then remove the old draw functions
   and the classic-script globals.

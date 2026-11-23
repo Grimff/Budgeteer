@@ -14,6 +14,7 @@ import { Build } from './screens/Build.jsx';
 import { catRenderR, flowRenderR } from './popups/Category.jsx';
 import { lnkListR, lnkRuleR } from './popups/Link.jsx';
 import { openDR } from './popups/Amount.jsx';
+import { spFormR, spAddPartR } from './popups/Split.jsx';
 
 replaceScreen('renderHistory', () => draw($('#T-history'), <History />));
 // Budget: This month is React; Build budget and Forecast are still drawn by renderBuild / renderForecast. The
@@ -28,6 +29,8 @@ replaceScreen('flowRender', flowRenderR);
 replaceScreen('lnkList', lnkListR);
 replaceScreen('lnkRule', lnkRuleR);
 replaceScreen('openD', openDR);
+replaceScreen('spForm', spFormR);
+replaceScreen('spAddPart', spAddPartR);
 replaceScreen('renderBuild', () => draw($('#T-budget'), <Build />));
 replaceScreen('renderForecast', () => { draw($('#T-budget'), <Forecast />); fcBody(); });
 // bankBadge (the count on the Bank tab) ran at the end of the old renderBank once the bank was set up.
@@ -372,6 +375,25 @@ addParity({
     add('odd names', () => { payDialog(S.loans[0] && S.loans[0].id); depDialog(S.goals[0] && S.goals[0].id); }, tweak(s => { s.loans.forEach(l => { l.name += ' & <co>'; }); s.goals.forEach(g => { g.name = '"' + g.name + '" & <x>'; }); }));
     add('no choices or chips', () => openD({ title: 'Plain', amt: null, save: () => {} }));
     add('choice matching none', () => openD({ title: 'Plain', sel: [{ v: 'a', l: 'A' }, { v: 'b', l: 'B & <b>' }], selV: 'zz', chips: [{ l: 'x', v: 0 }], amt: 0, ok: 'Go', del: () => {}, save: () => {} }));
+    return c;
+  },
+});
+// The split form in a scratch .spf box, for filings of each kind (money out and in, each category type, a removed
+// item): as opened, after Add a part twice, and with values typed and chosen before adding (they must stay).
+const spBox = id => () => { const b = document.createElement('div'); b.className = 'spf'; b.id = 'spx'; b.dataset.spf = id; $('main').appendChild(b); return () => b.remove(); };
+addParity({
+  name: 'Split form', fn: 'spForm', also: ['spAddPart'], el: '#spx', cases: () => {
+    const c = [], E = Object.entries(S.txd || {}).filter(([, r]) => r.v !== 'split' && !r.sp && Math.abs(+r.amt || 0) > 0.02), seen = new Set();
+    const pick = E.filter(([, r]) => { const t = (r.amt < 0 ? 'in ' : 'out ') + r.v.split(':')[0]; if (seen.has(t)) return false; seen.add(t); return true; });
+    for (const [id, r] of pick) {
+      const t = `${r.amt < 0 ? 'in' : 'out'} ${r.v}`, b = () => $('#spx');
+      c.push({ label: t, set: spBox(id), call: () => spForm(b(), id) });
+      c.push({ label: t + ' + 2 parts', set: spBox(id), call: () => { spForm(b(), id); spAddPart(b()); spAddPart(b()); } });
+      c.push({ label: t + ' typed, then a part', set: spBox(id), call: () => { spForm(b(), id); const s = b().querySelectorAll('.spr'); s[0].querySelector('input').value = '1.5'; s[1].querySelector('input').value = '7'; s[1].querySelector('select').selectedIndex = 3; spLeft(b()); spAddPart(b()); } });
+    }
+    const [id0] = pick[0] || [];
+    if (id0) for (const v of ['xfer', 'skip', 'once', 'i:gone', S.loans[0] ? 'l:' + S.loans[0].id : 'xfer', S.goals[0] ? 'g:' + S.goals[0].id : 'skip']) c.push({ label: 'filed as ' + v, set: () => both(tweak(s => { s.txd[id0].v = v; })(), spBox(id0)()), call: () => { spForm($('#spx'), id0); spAddPart($('#spx')); } });
+    if (id0) c.push({ label: 'odd names, other month', set: () => both(tweak(s => { s.txd[id0].k = addM(TK, -1); Object.values(s.plans).forEach(p => p.groups.forEach(g => { g.name += ' & <g>'; g.items.forEach(i => { i.name = '"' + i.name + '" <i>'; }); })); })(), spBox(id0)()), call: () => spForm($('#spx'), id0) });
     return c;
   },
 });
