@@ -1,6 +1,7 @@
 // The React screens. Loaded by index.html after the other js files (which it uses by name: S, plan, f0, …) and
 // before sample.js / server-sync.js, so the app starts with these screens in place.
 import { draw, replaceScreen, LEGACY } from './bridge.js';
+import { addActScreen, runActParity } from './actparity.js';
 import { addParity, addPiece, runParity, monthsToTry, emptyHousehold, withS, at } from './parity.js';
 import { History } from './screens/History.jsx';
 import { Wealth } from './screens/Wealth.jsx';
@@ -522,5 +523,11 @@ addParity({
     return c;
   },
 });
+// Action parity: screens whose buttons have React click handlers, each clicked with the old switch and with its handler.
+const show = (tab, more) => () => { const o = { tab: S.tab, budv: BUDV }; S.tab = tab; const u = more && more(); renderAll(); return () => { if (u) u(); S.tab = o.tab; BUDV = o.budv; }; };
+addActScreen({ name: 'History', set: show('history') });
+addActScreen({ name: 'History, 12 months, older month', set: show('history', () => both(setHR('12'), at(addM(TK, -2)))) });
+addActScreen({ name: 'History, starting later', set: show('history', tweak(s => { s.histFrom = addM(TK, -3); })) });
+window.reactActParity = runActParity;
 window.reactParity = runParity;
 if (DEMO) window.LEGACY_SCREENS = LEGACY;   // sample mode only: the old draw functions, for comparing by hand

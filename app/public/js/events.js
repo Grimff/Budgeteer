@@ -74,6 +74,7 @@ document.addEventListener('input',e=>{const t=e.target;t._sel=false;if(!t.matche
  let c=0,i=0;while(i<f.length&&c<keep){if(/[0-9.]/.test(f[i]))c++;i++}try{t.setSelectionRange(i,i)}catch(_){}},true);
 document.addEventListener('click',e=>{const nd=e.target.closest('#sk .nd'),lk=nd?null:e.target.closest('#sk .lk');if((nd||lk)&&K){if(SKD){SKD=false;return}const n=nd?K.all[+nd.dataset.n]:K.L[+lk.dataset.l].t;return skOpen(n,{l:e.clientX,r:e.clientX,y:e.clientY})}
  if(!e.target.closest('#skc')&&!e.target.closest('dialog')&&$('#skc:not([hidden])'))skClose();
+ if(e.rx)return;   // handled by the element's own React handler (bridge.js on)
  const b=e.target.closest('[data-act]');if(!b)return;const d=b.dataset;INB=!!b.closest('[data-build]');
  switch(d.act){
  case'bankConnect':return bankConnect(d.id||'',d.kind||'');

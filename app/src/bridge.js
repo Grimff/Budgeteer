@@ -28,3 +28,15 @@ export function replaceScreen(name, fn) {
   LEGACY[name] = window[name];
   window[name] = fn;
 }
+
+// Click handlers on elements (phase 3). on('x') runs ACT.x (actions.js) with the element's data-* values, the element
+// and the native click, setting INB (inside Build budget) as the delegated listener did, and marks the click so the old
+// click switch in events.js skips it. REACT_EVENTS = false (only the action parity check) leaves the click to the old
+// switch instead, to compare the two.
+import { ACT } from './actions.js';
+window.REACT_EVENTS = true;
+export const on = name => e => {
+  if (!window.REACT_EVENTS) return;
+  const b = e.currentTarget; e.nativeEvent.rx = true; INB = !!b.closest('[data-build]');
+  ACT[name](b.dataset, b, e.nativeEvent);
+};

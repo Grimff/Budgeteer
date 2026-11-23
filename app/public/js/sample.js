@@ -94,7 +94,7 @@ async function selfTest(){const T=[],ok=(c,name,detail='')=>T.push({ok:!!c,name,
  const D=DEMOD,past=addM(TK,-1),near=(a,b)=>Math.abs(a-b)<0.01,sumTx=(k,re,acct)=>r2(D.tx.filter(t=>t.date.startsWith(k)&&re.test(t.name)&&(!acct||t.account===acct)).reduce((a,t)=>a+t.amount,0));
  // The React screens must draw what the old screens drew (app/src/parity.js): checked on the sample as loaded and again at the end.
  const parity=when=>{if(window.reactParity)reactParity().forEach(r=>ok(r.ok,r.name+' · '+when,r.detail));else ok(false,'React screens loaded')};
- try{parity('sample as loaded');
+ try{parity('sample as loaded');if(window.reactActParity)reactActParity().forEach(r=>ok(r.ok,r.name,r.detail));
   ok(BK.tx.length===D.tx.length&&BK.accts.length===5,'Sample bank data loaded',`${BK.tx.length} transactions, ${BK.accts.length} accounts`);
   ok(inbox().length===0,'Every sample transaction is filed',`${inbox().length} left to review`);
   // Income, a fixed bill, groceries and dining for last month, straight from the transactions.
