@@ -75,6 +75,20 @@ server against a real `data/` folder while testing; use `tools/realtest.js`.
 
 - `GET /api/health`, `GET /api/rev`, `GET/PUT /api/data` (PUT with `baseRev` → 409 on conflict;
   atomic write; daily backup). Optional `BASIC_AUTH=user:pass`.
+- **Backups:** `dailyBackup` copies the budget before the first save of each local day (`today()`) to
+  `backups/budgeteer-YYYY-MM-DD.json`. `GET /api/backups` (`listBackups`: daily + `budgeteer-before-restore-<time>.json`),
+  `POST /api/backups/restore {id}` (listed ids only; saves the current budget as a before-restore copy, keeps 10, writes
+  the copy with a new rev). Client: `bkList`/`bkRestore`/`bkCard` in settings.js (Settings → General → Backups).
+- **Phone alerts:** `NOTIFY_URL` (ntfy topic URL → JSON publish `{topic,title,message}` to the server root; a URL with
+  `/api/webhook/` → `{title,message}`), optional `NOTIFY_AUTH`. `GET /api/notify` → `{configured,target}`, `POST
+  /api/notify {alerts:[{key,title,message}]}` sends each key once (`data/notify-sent.json`, 62 days, serialized),
+  `POST /api/notify/test`. `syncAll` sends `conn:<item>:<code>` itself for connections with errors.
+- **CSV import:** `POST /api/bank/import {rows:[{date,name,amount}], account | newAccount{name,type}, balance?}`,
+  `DELETE /api/bank/import/:acctId`. Imported accounts are one more item (`item_id:'csv'`, `kind:'csv'`, no token) in
+  `bank-connections.json`; transactions go to `bank-transactions.json` (`item:'csv'`), balances to `bank-loans.json`,
+  so every bank route serves them unchanged; `syncAll` skips the item; Plaid-only routes need keys, these don't
+  (`status.configured` is true with only CSV accounts; `status.plaid` says whether keys are set). Ids hash
+  account|date|amount|name|repeat-count, so re-imports skip. Refused (409) while a sync runs (`bankBusy`).
 - **Efficiency:** GET routes read JSON through `readCached` (`viewBank/viewTx/viewLoans/viewInv`, cached until the
   file's size or mtime changes; never mutate what they return). Code that edits a file uses `loadX()` (fresh read)
   and `writeJ`/`writeAtomic`, which update/clear the cache. Responses over 1 KB are gzipped when accepted (`res.gz`);
@@ -228,6 +242,15 @@ server against a real `data/` folder while testing; use `tools/realtest.js`.
 
 ## Screens
 
+- **Needs a look** (`js/alerts.js`, `alertsCard` above the setup checklist, current month only): `alertsNow()` = banks
+  with errors, linked bills (have a rule) not paid by their due day or due within 3 days (`isDue`, `billPaid`), flex
+  items over plan (`flexAct`), transactions to sort (`inbox`). Keys carry the month; **Hide** (`ntHide`) stores keys
+  in localStorage `pfb_alerts_hidden`. `notifyAlerts()` runs after each `bankLoad` and posts them to `/api/notify`
+  (skipped in sample mode). Settings → Connections → Phone alerts (`ntCard`, `ntTest`).
+- **CSV import screen** (`js/csv-import.js`, `csvCard` in Settings → Connections, also shown without Plaid keys):
+  `cvSplit` (quotes, CRLF, BOM, `,`/`;`/tab), `cvNum` (parentheses, currency, decimal comma), `cvDate`
+  (`ymd`/`mdy`/`dmy`), `cvLoadText` guesses columns, `cvRows` builds Plaid-signed rows, `cvImport`/`cvDel`. State in
+  `CV` (not saved); selects use `data-cv` and inputs `data-cvt` with their own listeners (not the main change listener).
 - **Only the visible tab is drawn:** `renderAll` shows the tab, then calls `TABR[S.tab]`; hidden tabs keep stale HTML
   until switched to. Every tab switch must go through `commit()`/`renderAll` (all `S.tab=` sites do). Calling one
   tab's `renderX()` directly is fine. Tab draw functions must stay free of side effects (no saves or data changes).
@@ -363,9 +386,9 @@ width (375px) with no sideways scrolling.
 
 ## Open items
 
-- **Phone install + https:** serve it over https (e.g. `tailscale serve` or a reverse proxy). Then add manifest + icon +
-  full-screen (needs `server.js` to serve them), an optional offline mode, and Plaid OAuth return
-  handling with `PLAID_REDIRECT_URI` set to the https address.
+- **https:** the manifest and iPhone meta tags give Add to Home Screen with an icon and full screen over plain http.
+  Serving over https (e.g. `tailscale serve`) would also allow an offline mode and Plaid OAuth return handling with
+  `PLAID_REDIRECT_URI` set to the https address.
 - **Brokerage investment history:** if Plaid sends no flows, Retirement goals show balance but no
   contributions; check the server log.
 - **Payment source** (`bankSrc(l)`): hand-added loans always use bank filings; a linked loan uses its
@@ -391,5 +414,5 @@ width (375px) with no sideways scrolling.
   first sync after connecting.
 - Liabilities covers student loans, mortgages and cards only; enter APR/minimum for auto and
   personal loans by hand.
-- **Ideas not built yet** (the plan's v7): health-check dot on the gear, phone install
-  (Tailscale HTTPS + manifest), in-app alerts, restore a backup in the app.
+- **Ideas not built yet:** health-check dot on the gear; separate logins per household member; a React rewrite
+  (could go tab by tab, one `TABR` entry at a time, with the budget math moved into shared modules first).

@@ -71,6 +71,7 @@ If two people edit at the same moment, the app keeps the server's copy and re-ap
 | `BANK_DETAIL_HOURS` | Hours between refreshes of loan details and investment holdings on automatic syncs (default 24). **Sync now** always refreshes them. |
 | `BANK_HISTORY_DAYS` | Days of history pulled when you connect a new bank (default 365). |
 | `PLAID_COUNTRIES`, `PLAID_REDIRECT_URI` | Optional Plaid settings. |
+| `NOTIFY_URL`, `NOTIFY_AUTH` | Phone alerts (see below). |
 
 ## Bank sync (Plaid)
 
@@ -113,6 +114,41 @@ account in the Plaid dashboard (both are paid add-ons). Then:
 - **Brokerages:** use **Connect a brokerage** on the Wealth tab. The Wealth tab shows net worth, bank
   balances, holdings and how your investments did with deposits left out. Balance history starts the
   day you connect.
+
+## Accounts without Plaid (CSV import)
+
+Settings → Connections → **Import from a CSV file**. Download transactions from the bank's website as CSV, pick
+the file, check the guessed columns against the preview (purchases should be under **Out**), choose or name the
+account, and import. Import again whenever you like: rows already imported are skipped. Imported accounts are
+filed, budgeted and shown in Wealth and Loans like connected ones. This works without any Plaid keys.
+
+## Alerts
+
+The Budget tab's **Needs a look** card lists what needs attention this month: a bank that needs you to sign in
+again, a linked bill that hasn't shown up by its due day (or is due within 3 days), a spending category over plan,
+and transactions to sort. **Hide** removes one in that browser.
+
+To get them on your phone, set `NOTIFY_URL` in `.env` and restart:
+
+- **ntfy:** `NOTIFY_URL=https://ntfy.sh/pick-a-long-random-topic` (or your own ntfy server), and subscribe to that
+  topic in the ntfy app. For a protected topic, set `NOTIFY_AUTH=Bearer tk_...`.
+- **Home Assistant:** `NOTIFY_URL=http://homeassistant.local:8123/api/webhook/your-id`, with an automation that
+  sends `{{ trigger.json.title }}` / `{{ trigger.json.message }}` to your phone.
+
+Each alert is sent once. Alerts about bills and spending go out after a bank refresh while the app is open in a
+browser somewhere; bank sign-in problems are sent by the server itself. Settings → Connections → **Phone alerts**
+has a test button.
+
+## Backups
+
+The server keeps a copy of the budget each day (`BACKUPS_KEEP` days) in `data/backups/`. Settings → General →
+**Restore a daily copy** lists them; restoring keeps the budget from just before as its own copy, so you can switch
+back. **Download backup** / **Restore from a file** work with a file you keep yourself.
+
+## On your phone
+
+Open the app in your phone's browser and use **Add to Home Screen** (Safari's Share menu, or Chrome's menu). It opens
+full-screen with its own icon.
 
 ## Updating
 
