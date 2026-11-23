@@ -221,7 +221,9 @@ server against a real `data/` folder while testing; use `tools/realtest.js`.
   what that rule filed; Move / Undo / Add are manual.
 - Fixed bills and income get actuals from `txd` (`txIdx` → `billPaid`, `incGot`); groceries/flex
   use `flexAct` (filed + hand entries, never the stored `act`, which could drift).
-- `totals()`: bills = paid else planned; income this month = max(received, planned).
+- `totals()`: bills = paid else planned, spending = filed else planned; income this month = max(received, planned).
+  Exception (`seenNone(k,i)`): in a finished month (`k<TK`), a bank-linked line (has a rule, not a set-aside bill) with
+  nothing filed counts $0, not its plan, in `totals` and History's `monthSum` alike (the ledger already showed $0).
 - **Budget start** (`budStart()`): the Start date (`bankFrom`) month, or the first month the bank has
   transactions for when that is later. `firstMonth()` and `histMonths()` use it; loan tracking dates
   never move the budget's start. Older plan versions may exist in data; they are ignored.

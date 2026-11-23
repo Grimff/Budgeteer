@@ -152,7 +152,7 @@ const xmOn=k=>xmAt(k).some(a=>a.id!=='wf');
 const destName=to=>to==='keep'?'Kept in checking':to==='snow'?'Snowball':to.startsWith('g:')?((S.goals.find(g=>'g:'+g.id===to)||{}).name||'Removed goal'):((S.loans.find(l=>'l:'+l.id===to)||{}).name||'Removed loan');
 function totals(k=S.cur){const p=plan(k),m=MO(k);let inc=0,incA=0,incN=0,fixed=0,fixedA=0,fixedN=0,flexP=0,flexA=0,flexN=0,flexItems=0;
  p.income.forEach(i=>{inc+=+i.amt||0;incA+=incActual(k,i);if(!i.once&&incGot(k,i.id))incN++});
- p.groups.forEach(g=>g.items.forEach(i=>{if(g.flex){flexItems++;flexP+=+i.amt||0;const fa=flexAct(k,i.id);if(fa!=null){flexA+=fa;flexN++}else flexA+=+i.amt||0}else{fixed+=+i.amt||0;const pd=billPaid(k,i.id);fixedA+=pd?pd.amt:+i.amt||0;if(pd)fixedN++}}));
+ p.groups.forEach(g=>g.items.forEach(i=>{if(g.flex){flexItems++;flexP+=+i.amt||0;const fa=flexAct(k,i.id);if(fa!=null){flexA+=fa;flexN++}else flexA+=seenNone(k,i)?0:+i.amt||0}else{fixed+=+i.amt||0;const pd=billPaid(k,i.id);fixedA+=pd?pd.amt:seenNone(k,i)?0:+i.amt||0;if(pd)fixedN++}}));
  let loans=0,loansA=0;S.loans.forEach(l=>{loans+=loanPlan(l,k);const r=k<l.start?null:row(l,k);loansA+=r?r.pay:(k<l.start?l.min:0)});
  let save=0,saveA=0;S.goals.forEach(g=>{save+=goalPlan(g,k);saveA+=savedIn(g,k)});
  if(k>=TK&&(WF.inc||WF.cost)){inc+=WF.inc;incA+=WF.inc;fixed+=WF.cost;fixedA+=WF.cost}
@@ -177,3 +177,6 @@ const ring=(pct,c,sz=118)=>{const R=sz/2-10,L=2*Math.PI*R,p=Math.max(0,Math.min(
 // every over/under comparison leaves out (Budget summary, ledger, Compare, review, History, alerts).
 const hasPlan=i=>(+i.amt||0)>0.5;
 function unplannedA(k){let u=0;plan(k).groups.forEach(g=>g.items.forEach(i=>{if(hasPlan(i))return;if(g.flex)u+=flexAct(k,i.id)||0;else{const pd=billPaid(k,i.id);if(pd)u+=pd.amt}}));return u}
+// A finished month: a line linked to the bank (it has a rule) that saw nothing spent or paid spent $0, not its plan.
+// Lines tracked by hand, set-aside bills (their monthly set-aside is real) and this or later months still count the plan.
+const seenNone=(k,i)=>SRV&&k<TK&&!(+i.freq>1)&&rulesFor('i:'+i.id).length>0;

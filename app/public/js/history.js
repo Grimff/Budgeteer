@@ -1,7 +1,7 @@
 'use strict';
 /* ---------- render: history ---------- */
 function monthSum(k){const p=plan(k),m=MO(k),rows=[];let inc=0;p.income.forEach(i=>{inc+=incActual(k,i)});
- let spU=0;p.groups.forEach(g=>{if(g.loose&&!g.items.length)return;let pl=0,ac=0,est=false;g.items.forEach(i=>{const a=+i.amt||0;pl+=a;if(g.flex){const fa=flexAct(k,i.id);if(fa!=null){ac+=fa;if(a<=0.5)spU+=fa}else{ac+=a;est=true}}else{const pd=billPaid(k,i.id);ac+=pd?pd.amt:a;if(pd&&a<=0.5)spU+=pd.amt}});rows.push({name:g.name,c:g.color,pl,ac,est:g.flex&&est,flex:g.flex})});
+ let spU=0;p.groups.forEach(g=>{if(g.loose&&!g.items.length)return;let pl=0,ac=0,est=false;g.items.forEach(i=>{const a=+i.amt||0;pl+=a;if(g.flex){const fa=flexAct(k,i.id);if(fa!=null){ac+=fa;if(a<=0.5)spU+=fa}else if(!seenNone(k,i)){ac+=a;est=true}}else{const pd=billPaid(k,i.id);ac+=pd?pd.amt:seenNone(k,i)?0:a;if(pd&&a<=0.5)spU+=pd.amt}});rows.push({name:g.name,c:g.color,pl,ac,est:g.flex&&est,flex:g.flex})});
  let lp=0,la=0,lest=false,extra=0,isv=0;S.loans.forEach(l=>{lp+=loanPlan(l,k);if(k<l.start){la+=l.min;lest=true;return}const r=row(l,k);if(!r)return;la+=r.pay;if(!r.lg)lest=true;const mn=Math.min(l.min,r.open+r.int);if(r.lg&&r.pay>mn+0.005){extra+=r.pay-mn;isv+=payEffect(l,k,r.pay).saved}});
  rows.push({name:'Loan payments',c:C.sky,pl:lp,ac:la,est:lest,sav:true});
  let sp=0,sa=0;S.goals.forEach(g=>{sp+=goalPlan(g,k);sa+=savedIn(g,k)});rows.push({name:'Savings goals',c:C.lilac,pl:sp,ac:sa,est:false,sav:true});

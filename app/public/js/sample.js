@@ -144,6 +144,12 @@ async function selfTest(){const T=[],ok=(c,name,detail='')=>T.push({ok:!!c,name,
   ok(bis&&S.txd[bis.id]&&S.txd[bis.id].v==='i:dining','An imported purchase is filed by an existing rule',bis&&S.txd[bis.id]&&S.txd[bis.id].v);
   cvLoadText(csv,'test.csv');CV.acct=ia.id;await cvImport();ok(BK.tx.filter(t=>t.item==='csv').length===3,'Importing the same file again adds nothing');
   {const cf=window.confirm;window.confirm=()=>true;try{await cvDel(ia.id)}finally{window.confirm=cf}}ok(!BK.tx.some(t=>t.item==='csv')&&!BK.accts.some(a=>a.item==='csv'),'Removing an imported account removes its transactions');
+  // A linked line with nothing in a finished month spent $0, not its plan (totals and History agree).
+  {const id=uid(),spent=()=>totals(past).flexA,hist=()=>monthSum(past).rows.filter(r=>r.flex).reduce((a,r)=>a+r.ac,0),b0=spent(),h0=hist();
+   editPlan(p=>p.groups.find(g=>g.id==='flex').items.push({id,name:'Test line',amt:75,due:0}),Object.keys(S.plans).sort()[0]);S.rules.push({id:'rt',p:'NO SUCH STORE ANYWHERE',dir:'out',v:'i:'+id});
+   ok(near(spent(),b0)&&near(hist(),h0),'A linked line with nothing spent adds $0 to a finished month',`${f2(spent())} vs ${f2(b0)}`);
+   S.rules=S.rules.filter(r=>r.id!=='rt');ok(near(spent(),b0+75),'An unlinked line with nothing yet still counts its plan');
+   editPlan(p=>p.groups.forEach(g=>g.items=g.items.filter(i=>i.id!==id)),Object.keys(S.plans).sort()[0])}
   // No plan: an item with no planned amount is tracked (counted in Spent) but never over plan — row, summary, alerts.
   const first=Object.keys(S.plans).sort()[0],setAmt=(id,v)=>editPlan(p=>p.groups.forEach(g=>g.items.forEach(i=>{if(i.id===id)i.amt=v})),first);
   setAmt('dining',0);S.cur=past;document.querySelector('.tabs button[data-t="budget"]').click();renderBudget();
