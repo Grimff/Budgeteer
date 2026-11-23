@@ -8,8 +8,12 @@ import { Goals } from './screens/Goals.jsx';
 import { Loans } from './screens/Loans.jsx';
 import { Settings, NtCard } from './screens/Settings.jsx';
 import { Bank } from './screens/Bank.jsx';
+import { ThisMonth, RcList } from './screens/Budget.jsx';
 
 replaceScreen('renderHistory', () => draw($('#T-history'), <History />));
+// Budget: This month is React; Build budget and Forecast are still drawn by renderBuild / renderForecast. The
+// money-flow chart is drawn into #sk by sankey() afterwards, as before.
+replaceScreen('renderBudget', () => { if (BUDV === 'build') return renderBuild(); if (BUDV === 'fc') return renderForecast(); draw($('#T-budget'), <ThisMonth />); sankey(); });
 // bankBadge (the count on the Bank tab) ran at the end of the old renderBank once the bank was set up.
 replaceScreen('renderBank', () => { const el = $('#T-bank'); if (!el) return; draw(el, <Bank />); if (SRV && BK.st && BK.st.configured) bankBadge(); });
 replaceScreen('renderSettings', () => { const el = $('#T-settings'); if (el) draw(el, <Settings />); });
@@ -184,6 +188,42 @@ addParity({
     c.push({ label: 'empty household', set: () => withS(emptyHousehold()) });
     return c;
   },
+});
+const budv = setVar(() => BUDV, v => { BUDV = v; }), flow = setVar(() => S.flow, v => { S.flow = v; });
+addParity({
+  name: 'Budget (This month)', fn: 'renderBudget', el: '#T-budget', cases: () => {
+    const c = [];
+    for (const k of monthsToTry()) for (const f of ['plan', 'actual', 'compare']) c.push({ label: `${k} ${f}`, set: () => both(budv('month')(), flow(f)(), at(k)) });
+    const guide = v => () => { const a = BCL.has('guide'), b = BCL.has('!guide'); BCL.delete('guide'); BCL.delete('!guide'); BCL.add(v ? 'guide' : '!guide'); return () => { BCL.delete('guide'); BCL.delete('!guide'); if (a) BCL.add('guide'); if (b) BCL.add('!guide'); }; };
+    c.push({ label: 'set-up open, things to sort, alerts', set: () => both(budv('month')(), guide(false)(), unfile(6)(), swap(BK, 'st', { ...BK.st, items: (BK.st.items || []).map((it, i) => i ? it : { ...it, institution: { name: 'Bank & <Co>' }, error: { code: 'X', message: 'Sign <in>' } }) })) });
+    c.push({ label: 'set-up shut', set: () => both(budv('month')(), guide(true)(), unfile(2)()) });
+    c.push({ label: 'alerts hidden', set: () => { const o = { ...NTH }; alertsNow().forEach(a => { NTH[a.key] = 1; }); return () => { Object.keys(NTH).forEach(k => delete NTH[k]); Object.assign(NTH, o); }; } });
+    c.push({ label: 'review done / swept', set: tweak(s => { const lk = addM(TK, -1), m = s.months[lk] || (s.months[lk] = { act: {}, pay: {}, dep: {} }); m.swept = 321; }) });
+    c.push({ label: 'review dismissed', set: tweak(s => { const lk = addM(TK, -1), m = s.months[lk] || (s.months[lk] = { act: {}, pay: {}, dep: {} }); m.rv = 1; }) });
+    c.push({ label: 'left-over rules', set: tweak(s => { const g = s.goals[0], l = s.loans[0]; s.al = [...(s.al || []), g && { id: 'x1', to: 'g:' + g.id, src: 'extra', mode: '%', v: 50, from: addM(TK, -2) }, l && { id: 'x2', to: 'l:' + l.id, src: 'extra', mode: '%', v: 30, from: addM(TK, -2) }].filter(Boolean); }) });
+    for (const k of [addM(TK, -1), TK, addM(TK, 1)]) c.push({ label: k + ' one-time items, overrides, set-asides, rollover', set: () => both(at(k), tweak(s => {
+      // a plan version from two months back, so roll-over has a month where it starts (the old carry() recurses forever
+      // when the earliest plan version rolls over: an existing bug, not something the parity check is for)
+      const m = s.months[k] || (s.months[k] = { act: {}, pay: {}, dep: {} }), k0 = addM(k, -2), P = s.plans[k0] = clone(s.plans[Object.keys(s.plans).sort().filter(x => x <= k0).pop() || Object.keys(s.plans).sort()[0]]);
+      m.extra = [{ id: 'oi1', kind: 'inc', name: 'Bonus & <tip>', amt: 400 }]; const fx = P.groups.find(g => !g.flex), fl = P.groups.find(g => g.flex);
+      if (fx) { m.extra.push({ id: 'oi2', kind: 'item', gid: fx.id, name: 'Repair', amt: 150 }); if (fx.items[0]) { fx.items[0].freq = 6; fx.items[0].dm = 3; } if (fx.items[1]) fx.items[1].due = 2; if (fx.items[2]) fx.items[2].amt = 0; }
+      if (fl && fl.items[0]) { fl.items[0].roll = true; if (fl.items[1]) fl.items[1].amt = 0; }
+      if (s.goals[0]) { m.gplan = { [s.goals[0].id]: 90 }; } if (s.loans[0]) { m.lxp = { [s.loans[0].id]: 60 }; s.loans[0].due = 3; } })()) });
+    c.push({ label: 'pending payments, hand purchases', set: () => both(tweak(s => { const m = s.months[TK] || (s.months[TK] = { act: {}, pay: {}, dep: {} }); const it = plan(TK).groups.find(g => g.flex); m.rc = [{ id: 'rc1', store: 'Corner & <shop>', amt: 12.5, item: it && it.items[0] && it.items[0].id, date: TK + '-05' }, { id: 'rc2', amt: 3, item: 'gone' }, { id: 'rc3', store: 'Bank one', amt: 9, bank: true }]; })(), (() => { const ids = Object.keys(S.txd || {}).filter(id => S.txd[id].k === TK); ids.forEach(i => PSET.add(i)); OPEN.add('rcl'); return () => { ids.forEach(i => PSET.delete(i)); OPEN.delete('rcl'); }; })()) });
+    c.push({ label: 'linked loan', set: () => (tweak(s => { const a = (BK.loans || []).find(x => x.type === 'loan'); if (a) s.loans.push({ id: 'lk1', name: 'Linked loan', apr: 5, bal: openBal(a), min: 200, due: 10, start: TK, color: '#8fc9ff', acct: a.id, anch: { k: TK, eob: openBal(a) } }); s.loans.push({ id: 'h2', name: 'Hand & loan', apr: 3, bal: 900, min: 100, due: 0, start: addM(TK, -2), color: '#abc' }); }))() });
+    c.push({ label: 'hand loan with a late linked payment', set: tweak(s => { s.loans.push({ id: 'h3', name: 'Late loan', apr: 4, bal: 2000, min: 150, due: 1, start: addM(TK, -2), color: '#abc' }); s.rules = [...(s.rules || []), { id: 'rh3', p: 'LATE LENDER PAY', dir: 'out', v: 'l:h3' }]; }) });
+    c.push({ label: 'no bank (inputs)', set: () => { const o = SRV; SRV = false; return () => { SRV = o; }; } });
+    c.push({ label: 'no bank, last month', set: () => both((() => { const o = SRV; SRV = false; return () => { SRV = o; }; })(), at(addM(TK, -1))) });
+    c.push({ label: 'empty household', set: () => withS(emptyHousehold()) });
+    c.push({ label: 'empty household, future', set: () => both(withS(emptyHousehold()), at(addM(TK, 2))) });
+    return c;
+  },
+});
+// The purchases list (rcList) as other callers use it, bank rows included.
+addPiece({
+  name: 'Purchases list', html: () => rcList({ rc: [{ id: 'a', store: 'Shop & <co>', amt: 12.5, item: (allItems(S.cur)[0] || { i: {} }).i.id, date: S.cur + '-03' }, { id: 'b', amt: 4, item: 'gone', bank: true, txid: 'p1' }, { id: 'c', store: 'X', amt: 1, bank: true, txid: 'p2', date: S.cur + '-09' }] }),
+  node: () => <RcList m={{ rc: [{ id: 'a', store: 'Shop & <co>', amt: 12.5, item: (allItems(S.cur)[0] || { i: {} }).i.id, date: S.cur + '-03' }, { id: 'b', amt: 4, item: 'gone', bank: true, txid: 'p1' }, { id: 'c', store: 'X', amt: 1, bank: true, txid: 'p2', date: S.cur + '-09' }] }} />,
+  cases: () => [{ label: 'closed' }, { label: 'open, one pending', set: () => { OPEN.add('rcl'); PSET.add('p1'); return () => { OPEN.delete('rcl'); PSET.delete('p1'); }; } }],
 });
 window.reactParity = runParity;
 if (DEMO) window.LEGACY_SCREENS = LEGACY;   // sample mode only: the old draw functions, for comparing by hand

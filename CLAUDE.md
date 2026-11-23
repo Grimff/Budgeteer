@@ -93,8 +93,11 @@ works (and `npm test` passes) after every step.
   components with hover state; Settings (all four views, CSV import, phone alerts). The px/wi live inputs still patch
   #pxr/#wp-… with the old string helpers, and the rules search still runs rulesFilter while typing, until phase 3.
   Health-check messages are still HTML strings from healthChecks (inserted by `Html`) until it returns data.
-  Bank (To review, Filed, Move panel `MvPanel`, double counts). To do: Budget (This month, Build, Forecast, flow,
-  compare).
+  Bank (To review, Filed, Move panel `MvPanel`, double counts). Budget → This month (`ThisMonth`: summary bar, Needs a
+  look, Getting set up, monthly review, extra money, budget lines, purchases); the money-flow chart / Compare inside
+  it is still drawn by sankey() (flow.js, compare.js) into #sk after the React draw, and alert buttons come from
+  alertsNow() as HTML. To do: Budget → Build budget (renderBuild, with its drag handles) and Forecast
+  (renderForecast/fcBody/fcLanes/fcChart); `renderBudget`'s React version hands those two views to the old functions.
 - **Parity check** (`app/src/parity.js`, part of the self-test, run on the sample as loaded and again at the end):
   every converted screen is drawn by the old function (kept in `LEGACY` until phase 1 is done) and by React for many
   cases (every month, each range/view setting, an empty household) and must match: same elements, attributes (style
