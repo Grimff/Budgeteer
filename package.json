@@ -1,0 +1,14 @@
+{
+  "name": "budgeteer",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Self-hosted household budget with Plaid bank sync. No dependencies.",
+  "license": "UNLICENSED",
+  "engines": { "node": ">=18" },
+  "scripts": {
+    "start": "node app/server.js",
+    "check": "node tools/check.js",
+    "realtest": "node tools/realtest.js",
+    "livetest": "node tools/livetest.js"
+  }
+}

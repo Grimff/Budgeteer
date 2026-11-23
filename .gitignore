@@ -1,0 +1,9 @@
+# Real budget, bank transactions and Plaid access tokens: never commit.
+data/
+.env
+.env.*
+!.env.example
+node_modules/
+*.log
+.DS_Store
+Thumbs.db

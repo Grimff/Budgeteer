@@ -1,0 +1,22 @@
+# Budgeteer with Docker.
+#   1. cp .env.example .env   and fill in your Plaid keys and a password
+#   2. docker compose up -d --build
+#   3. open http://localhost:8095 (or http://YOUR-SERVER-IP:8095)
+# Your budget, bank data and Plaid tokens are saved in ./data, which is git-ignored.
+services:
+  budgeteer:
+    build: .
+    # To run the image GitHub builds instead (see README), replace `build: .` with:
+    # image: ghcr.io/YOUR-GITHUB-NAME/budgeteer:latest
+    container_name: budgeteer
+    env_file: .env
+    environment:
+      # Fixed inside the container, whatever .env says (for npm start).
+      - DATA_DIR=/data
+      - PORT=8080
+    # On a NAS, run as the user that owns the data folder, e.g. user: "1000:1000"
+    volumes:
+      - ./data:/data
+    ports:
+      - "${HOST_PORT:-8095}:8080"
+    restart: unless-stopped

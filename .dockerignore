@@ -1,0 +1,4 @@
+# Only app/ goes into the image.
+*
+!app/
+!Dockerfile
