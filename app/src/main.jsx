@@ -16,6 +16,7 @@ import { lnkListR, lnkRuleR } from './popups/Link.jsx';
 import { openDR } from './popups/Amount.jsx';
 import { spFormR, spAddPartR } from './popups/Split.jsx';
 import { compareViewR } from './flow/Compare.jsx';
+import { zbarR, skTipR, skCardR } from './flow/Card.jsx';
 
 replaceScreen('renderHistory', () => draw($('#T-history'), <History />));
 // Budget: This month is React; Build budget and Forecast are still drawn by renderBuild / renderForecast. The
@@ -33,6 +34,9 @@ replaceScreen('openD', openDR);
 replaceScreen('spForm', spFormR);
 replaceScreen('spAddPart', spAddPartR);
 replaceScreen('compareView', compareViewR);
+replaceScreen('zbar', zbarR);
+replaceScreen('skTip', skTipR);
+replaceScreen('skCard', skCardR);
 replaceScreen('renderBuild', () => draw($('#T-budget'), <Build />));
 replaceScreen('renderForecast', () => { draw($('#T-budget'), <Forecast />); fcBody(); });
 // bankBadge (the count on the Bank tab) ran at the end of the old renderBank once the bank was set up.
@@ -411,6 +415,38 @@ addParity({
     c.push({ label: 'empty household', set: () => both(scratch('cmx', 'sk cmpv')(), withS(emptyHousehold())) });
     // this month: a bill not paid yet (its filings removed), a spending line planned at 30¢
     c.push({ label: 'bill unpaid this month, tiny plan', set: () => both(scratch('cmx', 'sk cmpv')(), tweak(s => { const p = plan(TK), b = p.groups.find(g => !g.flex).items[0], f = p.groups.find(g => g.flex).items[0]; for (const [id, r] of Object.entries(s.txd)) if (r.v === 'i:' + b.id && r.k === TK) delete s.txd[id]; Object.values(s.plans).forEach(q => q.groups.forEach(g => g.items.forEach(i => { if (i.id === f.id) i.amt = 0.3; }))); })()) });
+    return c;
+  },
+});
+// The money-flow chart's card, tip and zoom bar for every node and ribbon, planned and actual, in a past, this and a
+// future month, and over budget. sankey (still the old one) fills K first; the Budget tab is shown so #sk exists.
+const skSet = (flow, k, tw) => () => {
+  const o = { tab: S.tab, budv: BUDV, flow: S.flow }, u = [tw ? tw() : null, at(k)];
+  S.tab = 'budget'; BUDV = 'month'; S.flow = flow; renderAll();
+  return () => { u.reverse().forEach(f => f && f()); S.tab = o.tab; BUDV = o.budv; S.flow = o.flow; };
+};
+const skViews = () => [['plan', TK], ['actual', TK], ['actual', addM(TK, -1)], ['plan', addM(TK, 2)], ['plan', TK, tweak(s => { Object.values(s.plans).forEach(p => p.income.forEach(i => { i.amt = 100; })); })]];
+const ev = { clientX: 200, clientY: 200 };
+addParity({
+  name: 'Money-flow card', fn: 'skCard', el: '#skc', cases: () => {
+    const c = [];
+    for (const [f, k, tw] of skViews()) { const u = skSet(f, k, tw)(); const n = K ? K.all.length : 0; u(); for (let j = 0; j < n; j++) c.push({ label: `${f} ${k}${tw ? ' over' : ''} node ${j}`, set: skSet(f, k, tw), call: () => skCard(K.all[j], { l: 0, r: 0, y: 0 }) }); }
+    return c;
+  },
+});
+addParity({
+  name: 'Money-flow tip', fn: 'skTip', el: '#skt', cases: () => {
+    const c = [];
+    for (const [f, k, tw] of skViews()) { const u = skSet(f, k, tw)(); const n = K ? K.all.length : 0, nl = K ? K.L.length : 0; u(); for (let j = 0; j < n; j++) c.push({ label: `${f} ${k} node ${j}`, set: skSet(f, k, tw), call: () => skTip(K.all[j], null, ev) }); for (let j = 0; j < nl; j++) c.push({ label: `${f} ${k} ribbon ${j}`, set: skSet(f, k, tw), call: () => skTip(null, K.L[j], ev) }); }
+    c.push({ label: 'nothing', set: skSet('plan', TK), call: () => skTip(null, null, ev) });
+    return c;
+  },
+});
+addParity({
+  name: 'Money-flow zoom bar', fn: 'zbar', el: '#zb', cases: () => {
+    const c = [];
+    for (const [f, k] of skViews().slice(0, 3)) { const u = skSet(f, k)(); const ids = K ? K.all.map((x, j) => j) : []; u(); for (const j of ids) c.push({ label: `${f} ${k} node ${j}`, set: skSet(f, k), call: () => zbar(K.all[j]) }); }
+    c.push({ label: 'none', set: skSet('plan', TK), call: () => zbar(null) });
     return c;
   },
 });
