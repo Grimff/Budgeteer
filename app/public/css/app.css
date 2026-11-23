@@ -317,6 +317,7 @@ footer{max-width:1240px;margin:0 auto;padding:10px clamp(16px,4vw,44px) 50px;dis
 
 a.btn{text-decoration:none;display:inline-flex;align-items:center}
 .hci.info>i{background:color-mix(in srgb,var(--sky) 24%,transparent);color:var(--sky)}.nt{margin:8px 0 16px}.nt .hcl{margin-top:10px}.hca .lnk{font-size:12.5px}
+.cvg{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:10px}.cvg .f>span{display:block;font-size:13px;color:var(--mut);margin-bottom:4px}.cvpick{cursor:pointer}.cvt td:nth-child(2),.cvt th:nth-child(2){text-align:left;white-space:normal;width:60%}
 .bkl{display:grid;gap:6px;margin-top:14px;max-height:360px;overflow:auto}.bkr{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:8px 12px;border-radius:14px;background:var(--s2,rgba(255,255,255,.04));font-size:14px}
 .selftest{margin:16px auto;max-width:1100px}.selftest ul{list-style:none;padding:0;margin:10px 0 0;display:grid;gap:4px;font-size:14px}.selftest li.ok{color:var(--text)}.selftest li.bad{color:var(--red);font-weight:600}
 .sync{display:flex;flex-wrap:wrap;align-items:center;gap:12px 16px;border-radius:22px;padding:16px 20px;margin:8px 0 6px;background:var(--s1);border:1px solid var(--line)}

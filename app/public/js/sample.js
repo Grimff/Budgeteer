@@ -75,6 +75,13 @@ async function demoFetch(u,o={}){const url=new URL(String(u),location.href);if(!
  if(p==='/api/bank/accounts')return J(200,{accounts:D.accts});
  if(p==='/api/bank/sync')return J(200,{ok:true,added:0,items:D.items});
  if(p==='/api/bank/settings'&&m==='PUT'){Object.assign(D.refresh,body());return J(200,{ok:true,refresh:{...D.refresh}})}
+ // CSV import, kept in memory like the server does it (same rules: new account or existing one, repeated rows skipped).
+ if(p==='/api/bank/import'&&m==='POST'){const b=body(),T={checking:['depository','checking'],savings:['depository','savings'],credit:['credit','credit card'],loan:['loan','loan']};let it=D.items.find(x=>x.kind==='csv');
+  if(!it){it={kind:'csv',item_id:'csv',institution:{name:'Imported from CSV files'},accounts:[],lastSync:null,error:null,count:0,liab:'none',inv:'none'};D.items.push(it)}
+  let a=it.accounts.find(x=>x.id===b.account);if(!a){const t=T[b.newAccount&&b.newAccount.type];if(!t||!b.newAccount.name)return J(400,{error:'Pick an account, or name a new one and choose its type.'});a={id:'csv-'+uid(),name:b.newAccount.name,official:'',mask:'',type:t[0],subtype:t[1],bal:null,avail:null,balAt:null};it.accounts.push(a);D.accts.push({...a,item:'csv',institution:it.institution.name,months:{},days:{}});if(t[0]!=='depository')D.loans.push({...a,item:'csv',institution:it.institution.name,months:{},pays:{},payList:[],liab:null,liabState:'none'})}
+  const seen={};let added=0,skipped=0;(b.rows||[]).forEach(r=>{const k=[a.id,r.date,r.amount,r.name].join('|');seen[k]=(seen[k]||0)+1;const id='csv-'+k+'|'+seen[k];if(D.tx.some(t=>t.id===id)){skipped++;return}D.tx.push({id,item:'csv',account:a.id,date:r.date,name:r.name,merchant:'',amount:r.amount,pending:false,ppid:'',pfc:null,accountName:'Imported '+a.name});added++});
+  if(b.balance!=null){a.bal=b.balance;D.accts.filter(x=>x.id===a.id).forEach(x=>x.bal=b.balance)}it.count=D.tx.filter(t=>t.item==='csv').length;it.lastSync=new Date().toISOString();D.tx.sort((x,y)=>y.date.localeCompare(x.date));return J(200,{ok:true,added,skipped,account:a.id})}
+ if(p.startsWith('/api/bank/import/')&&m==='DELETE'){const id=decodeURIComponent(p.split('/').pop()),it=D.items.find(x=>x.kind==='csv');if(!it)return J(404,{error:'unknown account'});it.accounts=it.accounts.filter(x=>x.id!==id);D.tx=D.tx.filter(t=>t.account!==id);D.accts=D.accts.filter(x=>x.id!==id);D.loans=D.loans.filter(x=>x.id!==id);if(!it.accounts.length)D.items=D.items.filter(x=>x!==it);return J(200,{ok:true})}
  if(p.startsWith('/api/notify'))return J(200,{configured:false,sent:0});   // no phone alerts from sample data
  if(p==='/api/backups')return J(200,{backups:[1,2,3].map(n=>{const at=new Date(Date.now()-n*864e5).toISOString().slice(0,10);return{id:`budgeteer-${at}.json`,kind:'daily',at,size:20000}})});
  if(p==='/api/backups/restore'&&m==='POST'){D.rev+=2;D.restored=(D.restored||0)+1;return J(200,{ok:true,rev:D.rev})}   // sample: keeps the same budget
@@ -126,6 +133,17 @@ async function selfTest(){const T=[],ok=(c,name,detail='')=>T.push({ok:!!c,name,
   ok(!fi||keys.includes(`over:${TK}:${fi.i.id}`),'A category over plan shows',fi?fi.i.name:'(nothing spent yet this month)');
   ntHide('conn:it-bank:ITEM_LOGIN_REQUIRED');ok(!/sign in again/.test((document.querySelector('#T-budget .nt')||{}).textContent||''),'Hide removes an alert');
   BK.st.items[0].error=null;delete NTH['conn:it-bank:ITEM_LOGIN_REQUIRED'];if(fi)editPlan(p=>{const it=p.groups.find(g=>g.id===fi.g.id).items.find(i=>i.id===fi.i.id);it.amt=it._was;delete it._was},TK);
+  // CSV import: quotes, both signs and a date format are read; a purchase is filed by an existing rule; the same file
+  // again adds nothing; removing the account takes its transactions away.
+  const csv=`Date,Description,Amount\n${TK}-02,CORNER BISTRO,-23.50\n${TK}-02,"MYSTERY SHOP, INC","(10.00)"\n${TK}-03,REFUND FROM STORE,5.00\n${TK}-03,,1.00\n`;
+  cvLoadText(csv,'test.csv');Object.assign(CV,{acct:'new',nname:'Imported Checking',ntype:'checking',bal:'1,250.00'});const c1=cvRows();
+  ok(c1.rows.length===3&&c1.bad===1&&c1.rows[0].amount===23.5&&c1.rows[1].amount===10&&c1.rows[1].name==='MYSTERY SHOP, INC'&&c1.rows[2].amount===-5,'A CSV file is read correctly',JSON.stringify(c1.rows.map(r=>r.amount))+` · ${c1.bad} unreadable`);
+  ok(cvDate('22/11/2026','dmy')==='2026-11-22'&&cvDate('11/22/26','mdy')==='2026-11-22'&&cvNum('1.234,56')===1234.56&&cvNum('-$5')===-5,'CSV dates and amounts in other formats');
+  await cvImport();const imp=BK.tx.filter(t=>t.item==='csv'),bis=imp.find(t=>t.name==='CORNER BISTRO'),ia=BK.accts.find(a=>a.item==='csv');
+  ok(imp.length===3&&ia&&ia.bal===1250,'Imported transactions and balance show up',`${imp.length} transactions, balance ${ia&&f2(ia.bal)}`);
+  ok(bis&&S.txd[bis.id]&&S.txd[bis.id].v==='i:dining','An imported purchase is filed by an existing rule',bis&&S.txd[bis.id]&&S.txd[bis.id].v);
+  cvLoadText(csv,'test.csv');CV.acct=ia.id;await cvImport();ok(BK.tx.filter(t=>t.item==='csv').length===3,'Importing the same file again adds nothing');
+  {const cf=window.confirm;window.confirm=()=>true;try{await cvDel(ia.id)}finally{window.confirm=cf}}ok(!BK.tx.some(t=>t.item==='csv')&&!BK.accts.some(a=>a.item==='csv'),'Removing an imported account removes its transactions');
   // Daily copies: the list loads, and restoring one reloads the budget from the server.
   await bkList();ok(Array.isArray(BKP)&&BKP.length===3&&document.querySelectorAll('.bkr').length>=0,'Daily copies are listed',Array.isArray(BKP)?BKP.length+' copies':'not loaded');
   {const cf=window.confirm;window.confirm=()=>true;try{await bkRestore(BKP[0].id)}finally{window.confirm=cf}}ok(D.restored===1&&FS.state==='ok'&&S.goals.some(g=>g.id==='trip'),'Restoring a daily copy reloads the budget');

@@ -315,6 +315,61 @@ function loanAccounts() {
 // full: also refresh loan details and investments now (Sync now, new connection, reconnect). Otherwise they
 // refresh when DETAIL_HOURS have passed since the last time (or they were never fetched for this connection).
 let fullNext = null;   // a full sync waiting for the running (automatic) one to finish
+// ---------- accounts imported from CSV files ----------
+// Kept as one more connection (item_id 'csv', kind 'csv', no access token) in the same files Plaid data uses, so every
+// bank route, the budget, filing rules, Wealth and Loans treat them like any other account; syncAll skips it.
+// Amounts use Plaid's sign (+ = money out of the account; on cards and loans + = more owed). A transaction's id is a
+// hash of account, date, amount, name and how many identical rows came before it in the file, so importing the same
+// or an overlapping file again doesn't add anything twice.
+const CSV_TYPES = { checking: ['depository', 'checking'], savings: ['depository', 'savings'], credit: ['credit', 'credit card'], loan: ['loan', 'loan'] };
+function csvImport(b) {
+  if (bankBusy()) return [409, { error: 'A bank sync is running. Try again in a moment.' }];
+  const rows = Array.isArray(b.rows) ? b.rows : [];
+  if (!rows.length || rows.length > 20000) return [400, { error: rows.length ? 'Too many rows (20,000 at most).' : 'No rows to import.' }];
+  const good = rows.filter(r => r && /^\d{4}-\d{2}-\d{2}$/.test(r.date) && isFinite(r.amount) && typeof r.name === 'string');
+  if (good.length !== rows.length) return [400, { error: `${rows.length - good.length} row(s) have a bad date, amount or name.` }];
+  const bank = loadBank(), store = loadTx(), loans = loadLoans(), now = new Date().toISOString();
+  let item = bank.items.find(it => it.kind === 'csv');
+  if (!item) { item = { item_id: 'csv', kind: 'csv', institution: { id: '', name: 'Imported from CSV files' }, accounts: [], cursor: null, added: now, liab: 'none', inv: 'none' }; bank.items.push(item); }
+  let acct = item.accounts.find(a => a.id === b.account);
+  if (!acct) {
+    const t = CSV_TYPES[b.newAccount && b.newAccount.type], name = String(b.newAccount && b.newAccount.name || '').trim().slice(0, 60);
+    if (!t || !name) return [400, { error: 'Pick an account, or name a new one and choose its type.' }];
+    acct = { id: 'csv-' + crypto.randomBytes(6).toString('hex'), name, official: '', mask: String(b.newAccount.mask || '').replace(/\D/g, '').slice(-4), type: t[0], subtype: t[1], bal: null, avail: null, balAt: null };
+    item.accounts.push(acct);
+  }
+  const seen = {}; let added = 0, skipped = 0;
+  for (const r of good) {
+    const amount = Math.round(Number(r.amount) * 100) / 100, name = r.name.trim().slice(0, 200), k = [acct.id, r.date, amount, name].join('|');
+    seen[k] = (seen[k] || 0) + 1;
+    const id = 'csv-' + crypto.createHash('sha1').update(k + '|' + seen[k]).digest('hex').slice(0, 20);
+    if (store.tx[id]) { skipped++; continue; }
+    store.tx[id] = { id, item: 'csv', account: acct.id, date: r.date, name, merchant: '', amount, pending: false, ppid: '', pfc: null };
+    added++;
+  }
+  if (b.balance != null && b.balance !== '' && isFinite(b.balance)) {
+    acct.bal = Math.round(Number(b.balance) * 100) / 100; acct.avail = acct.type === 'depository' ? acct.bal : null; acct.balAt = now;
+    const e = loans.acct[acct.id] || (loans.acct[acct.id] = { days: {} }); e.days[today()] = acct.bal; e.item = 'csv';
+  }
+  item.lastSync = now; item.error = null; item.count = Object.values(store.tx).filter(t => t.item === 'csv').length;
+  writeJ(TX_FILE, store); writeJ(LOAN_FILE, loans); writeJ(BANK_FILE, bank);
+  log(`CSV import into ${acct.name}: ${added} added, ${skipped} already there`);
+  return [200, { ok: true, added, skipped, account: acct.id }];
+}
+function csvRemove(id) {
+  if (bankBusy()) return [409, { error: 'A bank sync is running. Try again in a moment.' }];
+  const bank = loadBank(), item = bank.items.find(it => it.kind === 'csv'), a = item && item.accounts.find(x => x.id === id);
+  if (!a) return [404, { error: 'unknown account' }];
+  item.accounts = item.accounts.filter(x => x !== a);
+  if (!item.accounts.length) bank.items = bank.items.filter(x => x !== item);
+  const store = loadTx(); for (const k of Object.keys(store.tx)) if (store.tx[k].account === id) delete store.tx[k];
+  item.count = Object.values(store.tx).filter(t => t.item === 'csv').length;
+  const loans = loadLoans(); delete loans.acct[id];
+  writeJ(TX_FILE, store); writeJ(LOAN_FILE, loans); writeJ(BANK_FILE, bank);
+  return [200, { ok: true }];
+}
+// A Plaid sync reads the bank files at its start and writes them at its end, so an import in between would be lost.
+const bankBusy = () => !!syncing;
 function syncAll(full) {
   if (!bankOn()) return Promise.resolve({ added: 0 });
   if (syncing) {
@@ -324,6 +379,7 @@ function syncAll(full) {
   syncing = (async () => {
     const bank = loadBank(), store = loadTx(), loans = loadLoans(), inv = loadInv(); let added = 0;
     for (const it of bank.items) {
+      if (it.kind === 'csv') continue;   // imported from CSV files: nothing to fetch
       try {
         await refreshAccounts(it);
         snapshotBalances(it, loans);
@@ -353,7 +409,7 @@ function syncTick() { const h = syncSet().hours; if (!h || syncing) return; if (
 if (bankOn()) { lastAll = loadBank().items.reduce((m, it) => Math.max(m, Date.parse(it.lastSync || '') || 0), 0); setTimeout(syncTick, 15000); setInterval(syncTick, 60000); }
 async function bankRoute(p, req, res, url) {
   if (p === '/api/bank/status' && req.method === 'GET')
-    return send(res, 200, { configured: bankOn(), env: PLAID_ENV, syncing: !!syncing, refresh: syncInfo(), items: viewBank().items.map(publicItem) });
+    return send(res, 200, { configured: bankOn() || viewBank().items.some(it => it.kind === 'csv'), plaid: bankOn(), env: PLAID_ENV, syncing: !!syncing, refresh: syncInfo(), items: viewBank().items.map(publicItem) });
   if (p === '/api/bank/settings' && req.method === 'PUT') {
     let b = {}; try { b = JSON.parse(await readBody(req) || '{}'); } catch (_) { return send(res, 400, { error: 'bad json' }); }
     const cur = syncSet(), h = b.hours != null ? Number(b.hours) : cur.hours;
@@ -361,7 +417,14 @@ async function bankRoute(p, req, res, url) {
     writeJ(SET_FILE, { hours: h, open: b.open != null ? !!b.open : cur.open });
     return send(res, 200, { ok: true, refresh: syncInfo() });
   }
-  if (!bankOn()) return send(res, 400, { error: 'Plaid keys are not set on the server.' });
+  // CSV imports and reading bank data work without Plaid; connecting a bank needs the keys.
+  if (!bankOn() && ['/api/bank/link-token', '/api/bank/exchange', '/api/bank/reconnected'].includes(p)) return send(res, 400, { error: 'Plaid keys are not set on the server. Add them to .env and restart it, or import a CSV file instead.' });
+  if (p === '/api/bank/import' && req.method === 'POST') {
+    let b; try { b = JSON.parse(await readBody(req) || '{}'); } catch (e) { return send(res, e.code === 413 ? 413 : 400, { error: e.code === 413 ? 'That file is too large.' : 'bad json' }); }
+    return send(res, ...csvImport(b));
+  }
+  const im = p.match(/^\/api\/bank\/import\/(csv-[A-Za-z0-9_-]+)$/);
+  if (im && req.method === 'DELETE') return send(res, ...csvRemove(im[1]));
   if (p === '/api/bank/link-token' && req.method === 'POST') {
     const b = JSON.parse((await readBody(req)) || '{}');
     const body = { client_name: 'Budgeteer', user: { client_user_id: 'budgeteer-household' }, country_codes: (process.env.PLAID_COUNTRIES || 'US').split(','), language: 'en' };
@@ -424,7 +487,7 @@ async function bankRoute(p, req, res, url) {
   const dm = p.match(/^\/api\/bank\/items\/([A-Za-z0-9_-]+)$/);
   if (dm && req.method === 'DELETE') {
     const bank = loadBank(), it = bank.items.find(x => x.item_id === dm[1]); if (!it) return send(res, 404, { error: 'unknown connection' });
-    try { await plaid('/item/remove', { access_token: it.access_token }); } catch (e) { log('item remove', e.code); }
+    if (it.kind !== 'csv') try { await plaid('/item/remove', { access_token: it.access_token }); } catch (e) { log('item remove', e.code); }
     bank.items = bank.items.filter(x => x !== it); writeJ(BANK_FILE, bank);
     const store = loadTx(); for (const k of Object.keys(store.tx)) if (store.tx[k].item === it.item_id) delete store.tx[k]; writeJ(TX_FILE, store);
     const loans = loadLoans(); for (const k of Object.keys(loans.acct)) if (loans.acct[k].item === it.item_id || (it.accounts || []).some(a => a.id === k)) delete loans.acct[k]; writeJ(LOAN_FILE, loans);

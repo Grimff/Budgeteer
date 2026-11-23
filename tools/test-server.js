@@ -89,5 +89,18 @@ const det = () => (calls['/liabilities/get'] || 0) + '/' + (calls['/investments/
   ok(l && Object.values(l.pays).reduce((x, y) => x + y, 0) === 60 * 300 && l.liab && l.liab.apr === 5, `loan payments grouped correctly (${Object.keys(l.pays).length} month(s), $${Object.values(l.pays).reduce((x, y) => x + y, 0)}) with lender details`);
   const ac = JSON.parse((await req('GET', '/api/bank/accounts')).body).accounts; ok(ac.length === 3 && ac.find(x => x.type === 'investment').holdings, 'accounts include holdings');
   const st = JSON.parse((await req('GET', '/api/bank/status')).body); ok(st.items[0].count === 3000 && !JSON.stringify(st).includes('fake-a'), 'status has counts and no tokens');
+  // CSV import: new account, two identical rows kept as two, the same file again adds nothing, a sync leaves it alone
+  const rows = [{ date: '2026-10-02', name: 'FARM STAND', amount: 12 }, { date: '2026-10-02', name: 'FARM STAND', amount: 12 }, { date: '2026-10-05', name: 'REFUND', amount: -3.5 }];
+  const i1 = JSON.parse((await req('POST', '/api/bank/import', { rows, newAccount: { name: 'Credit union', type: 'checking' }, balance: 900 })).body);
+  const i2 = JSON.parse((await req('POST', '/api/bank/import', { rows, account: i1.account })).body);
+  ok(i1.added === 3 && i2.added === 0 && i2.skipped === 3, `CSV rows imported once (${i1.added} added, then ${i2.added} added / ${i2.skipped} skipped)`);
+  const bad = await req('POST', '/api/bank/import', { rows: [{ date: '10/02/2026', name: 'X', amount: 1 }], account: i1.account });
+  ok(bad.code === 400, 'rows with a bad date are refused');
+  await req('POST', '/api/bank/sync', {});
+  const st2 = JSON.parse((await req('GET', '/api/bank/status')).body), ci = st2.items.find(x => x.kind === 'csv');
+  const tx2 = JSON.parse((await req('GET', '/api/bank/transactions')).body).tx.filter(t => t.item === 'csv'), ac2 = JSON.parse((await req('GET', '/api/bank/accounts')).body).accounts.find(a => a.id === i1.account);
+  ok(ci && !ci.error && ci.count === 3 && tx2.length === 3 && /Credit union/.test(tx2[0].accountName) && ac2 && ac2.bal === 900, 'imported account and transactions are served like bank data, and a sync leaves them alone');
+  const del = await req('DELETE', '/api/bank/import/' + i1.account), st3 = JSON.parse((await req('GET', '/api/bank/status')).body);
+  ok(del.code === 200 && !st3.items.some(x => x.kind === 'csv') && !JSON.parse((await req('GET', '/api/bank/transactions')).body).tx.some(t => t.item === 'csv'), 'removing the imported account removes its transactions');
   console.log(fail ? `${fail} FAILED` : 'ALL PASSED'); fs.rmSync(DIR, { recursive: true, force: true }); process.exit(fail ? 1 : 0);
 })().catch(e => { console.error(e); process.exit(1); });

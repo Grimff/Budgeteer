@@ -217,6 +217,10 @@ document.addEventListener('click',e=>{const nd=e.target.closest('#sk .nd'),lk=nd
  case'import':return $('#file').click();
  case'bkList':return bkList();
  case'ntHide':return ntHide(d.id);
+ case'cvImport':return cvImport();
+ case'cvCancel':CV={};return renderSettings();
+ case'cvDel':return cvDel(d.id);
+ case'cvGo':{if(S.tab!=='settings'||SV!=='connections'){SV='connections';S.tab='settings';commit(true)}const c=$('#cvcard');if(c)c.scrollIntoView({behavior:RM?'auto':'smooth',block:'start'});return}
  case'ntTest':return ntTest();
  case'bkRestore':return bkRestore(d.id);
  case'fsRetry':return FS.loaded?fsFlush(true):fsInit();
