@@ -12,19 +12,17 @@ Docker (`docker compose up -d --build`) on port 8095. Bank data comes from Plaid
 - **Settings and secrets:** `.env` (git-ignored; template `.env.example`) holds `PLAID_CLIENT_ID`, `PLAID_SECRET`,
   `PLAID_ENV`, `BASIC_AUTH` and the rest. `data/` is git-ignored and never committed.
 - **Docker:** `docker-compose.yml` builds the `Dockerfile` (node:22-alpine + `app/`), loads `.env` with `env_file`,
-  forces `DATA_DIR=/data`, `PORT=8080`, and mounts `./data:/data`. Optional: `.github/workflows/image.yml` pushes
-  `ghcr.io/<owner>/<repo>`: pushes to main → `:main`, tag `vN` → `:vN` + `:latest`.
-- **Release:** run `node tools/check.js` (must say OK), bump the footer "Version N" in index.html and the README,
-  commit, push main, then tag `vN` and push the tag. Current: **Version 1**. "Version N"/"vN" mentions below are
+  forces `DATA_DIR=/data`, `PORT=8080`, and mounts `./data:/data`.
+- **Release:** run `node tools/check.js` (must say OK), bump the footer "Version N" in index.html (`fsUI`) and the
+  README, commit, push main, then tag `vN` and push the tag. Current: **Version 1**. "Version N"/"vN" mentions below are
   from the app's earlier history and use the old numbering.
 
-## Data on the NAS (`data/`)
+## Data on the server (`data/`)
 
 `budgeteer-data.json` (the budget), `backups/` (daily copies of the budget and of
 `bank-loans.json`), `bank-connections.json` (**Plaid access tokens, private**),
 `bank-transactions.json`, `bank-loans.json` (balance per account per day + Liabilities details),
-`bank-investments.json` (holdings + deposit/withdrawal flows). `receipts/`, `.ocr/` are leftovers
-from before Version 9.
+`bank-investments.json` (holdings + deposit/withdrawal flows).
 
 **`data/` holds real data and real Plaid tokens** (never committed). Never print tokens, never run a
 server against a real `data/` folder while testing; use `tools/realtest.js`.
@@ -55,7 +53,7 @@ server against a real `data/` folder while testing; use `tools/realtest.js`.
   `DATA_DIR`, `PORT`, `PLAID_CLIENT_ID/SECRET=test`, `PLAID_BASE` pointing at it. Open it in the
   browser pane, drive it with JS, check phone width (375px) for overflow. Delete the copy after.
 - **Live test** (`NAS=http://your-server:8095 node tools/livetest.js`, same port): the budget is downloaded
-  once from the server and kept in memory (saves never go back), bank data is read from the NAS with GET
+  once from the server and kept in memory (saves never go back), bank data is read from the server with GET
   only, sync/connect are answered locally. Use it when the `data/` snapshot is too old to show a bug.
   No tokens involved.
 - Every input someone types in needs a `data-key` (see Text fields).
@@ -112,8 +110,8 @@ server against a real `data/` folder while testing; use `tools/realtest.js`.
   highest rate or smallest balance first, and `roll` adds each of its loans' minimum once paid off. A loan share
   stops at payoff, a goal share at its target; `until` stops it at a month. `alAt(k)`, `alPlan(to,k)` (set
   amount, used by the card/Build boxes), `alSet(to,m,v)` (set from month m on, ending earlier items via
-  `alEnd`), `alMigrate()` (one-time from v3/v4 shapes: goal `g.mp`/`g.monthly`, loan `l.xp`/`l.xtra`, `S.pxPlan`,
-  `S.xm`). Old names stay as wrappers: `goalMon`, `loanUsual`, `setUsual`, `verSet(g,'mp',…)`, `xmAt` (left-over
+  `alEnd`). (Older v3/v4 shapes, goal `g.mp`/`g.monthly`, loan `l.xp`/`l.xtra`, `S.pxPlan`, `S.xm`, are no longer
+  converted; data saved by any recent version is already in this shape.) Old names stay as wrappers: `goalMon`, `loanUsual`, `setUsual`, `verSet(g,'mp',…)`, `xmAt` (left-over
   rules), `snowR`. `xsBuild()` simulates month by month (set amounts first, then the pool, then left-over rules)
   into `XS{k:{pool, keep, snow, dest, 'p|'+dest, 'x|'+dest, 's|l:id'}}` (total / set / left-over / snowball part);
   `exShare` feeds `loanXtra` (= month override + shares) and `goalPlan` (= month override ?? share). `NOX` while it
@@ -130,7 +128,7 @@ server against a real `data/` folder while testing; use `tools/realtest.js`.
 - `loans[{…,acct,anch,xp}]` – balance path from `start`/`bal`; unlogged months assume the minimum, plus the
   **planned extra** from this month on. `l.xp{YYYY-MM: amount}` = usual extra in versions, each in force from its
   month (`loanUsual`, `setUsual(l,m,v)` drops later versions), set from `xStart()` = the viewed month or the
-  current one, whichever is later, so past months never change (v3; v2's `l.xtra` migrates in `renderAll`).
+  current one, whichever is later, so past months never change (v3).
   `months[k].lxp[id]` = one month's own extra (Build step 6, current/future months only). `loanXtra`, `loanPlan`
   (min + extra, capped at what's owed) is what the budget plans everywhere (totals, monthSum, sankey, compare,
   pop-up). Set in Build step 5 (`lxb`), on the loan card (`xtra`), by the what-if **Add to the plan** (`wiPlan`)
@@ -173,7 +171,7 @@ server against a real `data/` folder while testing; use `tools/realtest.js`.
 - `rules[{id,p,dir,v,min?,max?,x?[],shift?}]`, `catchAll` (item id | `'review'` | unset),
   `noAuto{}` (auto-filings the person undid), `txGone{}` (removed with a deleted month),
   `notBill{}` / `notInc{}` (ignored suggestions), `merchantMap{}` (suggestion only), `histFrom`,
-  `bankFrom` (filing start date), `badges[]`.
+  `bankFrom` (filing start date). Older saved data may also hold an unused `badges[]`.
 
 ## Bank filing (`autoFile`, after every bank load and after the other browser's changes load)
 
@@ -209,11 +207,13 @@ server against a real `data/` folder while testing; use `tools/realtest.js`.
   `balEnd` for other months. Interest saved never shows below $0.
 - **Wealth performance** (`perf`, `invSeries`): each account starts at its own first saved value, so
   connecting an account later is not growth; "Value now" is the investments total.
-- **NAS mode never asks "which version"** (the `pick`/`conflict` cards are for the old file mode only).
-  `REVK` (localStorage) = the NAS revision this browser's saved copy matches. On load: if there are
-  unsaved local edits (`PEND`) and the NAS is still at `REVK`, they are pushed; otherwise the NAS copy
-  replaces them. A save while the NAS copy is still loading (`FS.state==='wait'`) doesn't set `PEND`.
-  Any 409 adopts the NAS copy and re-files; a toast says so unless the save was auto-only (`FS.autoOnly`).
+- **Storage is the server only** ("budget on the server" section: `fsInit`/`fsLoad`/`fsQueue`/`fsFlush`/`fsPoll`/`fsUI`;
+  the old local-file mode was removed). `FS.state`: `wait` (connecting), `ok`, `err` (unreachable or a save failed;
+  the 10-second `fsPoll` reconnects via `fsInit` or retries the save). The browser keeps a copy in localStorage
+  (`KEY`). `REVK` = the server revision that copy matches. On load: if there are unsaved local edits (`PEND`) and the
+  server is still at `REVK`, they are pushed; otherwise the server copy replaces them. A save while the server copy
+  is still loading (`wait`) doesn't set `PEND`; a save while unreachable (`err`) does. Any 409 adopts the server copy
+  and re-files; a toast says so unless the save was auto-only (`FS.autoOnly`). Never asks "which version".
 
 ## Screens
 
@@ -279,8 +279,7 @@ server against a real `data/` folder while testing; use `tools/realtest.js`.
   ranges look back from the viewed month, label each month and fit the scale to the window; All starts at
   $0 and runs to the projected payoff; the readout says "Behind by" when above the minimum-only path), then interest saved / KPIs, best-rate tip, loan cards, "Loans from your bank" (track or
   link a Plaid loan; Allow for Liabilities; a lender connected twice is detected by same lender, type and
-  balance and left out). Wins/badges were removed in Version 28 (`checkBadges` is a
-  no-op; `S.badges` is kept in saved data). A hand-added loan with a linked bank payment shows
+  balance and left out). A hand-added loan with a linked bank payment shows
   "From your bank" when the month's paid amount equals its bank filings, "logs itself…" / Not seen
   before it arrives, and its history marks bank months "from bank". The Budget tab's loan pop-up explains the paid
   number (`loanNote`).

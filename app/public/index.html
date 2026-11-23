@@ -467,7 +467,7 @@ button.pill:not(.x){box-shadow:inset 0 0 0 1px var(--line2)}button.pill.ok{box-s
 
 <script>
 'use strict';
-const KEY='budgeteer_v2',OLD='budgeteer_v1';
+const KEY='budgeteer_v2';
 const $=s=>document.querySelector(s),$$=s=>[...document.querySelectorAll(s)];
 const uid=()=>Math.random().toString(36).slice(2,9);
 const RM=matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -492,21 +492,15 @@ const clone=o=>JSON.parse(JSON.stringify(o));
 
 /* ---------- data ---------- */
 const it=(name,amt,due=0)=>({id:uid(),name,amt,due});
-// Starting budget for a browser with nothing saved yet (the NAS copy replaces it): empty on purpose, so this file,
+// Starting budget for a browser with nothing saved yet (the server copy replaces it): empty on purpose, so this file,
 // which is in the GitHub repo, holds no budget data at all. The Build budget steps fill it in.
 function seedPlan(){return{income:[],groups:[]}}
 const seedLoans=()=>[],seedGoals=()=>[];
 
-function migrateOld(){try{const v=JSON.parse(localStorage.getItem(OLD));if(!v||!v.months)return null;const ks=Object.keys(v.months).sort();const k=[...ks].reverse().find(x=>x<=TK)||ks[ks.length-1];const m=v.months[k];if(!m||!m.groups)return null;
- const plan={income:(m.income||[]).map(i=>({id:i.id||uid(),name:i.name,amt:+i.amount||0})),groups:[]},act={};
- m.groups.filter(g=>!/loan/i.test(g.name)).forEach((g,ix)=>{const flex=!!g.track||/grocer|flex/i.test(g.name);plan.groups.push({id:g.id||uid(),name:g.name==='Flex spend'?'Flex spending':g.name,color:PAL[ix%PAL.length],flex,items:(g.items||[]).map(i=>{if(flex&&i.actual>0)act[i.id]=i.actual;return{id:i.id||uid(),name:i.name,amt:+i.planned||0,due:+i.due||0}})})});
- if(!plan.groups.length)return null;return{plan,act}}catch(e){return null}}
 
 let S;
-function load(){try{const v=JSON.parse(localStorage.getItem(KEY));if(v&&v.plans&&Object.keys(v.plans).length){v.cur=v.cur||TK;v.tab=v.tab||'budget';v.badges=v.badges||[];v.months=v.months||{};return v}}catch(e){}
- const st={plans:{},loans:seedLoans(),goals:seedGoals(),months:{},badges:[],cur:TK,tab:'budget',flow:'plan'};
- const old=migrateOld();if(old){st.plans[TK]=old.plan;if(Object.keys(old.act).length)st.months[TK]={act:old.act,pay:{},dep:{}}}else st.plans[TK]=seedPlan();
- return st}
+function load(){try{const v=JSON.parse(localStorage.getItem(KEY));if(v&&v.plans&&Object.keys(v.plans).length){v.cur=v.cur||TK;v.tab=v.tab||'budget';v.months=v.months||{};return v}}catch(e){}
+ return{plans:{[TK]:seedPlan()},loans:seedLoans(),goals:seedGoals(),months:{},cur:TK,tab:'budget',flow:'plan'}}
 S=load();
 let saveT,AUTOSAVE=false;function save(){if(!AUTOSAVE){try{FS.autoOnly=false}catch(_){}}try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){toast('Could not save in this browser. Download a backup to keep your changes.')}fsQueue()}
 
@@ -529,7 +523,6 @@ function plan(k=S.cur){const b=plan0(k);if(!b.groups.some(g=>g.items.some(i=>+i.
  return{...b,groups:b.groups.map(g=>({...g,items:g.items.map(i=>{if(!g.flex&&+i.freq>1)return{...i,base:+i.amt||0,amt:r2((+i.amt||0)/+i.freq)};if(g.flex&&i.roll){const c=carry(g.id,i,k);return c?{...i,base:+i.amt||0,amt:r2((+i.amt||0)+c),carry:c}:i}return i})}))}}
 function editPlan(fn,k){PC={};if(k==null)k=INB?scopeStart():S.cur;if(!S.plans[k])S.plans[k]=clone(basePlan(k));Object.keys(S.plans).sort().forEach(x=>{if(x>=k)fn(S.plans[x])})}
 const extras=(k=S.cur)=>{const m=MOW(k);return m.extra||(m.extra=[])};
-const onceBox=(kind,i,g)=>`<label class="once" title="Only count this in ${mon(S.cur)}"><input type="checkbox" data-act="once" data-kind="${kind}" ${g?`data-g="${g}"`:''} data-id="${i.id}" ${i.once?'checked':''} aria-label="${esc(i.name)}: ${mon(S.cur)} only"><span>${mon(S.cur).slice(0,3)} only</span></label>`;
 
 /* ---------- loan math ---------- */
 let LP={};
@@ -649,13 +642,7 @@ const snowR=()=>alAt(xStart()).find(a=>a.to==='snow'&&a.id!=='wf');
 function alEnd(a,m){if(a.from>=m)S.al=S.al.filter(x=>x!==a);else if(!a.until||a.until>=m)a.until=addM(m,-1)}
 // Set the planned monthly amount for one goal or loan from month m on (the boxes on cards and in Build budget).
 function alSet(to,m,v){S.al||(S.al=[]);S.al.filter(a=>a.src==='plan'&&a.to===to).forEach(a=>alEnd(a,m));if(v>0.004)S.al.push({id:uid(),to,src:'plan',mode:'$',v:r2(v),from:m,until:''});if(!S.al.length)delete S.al}
-// One-time move from the older shapes (goal g.mp/g.monthly, loan l.xp/l.xtra, v3 pxPlan, v4 S.xm) into S.al.
-function alMigrate(){const A=S.al||[];let ch=false;const segs=(map,to)=>{const ks=Object.keys(map||{}).sort();ks.forEach((m,i)=>{const v=+map[m]||0;if(v>0.004)A.push({id:uid(),to,src:'plan',mode:'$',v,from:m,until:ks[i+1]?addM(ks[i+1],-1):''})})};
- S.goals.forEach(g=>{if(g.monthly!=null){if(!g.mp&&+g.monthly>0)g.mp={'2000-01':+g.monthly};delete g.monthly;ch=true}if(g.mp){segs(g.mp,'g:'+g.id);delete g.mp;ch=true}});
- if(S.pxPlan){const pp=S.pxPlan;S.loans.forEach(l=>{if(l.xp)Object.keys(l.xp).forEach(m=>{if(m>=pp.at)delete l.xp[m]})});A.push({id:uid(),to:'snow',src:'plan',mode:'$',v:pp.x,from:pp.at,until:'',how:pp.how||'rate',roll:true,loans:[]});delete S.pxPlan;ch=true}
- S.loans.forEach(l=>{if(l.xtra!=null){if(+l.xtra>0&&!l.xp)l.xp={[TK]:+l.xtra};delete l.xtra;ch=true}if(l.xp){segs(l.xp,'l:'+l.id);delete l.xp;ch=true}});
- if(S.xm){const ks=Object.keys(S.xm).sort();ks.forEach((m,i)=>S.xm[m].forEach(r=>A.push({...r,id:uid(),src:'extra',from:m,until:ks[i+1]?addM(ks[i+1],-1):'',loans:r.loans||[]})));delete S.xm;ch=true}
- if(ch){if(A.length)S.al=A;else delete S.al}}
+
 // One forward simulation, month by month: loan balances, goal balances, set amounts, then the left-over pool and the
 // left-over rules. Shares feed loanXtra and goalPlan; paid-off loans free their minimums for snowballs. While it runs
 // (NOX) shares count as 0, so nothing goes in circles. Keys: dest = total share, 'p|'+dest = set part,
@@ -696,8 +683,6 @@ function totals(k=S.cur){const p=plan(k),m=MO(k);let inc=0,incA=0,incN=0,fixed=0
  if(k>=TK&&(WF.inc||WF.cost)){inc+=WF.inc;incA+=WF.inc;fixed+=WF.cost;fixedA+=WF.cost}
  return{inc,incA,incN,fixed,fixedA,fixedN,flexP,flexA,flexN,flexItems,loans,loansA,save,saveA,left:inc-fixed-flexP-loans-save}}
 
-// Wins (badges) were removed in Version 28; S.badges stays in saved data so older copies still load.
-function checkBadges(){}
 
 /* ---------- small helpers ---------- */
 const PV={};
@@ -1150,14 +1135,14 @@ function confetti(){if(RM)return;const cv=$('#fx'),x=cv.getContext('2d'),dpr=dev
 
 /* ---------- render all ---------- */
 const TABR={budget:()=>renderBudget(),loans:()=>renderLoans(),goals:()=>renderGoals(),wealth:()=>renderWealth(),history:()=>renderHistory(),bank:()=>renderBank(),settings:()=>renderSettings()};
-function renderAll(enter){LP={};GP={};XS=null;PC={};alMigrate();TXI=null;ALC={};loanSync();migrateAlloc();const lm=lab(S.cur);$('#mlab').textContent=lm;$('#mp').value=S.cur;$('#tbtn').hidden=S.cur===TK;
+function renderAll(enter){LP={};GP={};XS=null;PC={};TXI=null;ALC={};loanSync();const lm=lab(S.cur);$('#mlab').textContent=lm;$('#mp').value=S.cur;$('#tbtn').hidden=S.cur===TK;
  // Only the visible tab is drawn; the others are redrawn when switched to (every tab switch goes through commit → renderAll).
  // Shown before it's drawn, so charts that size themselves to the tab (History) measure its real width.
  $$('.tabs button').forEach(b=>b.classList.toggle('on',b.dataset.t===S.tab));document.body.className='tab-'+S.tab;$$('.tab').forEach(t=>{t.hidden=t.dataset.tab!==S.tab;t.classList.remove('enter')});
    (TABR[S.tab]||renderBudget)();brandSet();
  if(enter){const t=$('#T-'+S.tab);void t.offsetWidth;t.classList.add('enter')}moveInd();fmtAll()}
 function moveInd(){const b=$(`.tabs [data-t="${S.tab}"]`),i=$('.ind');if(!b)return;i.style.width=b.offsetWidth+'px';i.style.transform=`translateX(${b.offsetLeft-i.offsetLeft}px)`;const T=b.parentElement;if(T.scrollWidth>T.clientWidth+2){const x=b.offsetLeft-(T.clientWidth-b.offsetWidth)/2;T.scrollTo({left:Math.max(0,x),behavior:RM?'auto':'smooth'})}}
-function commit(enter){if(INB&&SRV){INB=false;if(autoFile()){LP={}}}save();rerender(enter);checkBadges()}
+function commit(enter){if(INB&&SRV){INB=false;if(autoFile()){LP={}}}save();rerender(enter)}
 function rerender(enter){const a=document.activeElement,k=a&&a.dataset?a.dataset.key:null,raw=k?a.value:null,ss=k&&'selectionStart' in a?[a.selectionStart,a.selectionEnd]:null;
  renderAll(enter);
  if(k){const e=document.querySelector(`[data-key="${CSS.escape(k)}"]`);if(e){e.value=raw;RESTORING=true;try{e.focus({preventScroll:true})}finally{RESTORING=false}try{if(ss)e.setSelectionRange(ss[0],ss[1])}catch(_){}}}}
@@ -1364,14 +1349,11 @@ document.addEventListener('click',e=>{const nd=e.target.closest('#sk .nd'),lk=nd
  case'wiPlan':{const l=S.loans.find(x=>x.id===d.id),w=l?Math.round(WI[l.id]||0):0;if(!l)return;if(!w)return toast('Drag the slider to an amount first');const m=xStart(),v=loanUsual(l,m)+w;setUsual(l,m,v);WI[l.id]=0;toast(`${l.name}: ${f0(v)} extra a month from ${labS(m)}`);return commit()}
  case'export':{const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([JSON.stringify(S,null,1)],{type:'application/json'}));a.download='budgeteer-backup-'+new Date().toISOString().slice(0,10)+'.json';a.click();return}
  case'import':return $('#file').click();
- case'popout':{const w=window.open(location.href,'_blank');if(!w)toast('Chrome blocked the new tab. Open the file directly from the NAS folder instead.');return}
- case'fsConnect':case'fsOpen':case'fsReconnect':case'fsStep1':return fsStep1();case'fsCreate':case'fsStep2':return fsStep2();case'fsUseFile':return fsChoose('theirs');case'fsUseMine':return fsChoose('mine');case'fsRetry':return fsFlush(true);
- case'fsTheirs':return fsResolve('theirs');case'fsMine':return fsResolve('mine');case'fsLater':FS.later=true;try{sessionStorage.setItem('pfb_later','1')}catch(_){}return fsUI();
- case'fsForget':if(!confirm('Stop saving to the shared file on this computer? Your data stays in this browser, and the file stays on the NAS.'))return;FS.h=null;FS.rh=null;FS.lastH=null;FS.dir=null;kvSet('file',null);kvSet('dir',null);setFS('none');return;
+ case'fsRetry':return FS.loaded?fsFlush(true):fsInit();
  case'syncInfo':return $('footer').scrollIntoView({behavior:RM?'auto':'smooth'})}});
 function commitFocus(sel){commit();const e=$(sel);if(e){e.focus();e.select?.()}}
 $('#mp').addEventListener('change',e=>{if(e.target.value)go(e.target.value);e.target.style.pointerEvents='none'});
-$('#file').addEventListener('change',e=>{const f=e.target.files[0];if(!f)return;const r=new FileReader();r.onload=()=>{try{const v=JSON.parse(r.result);if(!((v.plans&&v.loans)||(v.data&&v.data.plans)))throw 0;if(!confirm('Replace everything in this browser with this backup?'))return;const d=v.data&&v.data.plans?v.data:v;S={...d,badges:d.badges||[],months:d.months||{},cur:S.cur,tab:S.tab,flow:S.flow};commit(true);toast('Backup restored')}catch(_){alert('That file isn’t a Budgeteer backup.')}};r.readAsText(f);e.target.value=''});
+$('#file').addEventListener('change',e=>{const f=e.target.files[0];if(!f)return;const r=new FileReader();r.onload=()=>{try{const v=JSON.parse(r.result);if(!((v.plans&&v.loans)||(v.data&&v.data.plans)))throw 0;if(!confirm('Replace everything in this browser with this backup?'))return;const d=v.data&&v.data.plans?v.data:v;S={...d,months:d.months||{},cur:S.cur,tab:S.tab,flow:S.flow};commit(true);toast('Backup restored')}catch(_){alert('That file isn’t a Budgeteer backup.')}};r.readAsText(f);e.target.value=''});
 addEventListener('scroll',()=>$('#bar').classList.toggle('sc',scrollY>6),{passive:true});
 addEventListener('resize',moveInd);
 document.fonts&&document.fonts.ready.then(moveInd);
@@ -1383,7 +1365,7 @@ document.fonts&&document.fonts.ready.then(moveInd);
 let FLQ='';
 const BK={st:null,tx:[],loans:null,accts:null,err:'',show:40,busy:false};
 const bankFrom=()=>S.bankFrom||(TK+'-01');
-async function bankLoad(){if(!SRV)return;try{const[a,b,c,e]=await Promise.all([fetch('api/bank/status',{cache:'no-store'}),fetch('api/bank/transactions?from='+bankFrom(),{cache:'no-store'}),fetch('api/bank/loans',{cache:'no-store'}),fetch('api/bank/accounts',{cache:'no-store'})]);BK.st=await a.json();if(b.ok){BK.tx=(await b.json()).tx||[];PSET=new Set(BK.tx.filter(t=>t.pending).map(t=>t.id))}if(c.ok)BK.loans=(await c.json()).accounts||[];if(e.ok)BK.accts=(await e.json()).accounts||[];BK.err=''}catch(e){BK.err='Couldn’t reach the bank service on your NAS.'}
+async function bankLoad(){if(!SRV)return;try{const[a,b,c,e]=await Promise.all([fetch('api/bank/status',{cache:'no-store'}),fetch('api/bank/transactions?from='+bankFrom(),{cache:'no-store'}),fetch('api/bank/loans',{cache:'no-store'}),fetch('api/bank/accounts',{cache:'no-store'})]);BK.st=await a.json();if(b.ok){BK.tx=(await b.json()).tx||[];PSET=new Set(BK.tx.filter(t=>t.pending).map(t=>t.id))}if(c.ok)BK.loans=(await c.json()).accounts||[];if(e.ok)BK.accts=(await e.json()).accounts||[];BK.err=''}catch(e){BK.err='Couldn’t reach the bank service on the server.'}
  autoSave();
  rerender();bankBadge()}
 // Files what it can and saves that as an auto-only change (see fsFlush).
@@ -1473,9 +1455,6 @@ function billLine(i,g){const fq=g?`<select class="in fq" data-k="item" data-g="$
  if(!rl.length)return `<div class="bst">${fq}<button type="button" class="pill" data-act="catTx" data-v="i:${i.id}" title="See payments">See payments</button><button class="lnk" data-act="lnkPay" data-kind="bill" data-id="${i.id}">Link payment</button></div>`;
  let st='Linked',cls='pill';if(k<TK){st='Not seen';cls='pill bad'}else if(k===TK){if(due&&NOW.getDate()>due+3){st='Not seen yet';cls='pill hot'}else st=due?'Due the '+ord(due):'Waiting'}
  return `<div class="bst">${fq}<button type="button" class="${cls}" data-act="catTx" data-v="i:${i.id}" title="See payments and links">${st}</button></div>`}
-// Groceries and flex items can hold several stores; each chip removes just that store.
-function flexLine(i){if(!SRV)return '';const rl=rulesFor('i:'+i.id);
- return `<div class="bst inc">${rl.map(r=>`<span class="pill" style="gap:4px">${esc(r.p)}<button class="x" data-act="ruleDel" data-id="${r.id}" aria-label="Stop filing ${esc(r.p)} here" style="width:18px;height:18px;font-size:13px">×</button></span>`).join('')}<button class="lnk" data-act="lnkPay" data-kind="flex" data-id="${i.id}">${rl.length?'Add a store':'Link stores'}</button></div>`}
 function incLine(i){if(!SRV)return '';const k=S.cur,g=incGot(k,i.id),rl=rulesFor('inc:'+i.id);
  if(g)return `<div class="bst inc"><button type="button" class="pill${g.amt>=(+i.amt||0)-0.5||k<TK?' ok':''}" data-act="catTx" data-v="inc:${i.id}" title="See deposits and links">Received ${f2(g.amt)}${k===TK&&g.amt<(+i.amt||0)-0.5?' of '+f0(+i.amt||0):''} · ${g.list.length>1?g.list.length+' deposits':dshort(g.list[0].d)}</button></div>`;
  if(!rl.length)return `<div class="bst inc"><button type="button" class="pill" data-act="catTx" data-v="inc:${i.id}" title="See deposits">See deposits</button><button class="lnk" data-act="lnkPay" data-kind="inc" data-id="${i.id}">Flag a deposit</button></div>`;
@@ -1747,9 +1726,7 @@ function renderBuild(){const p=plan(),first=firstMonth(),gap=pastGaps(),fixed=p.
  $('#T-budget').innerHTML=h}
 
 /* ---------- Savings accounts shared between goals ---------- */
-// alloc{acctId:{mode:'order'|'split',goals:[goalId],pct:{goalId:n},rest:'last'|'none'}}. Old goal.accts links move in here.
-function migrateAlloc(){if(!S.goals.some(g=>g.accts&&g.accts.length))return;S.alloc||(S.alloc={});
- S.goals.forEach(g=>{(g.accts||[]).forEach(a=>{const e=S.alloc[a]||(S.alloc[a]={mode:'order',goals:[],pct:{},rest:'last'});if(!e.goals.includes(g.id))e.goals.push(g.id)});delete g.accts})}
+// alloc{acctId:{mode:'order'|'split',goals:[goalId],pct:{goalId:n},rest:'last'|'none'}}.
 const gLinked=g=>Object.values(S.alloc||{}).some(e=>(e.goals||[]).includes(g.id));
 let ALC={};
 // How each linked account's balance divides between its goals in month k. bal(a) gives the balance to divide;
@@ -1829,10 +1806,10 @@ function catchSel(){return `<div class="catchr"><b>Purchases with no store link 
 const SYNC_OPTS=[[1,'Every hour'],[2,'Every 2 hours'],[3,'Every 3 hours'],[6,'Every 6 hours'],[12,'Twice a day'],[24,'Once a day'],[0,'Only when we tap Sync now']];
 const whenS=d=>new Date(d).toLocaleString('en-US',{month:'short',day:'numeric',hour:'numeric',minute:'2-digit'});
 function syncWord(rf){if(!rf)return 'Transactions sync every few hours';const o=SYNC_OPTS.find(x=>x[0]===rf.hours);return rf.hours?`Checks ${o?o[1].toLowerCase():'every '+rf.hours+' hours'}${rf.open?' and when the app is opened':''}`:(rf.open?'Checks when the app is opened or you tap Sync now':'Checks only when you tap Sync now')}
-// How often the NAS asks the banks for new data. Saved on the NAS, so it's the same for both of you.
+// How often the server asks the banks for new data. Saved on the server, so it's the same in every browser.
 function refreshCard(){const rf=BK.st&&BK.st.refresh;if(!rf)return '';
- return `<section class="card" style="margin-bottom:16px"><h2>Refresh bank data</h2><p class="mut" style="font-size:14px;margin:4px 0 12px">How often your NAS checks your banks for new transactions and balances. Plaid charges per connection per month, not per check, so checking more often costs nothing extra. Banks themselves only update a few times a day, so new charges can still take a few hours to show.</p>
- <div class="fields"><label class="f" style="max-width:280px">Check automatically<select class="in" data-c="refresh" data-f="hours">${(SYNC_OPTS.some(o=>o[0]===rf.hours)?SYNC_OPTS:[[rf.hours,`Every ${rf.hours} hours (NAS setting)`],...SYNC_OPTS]).map(([v,l])=>`<option value="${v}"${rf.hours===v?' selected':''}>${l}</option>`).join('')}</select></label>
+ return `<section class="card" style="margin-bottom:16px"><h2>Refresh bank data</h2><p class="mut" style="font-size:14px;margin:4px 0 12px">How often the server checks your banks for new transactions and balances. Plaid charges per connection per month, not per check, so checking more often costs nothing extra. Banks themselves only update a few times a day, so new charges can still take a few hours to show.</p>
+ <div class="fields"><label class="f" style="max-width:280px">Check automatically<select class="in" data-c="refresh" data-f="hours">${(SYNC_OPTS.some(o=>o[0]===rf.hours)?SYNC_OPTS:[[rf.hours,`Every ${rf.hours} hours (server setting)`],...SYNC_OPTS]).map(([v,l])=>`<option value="${v}"${rf.hours===v?' selected':''}>${l}</option>`).join('')}</select></label>
  <label class="chk" style="align-self:end;padding-bottom:10px"><input type="checkbox" data-c="refresh" data-f="open"${rf.open?' checked':''}> Also check when someone opens the app <small class="dim">(if the last check was 10+ minutes ago)</small></label></div>
  <p class="dim" style="font-size:13px;margin-top:10px">${rf.last?'Last check '+whenS(rf.last):'No check yet'}${rf.next?' · next automatic check around '+whenS(rf.next):rf.hours?'':' · automatic checks are off'}.</p></section>`}
 function connCard(items){const last=items.map(it=>it.lastSync).filter(Boolean).sort().pop();
@@ -1929,7 +1906,7 @@ function dataView(){const k=S.cur,T=totals(k),live=k>=TK,lm=mon(k),spentA=T.fixe
   ${tb([tr(['Cash',`${cash.length} account${cash.length===1?'':'s'}`,f2(cT)]),tr(['+ Investments',`${inv.length} account${inv.length===1?'':'s'}`,f2(iT)]),tr(['− Credit cards',`${cards.length} card${cards.length===1?'':'s'}`,f2(kT)]),tr(['− Loans',`${L.length} loan${L.length===1?'':'s'}: lender balance when linked, otherwise this month’s opening balance`,f2(loanT)]),tr(['= Net worth','',f2(cT+iT-kT-loanT)],'tot')],'nw')}</section>`}
 
  const tx=BK.tx||[],pend=tx.filter(t=>t.pending).length,txd=S.txd||{},TV=Object.values(txd),pv=Object.keys(S.plans||{}).sort(),ms=Object.keys(S.months||{}).sort(),items=(BK.st&&BK.st.items)||[],dr=tx.length?`${dshort(tx[tx.length-1].date)} – ${dshort(tx[0].date)}`:'none';
- h+=`<section class="card"><h2>Your data</h2><p class="mut" style="font-size:14px;margin:4px 0 12px">${SRV?'The budget is one file on your NAS that you both share. Bank data is kept beside it and only goes between the NAS and Plaid.':'The budget is saved in this browser.'}</p>
+ h+=`<section class="card"><h2>Your data</h2><p class="mut" style="font-size:14px;margin:4px 0 12px">${SRV?'The budget is one file on your server that everyone in the household shares. Bank data is kept beside it and only goes between the server and Plaid.':'The budget is saved in this browser.'}</p>
  ${tb([tr(['Budget versions',`${pv.length}`,how(pv.map(x=>'from '+labS(x)).join(' · '))]),tr(['Months with activity',`${ms.length}`,how(ms.length?labS(ms[0])+' – '+labS(ms[ms.length-1]):'')]),tr(['Rules',`${(S.rules||[]).length}`,'']),tr(['Filed transactions',`${TV.length}`,how(`${TV.filter(r=>r.auto).length} automatically (rules and matched transfers),${TV.filter(r=>!r.auto).length} by hand`)]),tr(['Loans · goals',`${L.length} · ${S.goals.length}`,'']),
   ...(SRV?[tr(['Bank transactions',`${tx.length}`,how(`since ${dshort(bankFrom())} · ${dr}${pend?' · '+pend+' pending':''}`)]),tr(['Bank connections',`${items.length}`,how(items.map(it=>esc(it.institution.name)+(it.lastSync?' ('+whenS(it.lastSync)+')':'')).join(' · '))])]:[]),
   ...(FS.last?[tr(['Last saved',whenS(FS.last),''])]:[])],'kv')}
@@ -1943,9 +1920,9 @@ function renderSettings(){const el=$('#T-settings');if(!el)return;const v=['gene
  if(v==='general'){
   h+=`<section class="card" style="margin-bottom:16px"><h2>Household</h2><p class="mut" style="font-size:14px;margin:4px 0 12px">Shown at the top left and in the browser tab, for both of you.</p><div class="fields"><label class="f">Name<input class="in" data-c="hh" data-f="name" data-key="hh-name" value="${esc(hhName())}" placeholder="Budgeteer" autocomplete="off"></label><label class="f">Subtitle<input class="in" data-c="hh" data-f="sub" data-key="hh-sub" value="${esc(hhSub())}" placeholder="Household budget" autocomplete="off"></label></div></section>`;
   h+=`<section class="card" style="margin-bottom:16px"><h2>Budget</h2><p class="mut" style="font-size:14px;margin:4px 0 12px">Income, bills and spending categories are set up in <button class="lnk" data-act="budv" data-v="build" style="padding:0;font-size:inherit">Build budget</button>.</p>${SRV?`<label class="f" style="max-width:260px">Budget and bank filing start<input class="in" type="date" data-c="bankfrom" value="${bankFrom()}"></label><div style="margin-top:14px">${catchSel()}</div>`:''}</section>`;
-  h+=`<section class="card"><h2>Backups</h2><p class="mut" style="font-size:14px;margin:4px 0 12px">${SRV?'The NAS saves a copy every day. You can also download one to keep yourself.':'Download a copy of your budget to keep it safe.'}</p><div class="adds"><button class="btn g sm" data-act="export">Download backup</button><button class="btn g sm" data-act="import">Restore backup</button></div></section>`}
+  h+=`<section class="card"><h2>Backups</h2><p class="mut" style="font-size:14px;margin:4px 0 12px">${SRV?'The server saves a copy every day. You can also download one to keep yourself.':'Download a copy of your budget to keep it safe.'}</p><div class="adds"><button class="btn g sm" data-act="export">Download backup</button><button class="btn g sm" data-act="import">Restore backup</button></div></section>`}
  else if(v==='data')h+=dataView();
- else if(!SRV)h+=`<section class="card"><p>Bank sync runs on your NAS server. Open the app from your NAS address (like http://192.168.1.50:8095) to use it.</p></section>`;
+ else if(!SRV)h+=`<section class="card"><p>Bank sync runs on the server, which can’t be reached right now. It reconnects on its own.</p></section>`;
  else if(v==='rules')h+=filingCard()+(rulesCard()||`<section class="card"><h2>Rules</h2><p class="mut" style="margin-top:6px">No rules yet. Make one with <b>Link payment</b>, <b>Flag a deposit</b> or <b>Link stores</b> in Build budget, or tick <b>Always</b> when you add a transaction in Bank → To review.</p></section>`);
  else if(!st||!st.configured)h+=`<section class="card"><p class="mut">${BK.err||(st?'Add your Plaid keys first; the Bank tab shows how.':'Loading…')}</p></section>`;
  else h+=connCard(items);
@@ -1982,7 +1959,7 @@ function invCard(a){const hs=a.holdings||[],wc=hs.filter(h=>h.cost!=null&&!h.cas
  return `<div class="wacct"><div class="bki"><div class="nm"><b>${nmA(a)}</b><small>${esc(subI(a.subtype))}${p.ok?` · ${sg(p.g)} market this month${Math.abs(p.fl)>0.5?`, ${sg(p.fl)} deposits`:''}`:''}</small></div><div class="wv"><b>${f2(+a.bal||0)}</b>${wc.length&&cost>0?`<small class="${g>=0?'pos':'neg'}">${sg(g)} (${(g/cost*100).toFixed(1)}%) total gain</small>`:''}</div></div>
  ${hs.length?`<details class="more" data-key="w-${a.id}"${ok?' open':''}><summary>${hs.length} holding${hs.length===1?'':'s'}</summary><div class="hold">${hs.slice().sort((x,y)=>(y.value||0)-(x.value||0)).map(h=>{const hg=h.cost!=null&&!h.cash?(+h.value||0)-h.cost:null;return `<div><span class="nm"><b>${esc(h.ticker||h.name)}</b><small>${h.ticker?esc(h.name):''}${h.qty!=null&&!h.cash?`${h.ticker?' · ':''}${(+h.qty).toLocaleString('en-US',{maximumFractionDigits:4})} shares`:''}</small></span><span class="w">${Math.round((+h.value||0)/tot*100)}%</span><span class="v"><b>${f2(+h.value||0)}</b>${hg!=null?`<small class="${hg>=0?'pos':'neg'}">${sg(hg)}</small>`:''}</span></div>`}).join('')}</div></details>`:a.holdings?'':'<p class="dim" style="font-size:13.5px;padding-bottom:12px">Holdings show here once Investments is allowed for this connection.</p>'}</div>`}
 function renderWealth(){const el=$('#T-wealth');if(!el)return;const head=`<div class="phead"><div><h1>Wealth</h1><p class="mut">Bank balances, investments and debts in one place. Updates after each bank sync.</p></div>${SRV?`<div class="phact"><button class="btn g sm ib" data-act="sview" data-v="connections" title="Connect banks and brokerages">${GEAR}Connections</button></div>`:''}</div>`;
- if(!SRV){el.innerHTML=head+`<section class="card"><p>Balances come from bank sync on your NAS. Open the app from your NAS address (like http://192.168.1.50:8095) to see them.</p></section>`;return}
+ if(!SRV){el.innerHTML=head+`<section class="card"><p>Balances come from bank sync on the server, which can’t be reached right now. It reconnects on its own.</p></section>`;return}
  if(!BK.st||!BK.accts){el.innerHTML=head+`<section class="card"><p class="mut">${BK.err||'Loading…'}</p></section>`;return}
  if(!BK.st.configured){el.innerHTML=head+`<section class="card"><p>Add your Plaid keys first. The Bank tab shows how.</p></section>`;return}
  const cash=acctsOf('depository'),inv=acctsOf('investment'),cards=acctsOf('credit'),cashT=sumBal(cash),invT=sumBal(inv),cardT=sumBal(cards),loanT=S.loans.reduce((x,l)=>x+debtNow(l),0),net=cashT+invT-cardT-loanT,pm=perf(inv,monthEnd0(),ymd(NOW));
@@ -2009,7 +1986,7 @@ const acctOf=l=>l.acct&&BK.loans?BK.loans.find(a=>a.id===l.acct):null;
 // Balance at the start of this month: today's balance plus any payment already made this month.
 function openBal(a){const y=a.liab,p=a.pays[TK]!=null?a.pays[TK]:y&&y.lastDate&&y.lastDate.slice(0,7)===TK&&+y.lastAmt>0?+y.lastAmt:0;return r2((+a.bal||0)+p)}
 // Copies bank data onto linked loans in memory. The bank parts (real, rp, live, link, auto) are never saved
-// to the shared file: they come from the NAS on each load, so two browsers never fight over them.
+// to the server: they come from bank data on each load, so two browsers never fight over them.
 function loanSync(){if(!BK.loans)return;S.loans.forEach(l=>{if(!l.acct)return;const a=acctOf(l);if(!a)return;
  l.real={...a.months};const rp={...a.pays},y=a.liab;(a.payList||[]).filter(x=>/disburs|proceeds|funding|advance/i.test(x.name||'')).forEach(x=>{const k=x.date.slice(0,7);if(rp[k]!=null){rp[k]=r2(rp[k]-x.amt);if(rp[k]<0.005)delete rp[k]}});if(y&&y.lastDate&&+y.lastAmt>0){const k=y.lastDate.slice(0,7);if(rp[k]==null)rp[k]=+y.lastAmt}l.rp=rp;
  l.live=a.bal!=null?{bal:a.bal,at:a.balAt}:null;if(a.bal!=null&&a.bal<=0.5){if(!l.done)l.done=TK}else if(a.bal!=null)delete l.done;l.link={inst:a.institution,name:a.official||a.name,mask:a.mask};
@@ -2035,10 +2012,10 @@ async function bankConnect(itemId,opt){try{await loadPlaid();const j=await jpost
  const h=Plaid.create({token:j.link_token,onSuccess:async(pt,meta)=>{try{if(itemId)await jpost('api/bank/reconnected',{item_id:itemId});else await jpost('api/bank/exchange',{public_token:pt,institution:meta&&meta.institution,kind:opt||''});
    toast(itemId?'Reconnected':'Connected '+((meta&&meta.institution&&meta.institution.name)||'your bank')+'. Pulling transactions…');bankLoad();[15,60,180].forEach(s=>setTimeout(()=>bankSync(true),s*1000))}catch(e){toast(e.message)}},
   onExit:err=>{if(err)toast(err.display_message||err.error_message||'Connection didn’t finish')}});h.open()}catch(e){toast(e.message)}}
-// auto: from opening the app; the NAS skips it if it synced in the last few minutes.
+// auto: from opening the app; the server skips it if it synced in the last few minutes.
 async function bankSync(quiet,auto){if(BK.busy)return;BK.busy=true;renderBank();if(S.tab==='loans')renderLoans();if(S.tab==='wealth')renderWealth();let skip=false;try{const j=await jpost('api/bank/sync',auto?{auto:true}:{});skip=!!j.skipped;if(!quiet)toast(j.added?`Synced ${j.added} new or updated transactions`:'Up to date')}catch(e){if(!quiet)toast(e.message)}BK.busy=false;if(skip){renderBank();if(S.tab==='loans')renderLoans();if(S.tab==='wealth')renderWealth();return}bankLoad()}
 let LASTOPEN=0;function openSync(){if(!SRV||document.hidden||Date.now()-LASTOPEN<5*60000||(BK.st&&BK.st.refresh&&!BK.st.refresh.open))return;LASTOPEN=Date.now();bankSync(true,true)}
-async function bankRemove(id){const it=BK.st.items.find(x=>x.item_id===id);if(!it||!confirm(`Disconnect ${it.institution.name}? Its downloaded transactions are deleted from the NAS. Anything you already added to the budget stays.`))return;await fetch('api/bank/items/'+encodeURIComponent(id),{method:'DELETE'}).catch(()=>{});toast('Disconnected '+it.institution.name);bankLoad()}
+async function bankRemove(id){const it=BK.st.items.find(x=>x.item_id===id);if(!it||!confirm(`Disconnect ${it.institution.name}? Its downloaded transactions are deleted from the server. Anything you already added to the budget stays.`))return;await fetch('api/bank/items/'+encodeURIComponent(id),{method:'DELETE'}).catch(()=>{});toast('Disconnected '+it.institution.name);bankLoad()}
 const GENERIC=new Set(['food','other','flex','power','internet','rent','loan','student','federal','private','personal','vehicle','maintenance','motorcycle','auto','new','bill','income','wages','gym','pet']);
 function txTargets(k){const A=allItems(k),I=plan(k).income;return{A,ok:v=>v==='skip'||v==='xfer'||v==='once'||(v.startsWith('g:')&&S.goals.some(g=>g.id===v.slice(2)))||(v.startsWith('i:')&&A.some(x=>x.i.id===v.slice(2)))||(v.startsWith('l:')&&S.loans.some(l=>l.id===v.slice(2)))||(v.startsWith('inc:')&&I.some(i=>i.id===v.slice(4)))}}
 function suggestTx(t){const k=t.date.slice(0,7),{A,ok}=txTargets(k),nm=(t.merchant||t.name||'').toLowerCase(),full=(t.merchant+' '+t.name).toLowerCase(),P=(t.pfc&&t.pfc[0])||'',D=(t.pfc&&t.pfc[1])||'';
@@ -2099,7 +2076,7 @@ let BV=null,FLF='all',FLN=50;try{BV=localStorage.getItem('pfb_bview')}catch(_){}
 const FLKIND=[['all','All'],['spend','Spending'],['bill','Bills'],['inc','Income'],['loan','Loans'],['xfer','Transfers'],['skip','Ignored']];
 function fileKind(r){const v=r.v||'';if(v==='xfer')return 'xfer';if(v==='skip')return 'skip';if(v.startsWith('l:'))return 'loan';if(v.startsWith('inc:')||v==='once')return 'inc';if(v.startsWith('i:')){const x=allItems(r.k).find(y=>y.i.id===v.slice(2));return x&&!x.g.flex?'bill':'spend'}return 'spend'}
 function renderBank(){const el=$('#T-bank');if(!el)return;const head=(right='',line='')=>`<div class="phead"><div><h1>Bank</h1><p class="mut">${line||'Transactions from your banks and cards, and the rules that file them.'}</p></div>${right}</div>`;
- if(!SRV){el.innerHTML=head()+`<section class="card"><p>Bank sync runs on your NAS server. Open the app from your NAS address (like http://192.168.1.50:8095) to use it.</p></section>`;return}
+ if(!SRV){el.innerHTML=head()+`<section class="card"><p>Bank sync runs on the server, which can’t be reached right now. It reconnects on its own.</p></section>`;return}
  const st=BK.st;if(!st){el.innerHTML=head()+`<section class="card"><p class="mut">${BK.err||'Loading…'}</p></section>`;return}
  if(!st.configured){el.innerHTML=head()+`<section class="card"><h2>Add your Plaid keys</h2><p class="mut" style="margin:8px 0 14px">The server needs your Plaid keys before it can connect to your bank. Add these lines under <b>environment</b> in your Docker compose file, then redeploy the stack:</p><pre class="code">- PLAID_CLIENT_ID=your-client-id\n- PLAID_SECRET=your-secret\n- PLAID_ENV=production</pre><p class="dim" style="font-size:14px;margin-top:10px">Use PLAID_ENV=sandbox with sandbox keys to try it with Plaid’s test bank first.</p></section>`;return}
  const items=st.items||[],ib=inbox(),show=ib.slice(0,BK.show||40),done=Object.entries(S.txd||{}).filter(([,r])=>r.k===S.cur&&!r.sp).sort((a,b)=>(b[1].d||'').localeCompare(a[1].d||'')),pi=pairIssues(),R=S.rules||[];
@@ -2134,77 +2111,49 @@ function rcList(m){const rc=(m.rc||[]).slice().sort((a,b)=>(b.date||'').localeCo
  const names={};allItems(S.cur).forEach(x=>names[x.i.id]=x.i.name);const tot=rc.reduce((a,r)=>a+r.amt,0);
  return `<details class="more rcl" data-key="rcl"${OPEN.has('rcl')?' open':''}><summary>Bank purchases in ${mon(S.cur)} <span class="mut n" style="margin-left:auto">${rc.length} · ${f2(tot)}</span></summary><div style="margin-top:8px">${rc.map(r=>`<div class="rcr">${r.bank?'<span class="rth bk" title="From your bank">BANK</span>':'<span class="rth"></span>'}<div class="nm"><b>${esc(r.store||'Purchase')}${r.txid?PND(r.txid):''}</b><small>${esc(names[r.item]||'Removed item')}${r.date?' · '+new Date(r.date+'T12:00').toLocaleDateString('en-US',{month:'short',day:'numeric'}):''}</small></div><span class="n">${f2(r.amt)}</span><button class="x" data-act="delRc" data-k="${S.cur}" data-id="${esc(r.id)}" aria-label="Remove">×</button></div>`).join('')}</div></details>`}
 
-/* ---------- shared data file on the NAS ---------- */
-const FS={state:/^https?:$/.test(location.protocol)?'wait':'none',dir:null,rh:null,lastH:null,incoming:null,h:null,mod:0,dirty:false,t:null,busy:false,last:null,err:'',later:false};
-try{FS.later=sessionStorage.getItem('pfb_later')==='1'}catch(_){}
-let HAS_FS=typeof window.showSaveFilePicker==='function';
-const WEB=/^https?:$/.test(location.protocol);let SRV=false;
+/* ---------- budget on the server ---------- */
+// The budget lives on the server (server.js, GET/PUT api/data). This browser keeps a copy in localStorage (KEY), so
+// edits made while the server can't be reached aren't lost: PEND marks unsaved edits, REVK the server revision that
+// copy matches. On load, unsaved edits are pushed only if the server is still at REVK; otherwise its copy wins.
+const FS={state:'wait',h:null,mod:0,dirty:false,t:null,busy:false,last:null,err:'',detail:'',loaded:false,initing:false};
+let SRV=false;
 async function srvGet(){const r=await fetch('api/data',{cache:'no-store'});if(r.status===404){FS.mod=0;return null}if(!r.ok)throw new Error('HTTP '+r.status);const j=await r.json();FS.mod=j.rev||0;const d=j.data;if(!d||!d.plans||!d.loans)throw new Error('notbudget');return d}
 async function srvRev(){const r=await fetch('api/rev',{cache:'no-store'});if(!r.ok)throw new Error('HTTP '+r.status);return (await r.json()).rev||0}
-async function srvPut(){const body=JSON.stringify({baseRev:FS.force?null:(FS.mod||null),data:sharedData()});FS.force=false;const r=await fetch('api/data',{method:'PUT',headers:{'Content-Type':'application/json'},body});if(r.status===409){const e=new Error('changed');e.name='Conflict';throw e}if(!r.ok)throw new Error('HTTP '+r.status);const j=await r.json();FS.mod=j.rev;FS.dirty=false;FS.last=new Date();try{localStorage.removeItem(PEND);localStorage.setItem(REVK,String(j.rev))}catch(_){}}
-const EMBED=(()=>{try{return window.self!==window.top}catch(_){return true}})();
+async function srvPut(){const body=JSON.stringify({baseRev:FS.mod||null,data:sharedData()});const r=await fetch('api/data',{method:'PUT',headers:{'Content-Type':'application/json'},body});if(r.status===409){const e=new Error('changed');e.name='Conflict';throw e}if(!r.ok)throw new Error('HTTP '+r.status);const j=await r.json();FS.mod=j.rev;FS.dirty=false;FS.last=new Date();try{localStorage.removeItem(PEND);localStorage.setItem(REVK,String(j.rev))}catch(_){}}
 const PEND='budgeteer_v2_unsynced',REVK='budgeteer_v2_rev';
-function idb(){return new Promise((res,rej)=>{const r=indexedDB.open('budgeteer',1);r.onupgradeneeded=()=>r.result.createObjectStore('kv');r.onsuccess=()=>res(r.result);r.onerror=()=>rej(r.error)})}
-async function kvGet(k){try{const db=await idb();return await new Promise(r=>{const q=db.transaction('kv').objectStore('kv').get(k);q.onsuccess=()=>r(q.result);q.onerror=()=>r(null)})}catch(e){return null}}
-async function kvSet(k,v){try{const db=await idb();await new Promise(r=>{const t=db.transaction('kv','readwrite');t.objectStore('kv').put(v,k);t.oncomplete=r;t.onerror=r})}catch(e){}}
 const sharedData=()=>{const{cur,tab,flow,storeMap,...d}=S;d.loans=(d.loans||[]).map(({real,rp,live,link,auto,...l})=>l);return d};
-const pack=()=>JSON.stringify({app:'budgeteer',version:2,savedAt:new Date().toISOString(),data:sharedData()});
-function adopt(d){S={...d,badges:d.badges||[],months:d.months||{},cur:S.cur,tab:S.tab,flow:S.flow};LP={};try{localStorage.setItem(KEY,JSON.stringify(S));if(SRV)localStorage.setItem(REVK,String(FS.mod||0))}catch(_){}}
-const sleep=ms=>new Promise(r=>setTimeout(r,ms));
-const TRANSIENT=['NotReadableError','NotFoundError','InvalidStateError','NoModificationAllowedError','AbortError','UnknownError','InvalidModificationError'];
-async function retry(fn,n=4){let last;for(let i=0;i<n;i++){try{return await fn()}catch(e){last=e;if(e&&(e.message==='notbudget'||e.name==='NotAllowedError'||e.name==='SecurityError'||e instanceof SyntaxError))throw e;await sleep(400*(i+1))}}throw last}
-async function fsRead(){if(SRV)return srvGet();return retry(fsRead1)}
-async function fsRead1(){const f=await FS.h.getFile(),txt=await f.text();FS.mod=f.lastModified;if(!txt.trim())return null;const j=JSON.parse(txt),d=j&&j.data;if(!j||j.app!=='budgeteer'||!d||!d.plans||!d.loans)throw new Error('notbudget');return d}
-async function fsWrite(){if(SRV)return srvPut();const data=pack();await retry(async()=>{const w=await FS.h.createWritable();try{await w.write(data);await w.close()}catch(e){try{await w.abort()}catch(_){}throw e}});FS.mod=(await retry(()=>FS.h.getFile())).lastModified;FS.dirty=false;FS.last=new Date();try{localStorage.removeItem(PEND)}catch(_){}}
-const pickOpts={types:[{description:'Budgeteer data',accept:{'application/json':['.json']}}]};
+function adopt(d){S={...d,months:d.months||{},cur:S.cur,tab:S.tab,flow:S.flow};LP={};try{localStorage.setItem(KEY,JSON.stringify(S));if(SRV)localStorage.setItem(REVK,String(FS.mod||0))}catch(_){}}
 function setFS(st,err){FS.state=st;if(err!==undefined)FS.err=err;if(st==='ok')FS.detail='';fsUI()}
-function fsErrMsg(e){FS.detail=e?`${e.name||'Error'}: ${e.message||e}`:'';try{console.error('[Budgeteer sync]',e)}catch(_){}if(SRV&&!(e&&e.message==='notbudget'))return 'Couldn’t reach the budget server on your NAS.';return e&&e.name==='SecurityError'?'Chrome won’t allow file access here because the app is open inside another page.':e&&e.name==='NotFoundError'?'The shared file wasn’t found. It may have been moved, renamed or deleted, or the NAS isn’t connected.':e instanceof SyntaxError?'The shared file looks damaged (it couldn’t be read as budget data).':e&&(e.name==='NoModificationAllowedError'||e.name==='InvalidModificationError')?'The NAS didn’t let Chrome save to the file. Check that you can edit files in that folder.':e&&e.message==='notbudget'?'That file isn’t a Budgeteer data file. Pick the shared budget file, or create a new one.':e&&e.name==='NotAllowedError'?'Chrome didn’t get permission to use the file.':'Couldn’t reach the shared file. Is the NAS connected?'}
-const FNAME='budgeteer-data.json';
-async function qperm(h){try{return await h.queryPermission({mode:'readwrite'})}catch(_){return 'prompt'}}
-async function pick(fn,o){const base={...pickOpts,id:'budgeteer',...o};const st=FS.rh||FS.lastH;if(st)base.startIn=st;try{return await fn(base)}catch(e){if(e.name==='AbortError'||!base.startIn)throw e;delete base.startIn;return await fn(base)}}
-async function fsStep1(){if(EMBED)return setFS('embed');let h;try{[h]=await pick(o=>showOpenFilePicker(o),{})}catch(e){if(e.name!=='AbortError')setFS(FS.state,fsErrMsg(e));return}
- let d;try{const f=await h.getFile(),t=await f.text();const j=t.trim()?JSON.parse(t):null;if(j&&(j.app!=='budgeteer'||!j.data||!j.data.plans||!j.data.loans))throw new Error('notbudget');d=j&&j.data}catch(e){setFS(FS.state,fsErrMsg(e));return}
- FS.rh=h;FS.lastH=h;kvSet('file',h);FS.incoming=d;let pend=false;try{pend=localStorage.getItem(PEND)==='1'}catch(_){}
- if(d&&pend){setFS('pick','');return}
- if(d){try{localStorage.setItem(KEY+'_before_shared',JSON.stringify(S))}catch(_){}adopt(d);rerender()}setFS('save','')}
-function fsChoose(w){if(w==='theirs'&&FS.incoming){adopt(FS.incoming);rerender()}setFS('save','')}
-async function fsStep2(){if(EMBED)return setFS('embed');let h;try{h=await pick(o=>showSaveFilePicker(o),{suggestedName:(FS.rh&&FS.rh.name)||FNAME})}catch(e){if(e.name!=='AbortError')setFS(FS.state,fsErrMsg(e));return}
- try{FS.h=h;FS.lastH=h;await fsWrite();kvSet('file',h);FS.incoming=null;setFS('ok','');toast('Connected. Changes now save to '+h.name)}catch(e){setFS('err',fsErrMsg(e))}}
-async function fsConnect(){return fsStep1()}
-async function fsReconnect(){return fsConnect()}
+function fsErrMsg(e){FS.detail=e?`${e.name||'Error'}: ${e.message||e}`:'';try{console.error('[Budgeteer sync]',e)}catch(_){}return e&&e.message==='notbudget'?'The server sent something that isn’t budget data.':'Couldn’t reach the budget server.'}
 async function fsLoad(){let pend=false,base=0;try{pend=localStorage.getItem(PEND)==='1';base=+localStorage.getItem(REVK)||0}catch(_){}
- const d=await fsRead();if(!d){await fsWrite();setFS('ok','');return}
- if(pend&&SRV){if(base&&base===FS.mod){setFS('ok','');FS.dirty=true;return fsFlush()}try{localStorage.removeItem(PEND)}catch(_){}adopt(d);rerender();setFS('ok','');return}
- if(pend){setFS('conflict','This browser has changes that were never saved to the shared file.');return}
+ const d=await srvGet();FS.loaded=true;if(!d){await srvPut();setFS('ok','');return}
+ if(pend){if(base&&base===FS.mod){setFS('ok','');FS.dirty=true;return fsFlush()}try{localStorage.removeItem(PEND)}catch(_){}}
  adopt(d);rerender();setFS('ok','')}
-function fsQueue(){if(!FS.h)return;if(FS.state!=='ok'){if(!(SRV&&FS.state==='wait'))try{localStorage.setItem(PEND,'1')}catch(_){}fsUI();return}FS.dirty=true;fsUI();clearTimeout(FS.t);FS.t=setTimeout(()=>fsFlush(),700)}
-async function fsFlush(force){if(!FS.h||FS.busy)return;if(force&&FS.state==='err'){FS.state='ok';FS.dirty=true}if(FS.state!=='ok'||!FS.dirty)return fsUI();FS.busy=true;
- try{const f=SRV?null:await retry(()=>FS.h.getFile());if(f&&f.lastModified>FS.mod+1){FS.busy=false;setFS('conflict','Your partner saved changes to the shared file while you were editing.');return}await fsWrite();FS.err='';FS.busy=false;fsUI()}
- catch(e){if(e&&e.name==='Conflict'&&(FS.autoOnly||SRV)){const quiet=FS.autoOnly;FS.autoOnly=false;try{const d=await fsRead();if(d){adopt(d);FS.dirty=false;FS.busy=false;try{localStorage.removeItem(PEND)}catch(_){}autoSave();rerender();if(!quiet)toast('Your partner saved a change at the same moment. Their version is showing; redo your last edit if it’s missing.')}}catch(_){}FS.busy=false;fsUI();return}
-  if(e&&e.name==='Conflict'){FS.busy=false;setFS('conflict','Your partner saved changes while you were editing.');return}try{localStorage.setItem(PEND,'1')}catch(_){}setFS('err',fsErrMsg(e))}FS.busy=false}
-async function fsResolve(which){try{if(which==='theirs'){const d=await fsRead();if(d){adopt(d);rerender()}FS.dirty=false;try{localStorage.removeItem(PEND)}catch(_){}toast('Loaded the latest from the shared file')}else{FS.force=true;await fsWrite();toast('Your version is saved')}setFS('ok','')}catch(e){setFS('err',fsErrMsg(e))}}
-async function fsPoll(){if(FS.state==='embed')return;if(FS.h&&FS.state==='err'&&!FS.busy&&!document.hidden)return fsFlush(true);if(!FS.h||FS.state!=='ok'||FS.busy||document.hidden)return;try{const f=SRV?{lastModified:await srvRev()}:await retry(()=>FS.h.getFile(),3);if(f.lastModified>FS.mod+1){if(FS.dirty)return fsFlush();FS.busy=true;const d=await fsRead();FS.busy=false;if(d){adopt(d);autoSave();rerender();toast('Updated with the latest changes from the shared file')}}FS.pf=0;if(FS.err){FS.err='';fsUI()}}catch(e){FS.busy=false;FS.pf=(FS.pf||0)+1;if(FS.pf>=3)setFS('err',fsErrMsg(e))}}
-async function fsInit(){if(WEB){try{const r=await fetch('api/health',{cache:'no-store'});if(r.ok&&(await r.json()).app==='budgeteer'){SRV=true;HAS_FS=true;rerender();FS.h={name:'your NAS'};try{await fsLoad()}catch(e){setFS('err',fsErrMsg(e))}bankLoad();openSync();return}}catch(_){}FS.state='none'}
- if(!HAS_FS){fsUI();return}if(EMBED){setFS('embed');return}const h=await kvGet('file');if(h&&typeof h.getFile==='function'){FS.lastH=h;if((await qperm(h))==='granted'){FS.h=h;try{await fsLoad();return}catch(e){}}setFS('perm');return}setFS('none')}
-function fsUI(){const b=$('#sync'),pill=$('#spill'),sv=$('#saved'),nm=FS.h?esc(FS.h.name):'',dn=FS.dir?esc(FS.dir.name):'the NAS folder';let h='';
- const card=(tone,title,body,acts)=>`<div class="sync ${tone}"><i></i><div><b>${title}</b><p>${body}</p></div><div class="sacts">${acts}</div></div>`;
- if(!HAS_FS)h='';
- else if(FS.state==='none'&&!FS.later)h=card('info','Share this budget with your partner','Connect to the budget file on the NAS so you both see the same numbers. Already have <b>budgeteer-data.json</b> on the NAS? Click <b>Open budget file</b>. Starting fresh? Click <b>Create new file</b> and save it in the NAS folder.'+(FS.err?`<br><span class="serr">${esc(FS.err)}</span>`:''),'<button class="btn sm" data-act="fsStep1">Open budget file</button><button class="btn g sm" data-act="fsStep2">Create new file</button><button class="lnk" data-act="fsLater">Not now</button>');
- else if(FS.state==='perm')h=card('warn','Connect to the shared budget · step 1 of 2','Chrome makes you pick the file each time the app is opened from a folder. Click <b>Open budget file</b> and choose <b>budgeteer-data.json</b>. Until then, changes save only in this browser.','<button class="btn sm" data-act="fsStep1">Open budget file</button>');
- else if(FS.state==='save')h=card('warn','Step 2 of 2: let the app save','You’re seeing the latest shared numbers. Click <b>Save to file</b>, then <b>Save</b> in the window that opens, and <b>Yes</b> when Windows asks to replace the file. The app writes the budget back right away, so nothing is lost.','<button class="btn sm" data-act="fsStep2">Save to file</button>');
- else if(FS.state==='pick')h=card('warn','Two versions of the budget','This browser has changes that never made it to the shared file. Which one should you keep?','<button class="btn sm" data-act="fsUseFile">Use the shared file</button><button class="btn g sm" data-act="fsUseMine">Keep this browser’s version</button>');
- else if(FS.state==='conflict')h=card('warn','Two versions of the budget',esc(FS.err)+' Pick which one to keep.','<button class="btn sm" data-act="fsTheirs">Use the shared file</button><button class="btn g sm" data-act="fsMine">Keep this browser’s version</button>');
- else if(FS.state==='err')h=card('bad','Not saved to the shared file',esc(FS.err)+' Your changes are safe in this browser. The app keeps retrying every 10 seconds.'+(FS.detail?`<br><span class="dim" style="font-size:13px">Details: ${esc(FS.detail)}${FS.h?' · file: '+esc(FS.h.name):''}</span>`:''),'<button class="btn sm" data-act="fsRetry">Try again</button><button class="btn g sm" data-act="fsStep1">Connect again</button>');
- if(FS.state==='embed')h=card('bad','Open the app in its own Chrome tab','It’s open inside another page right now (like a NAS file viewer or a preview), and Chrome blocks file access there, so it can’t save to the shared file. Anything you change here is saved only in this view. Download a backup first, then open the HTML file directly in Chrome: go to the NAS folder in File Explorer or Finder and double-click the file, or drag it into a Chrome tab. The address bar should start with <b>file://</b>.','<button class="btn g sm" data-act="export">Download backup</button><button class="btn sm" data-act="popout">Try opening in a new tab</button>');
- if(h&&FS.detail&&FS.state!=='err'&&FS.state!=='ok')h=h.replace('</p></div><div class="sacts">',`<br><span class="dim" style="font-size:13px">Details: ${esc(FS.detail)}</span></p></div><div class="sacts">`);
- b.innerHTML=h;
- const st=FS.state==='wait'?['','Connecting…']:!HAS_FS?['', 'Saved in this browser. Shared-file saving needs Chrome or Edge on a computer.']:FS.state==='perm'||FS.state==='save'||FS.state==='pick'?['bad','Not connected. Saved in this browser only']:FS.state==='ok'?['ok',FS.dirty||FS.busy?`Saving to ${nm}…`:`Saved to ${nm}${FS.last?' at '+FS.last.toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'}):''}`]:FS.state==='embed'?['bad','Opened inside another page. Not saving to the shared file']:FS.state==='none'?['','Saved in this browser only']:['bad','Not synced. Saved in this browser only'];
- sv.innerHTML=`<span class="dim">Version 1</span> · <i class="sdot ${st[0]}"></i>${st[1]}${FS.h&&FS.state==='ok'&&!SRV?` · <button class="lnk" data-act="fsStep1">Switch file</button> · <button class="lnk" data-act="fsForget">Stop sharing</button>`:FS.state==='none'&&HAS_FS&&FS.later?` · <button class="lnk" data-act="fsStep1">Share with partner</button>`:''}`;
- pill.hidden=!HAS_FS||FS.state==='none'||FS.state==='wait';pill.className='sp '+st[0];pill.innerHTML=`<i class="sdot ${st[0]}"></i>${FS.state==='ok'?(FS.dirty||FS.busy?'Saving…':'Synced'):'Not synced'}`}
+// A save while the server copy is still loading ('wait') doesn't mark PEND; while the server is unreachable it does.
+function fsQueue(){if(FS.state!=='ok'){if(FS.state!=='wait')try{localStorage.setItem(PEND,'1')}catch(_){}fsUI();return}FS.dirty=true;fsUI();clearTimeout(FS.t);FS.t=setTimeout(()=>fsFlush(),700)}
+async function fsFlush(force){if(!SRV||!FS.loaded||FS.busy)return;if(force&&FS.state==='err'){FS.state='ok';FS.dirty=true}if(FS.state!=='ok'||!FS.dirty)return fsUI();FS.busy=true;
+ try{await srvPut();FS.err='';FS.busy=false;fsUI()}
+ catch(e){if(e&&e.name==='Conflict'){const quiet=FS.autoOnly;FS.autoOnly=false;try{const d=await srvGet();if(d){adopt(d);FS.dirty=false;FS.busy=false;try{localStorage.removeItem(PEND)}catch(_){}autoSave();rerender();if(!quiet)toast('Someone else saved a change at the same moment. Their version is showing; redo your last edit if it’s missing.')}}catch(_){}FS.busy=false;fsUI();return}
+  try{localStorage.setItem(PEND,'1')}catch(_){}setFS('err',fsErrMsg(e))}FS.busy=false}
+// Every 10 seconds (and when the page comes back into view): reconnect if needed, retry a failed save, or pick up
+// changes saved from another browser.
+async function fsPoll(){if(document.hidden||FS.busy)return;if(!SRV||!FS.loaded)return fsInit();if(FS.state==='err')return fsFlush(true);if(FS.state!=='ok')return;
+ try{const rev=await srvRev();if(rev>FS.mod+1){if(FS.dirty)return fsFlush();FS.busy=true;const d=await srvGet();FS.busy=false;if(d){adopt(d);autoSave();rerender();toast('Updated with the latest changes from the server')}}FS.pf=0;if(FS.err){FS.err='';fsUI()}}
+ catch(e){FS.busy=false;FS.pf=(FS.pf||0)+1;if(FS.pf>=3)setFS('err',fsErrMsg(e))}}
+async function fsInit(){if(FS.initing)return;FS.initing=true;
+ try{const r=await fetch('api/health',{cache:'no-store'});if(!r.ok||(await r.json()).app!=='budgeteer')throw new Error('HTTP '+r.status);
+  if(!SRV){SRV=true;FS.h={name:'the server'};rerender();bankLoad();openSync()}
+  await fsLoad()}
+ catch(e){setFS('err',fsErrMsg(e))}finally{FS.initing=false}}
+function fsUI(){const b=$('#sync'),pill=$('#spill'),sv=$('#saved');
+ b.innerHTML=FS.state==='err'?`<div class="sync bad"><i></i><div><b>Not saved to the server</b><p>${esc(FS.err)} Your changes are safe in this browser. The app keeps retrying every 10 seconds.${FS.detail?`<br><span class="dim" style="font-size:13px">Details: ${esc(FS.detail)}</span>`:''}</p></div><div class="sacts"><button class="btn sm" data-act="fsRetry">Try again</button></div></div>`:'';
+ const st=FS.state==='wait'?['','Connecting…']:FS.state==='ok'?['ok',FS.dirty||FS.busy?'Saving to the server…':`Saved to the server${FS.last?' at '+FS.last.toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'}):''}`]:['bad','Not saved to the server. Saved in this browser only'];
+ sv.innerHTML=`<span class="dim">Version 1</span> · <i class="sdot ${st[0]}"></i>${st[1]}`;
+ pill.hidden=FS.state==='wait';pill.className='sp '+st[0];pill.innerHTML=`<i class="sdot ${st[0]}"></i>${FS.state==='ok'?(FS.dirty||FS.busy?'Saving…':'Synced'):'Not synced'}`}
 setInterval(fsPoll,10000);addEventListener('focus',fsPoll);document.addEventListener('visibilitychange',()=>{if(!document.hidden){fsPoll();openSync()}});
 addEventListener('beforeunload',e=>{if(FS.dirty&&FS.state==='ok'){fsFlush();e.preventDefault();e.returnValue=''}});
 
-LP={};checkBadges(false);renderAll(true);try{localStorage.setItem(KEY,JSON.stringify(S))}catch(_){}fsUI();fsInit();
+LP={};renderAll(true);try{localStorage.setItem(KEY,JSON.stringify(S))}catch(_){}fsUI();fsInit();
 </script>
 </body>
 </html>

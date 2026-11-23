@@ -6,8 +6,6 @@
 services:
   budgeteer:
     build: .
-    # To run the image GitHub builds instead (see README), replace `build: .` with:
-    # image: ghcr.io/YOUR-GITHUB-NAME/budgeteer:latest
     container_name: budgeteer
     env_file: .env
     environment:

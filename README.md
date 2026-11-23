@@ -17,7 +17,6 @@ budgeteer/
 ├── .env.example                copy to .env and add your Plaid keys
 ├── docker-compose.yml          run it with Docker
 ├── Dockerfile
-├── .github/workflows/image.yml optional: GitHub builds a Docker image on each version tag
 └── data/                       NOT in git: budget, bank data, Plaid tokens
 ```
 
@@ -53,14 +52,9 @@ docker compose up -d --build
 Open `http://localhost:8095` (or `http://YOUR-SERVER-IP:8095` from other devices). Data is saved
 in `./data` next to the compose file. Change the port with `HOST_PORT` in `.env`.
 
-**Prebuilt image (optional):** pushing a tag like `v1` makes GitHub Actions publish
-`ghcr.io/YOUR-GITHUB-NAME/budgeteer:latest`. In `docker-compose.yml`, swap `build: .` for that
-`image:` line. If the repo is private, log your server in once with
-`docker login ghcr.io -u YOUR-GITHUB-NAME` and a token that has `read:packages`.
-
 ## 3. Use it
 
-The footer should say **Version 1 · Saved to your NAS** (it means the server). The first browser
+The footer should say **Version 1 · Saved to the server**. The first browser
 to open an empty server saves its budget there; after that everyone loads the same copy.
 If two people edit at the same moment, the app keeps the server's copy and re-applies.
 
