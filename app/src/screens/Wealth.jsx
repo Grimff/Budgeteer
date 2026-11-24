@@ -9,7 +9,8 @@ const bigN = { font: "700 24px 'Inter Display',Inter,sans-serif" };
 // as the old code did), with a hover readout.
 function AreaChart({ pts, col }) {
   const ref = useRef(null), N = pts.length, [W, setW] = useState(null), [at, setAt] = useState(N - 1);
-  useLayoutEffect(() => { if (N >= 2) setW(Math.round(Math.min(1000, Math.max(340, ref.current.clientWidth || Math.max(0, (document.querySelector('main') || document.body).clientWidth - 90) || 1000)))); }, []);
+  // Measured again after every render (a re-render in place must size like a fresh draw did); setW skips equal values.
+  useLayoutEffect(() => { if (N >= 2) setW(Math.round(Math.min(1000, Math.max(340, ref.current.clientWidth || Math.max(0, (document.querySelector('main') || document.body).clientWidth - 90) || 1000)))); });
   if (N < 2) return <div id="wch"><p className="dim" style={{ fontSize: '14px', margin: '8px 0' }}>The chart fills in as values are saved after each sync, one point a day.</p></div>;
   if (W == null) return <div id="wch" ref={ref}></div>;
   const H = W < 640 ? 200 : 240, pl = 64, pr = 16, pt = 14, pb = 30, vs = pts.map(q => q.v), lo = Math.min(...vs), hi = Math.max(...vs), pad = (hi - lo) * .15 || hi * .02 || 1, mn = Math.max(0, lo - pad), mx = hi + pad, X = i => pl + i / (N - 1) * (W - pl - pr), Y = v => pt + (1 - (v - mn) / (mx - mn)) * (H - pt - pb);
@@ -56,7 +57,7 @@ export function Wealth() {
       {need.map(it => <div className="bki" key={it.item_id}><div className="nm"><b>{tx(it.institution.name)}</b><small>Allow investment details (holdings and cost basis) from this connection. It takes one quick sign-in through Plaid.</small></div><button className="btn g sm" data-act="invAllow" onClick={onAct('invAllow')} data-id={tx(it.item_id)}>Allow</button></div>)}{' '}
       {inv.length ? <><div className="wtools"><div className="seg" role="group" aria-label="Time range">{RANGES.map(([k, l]) => <button key={k} className={WR === k ? 'on' : ''} data-act="wr" onClick={onAct('wr')} data-r={k}>{l}</button>)}</div>{from > rangeFrom(WR, '') ? <span className="dim" style={{ fontSize: '13px' }}>Since {dshort(from)}, when tracking started</span> : null}</div>{' '}
         <div className="wperf">{rp.ok ? <><div><small>Market gain</small><b className={pn(rp.g)}>{sg(rp.g)}</b></div><div><small>Return</small><b className={pn(rp.g)}>{rp.g >= 0 ? '+' : '−'}{Math.abs(rp.pct * 100).toFixed(2)}%</b></div><div><small>Deposits</small><b>{sg(rp.fl)}</b></div><div><small>Value now</small><b>{f0(invT)}</b></div></> : <p className="dim" style={{ fontSize: '14px' }}>Performance shows once there are two days of values.</p>}</div>{' '}
-        <AreaChart pts={invSeries(inv, from)} col={C.aqua} />{inv.map(a => <InvCard key={a.id} a={a} />)}</> : null}</section>
+        <AreaChart key={from} pts={invSeries(inv, from)} col={C.aqua} />{inv.map(a => <InvCard key={a.id} a={a} />)}</> : null}</section>
     <section className="card" style={{ '--i': 2, marginTop: '16px' }}><div className="bh"><div><h2>Bank balances</h2><p>Checking and savings across your banks.</p></div><b className="n" style={bigN}>{f2(cashT)}</b></div>{cash.length ? cash.map(a => {
       const v = valueOn(a, monthEnd0()), ch = v != null ? (+a.bal || 0) - v : null;
       return <div className="bki" key={a.id}><div className="nm"><b><NmA a={a} /></b><small>{tx(subI(a.subtype))}{a.avail != null && Math.abs(a.avail - (+a.bal || 0)) > 0.005 ? ' · ' + f2(a.avail) + ' available' : ''}{ch != null ? <> · <span className={pn(ch)}>{sg(ch)}</span> this month</> : ''}</small></div><b className="n">{f2(+a.bal || 0)}</b></div>;

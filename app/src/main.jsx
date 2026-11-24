@@ -60,7 +60,7 @@ replaceScreen('renderLoans', () => draw($('#T-loans'), <Loans />));
 replaceScreen('pxLive', pxLiveR);
 replaceScreen('wiLive', wiLiveR);
 replaceScreen('renderGoals', () => draw($('#T-goals'), <Goals />));
-replaceScreen('renderWealth', () => { const el = $('#T-wealth'); if (el) draw(el, <Wealth />); });
+replaceScreen('renderWealth', () => live($('#T-wealth'), <Wealth />));
 
 // Parity cases: the same data drawn both ways (self-test only).
 const setHR = v => { const o = HR; HR = v; return () => { HR = o; }; };
@@ -80,7 +80,7 @@ const both = (...u) => () => u.reverse().forEach(f => f && f());
 // The bank accounts changed for one case.
 const accts = fn => () => swap(BK, 'accts', fn(clone(BK.accts || [])));
 addParity({
-  name: 'Wealth', fn: 'renderWealth', el: '#T-wealth', cases: () => {
+  name: 'Wealth', fn: 'renderWealth', el: '#T-wealth', live: true, cases: () => {
     const c = [], ks = monthsToTry();
     for (const k of ks) c.push({ label: k, set: () => at(k) });
     for (const r of RANGES.map(x => x[0])) for (const k of [addM(TK, -1), TK, addM(TK, 1)]) c.push({ label: `${k} ${r}`, set: () => at(k, () => { const o = WR; WR = r; return () => { WR = o; }; }) });
