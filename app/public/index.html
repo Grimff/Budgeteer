@@ -17,31 +17,8 @@
 <link rel="stylesheet" href="css/app.css">
 </head>
 <body>
-<header class="bar" id="bar">
-  <div class="brand" data-act="sview" data-v="general" title="Change the name in Settings"><span class="mark" aria-hidden="true"><svg class="lgo" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><defs><clipPath id="lgclip"><rect width="64" height="64" rx="18"/></clipPath></defs><g clip-path="url(#lgclip)"><path d="M32 32L13.459 -25.063A60 60 0 0 1 80.541 -3.267Z" fill="#ffb6d9"/><path d="M32 32L80.541 -3.267A60 60 0 0 1 80.541 67.267Z" fill="#ffe08a"/><path d="M32 32L80.541 67.267A60 60 0 0 1 13.459 89.063Z" fill="#d2f46b"/><path d="M32 32L13.459 89.063A60 60 0 0 1 -28 32Z" fill="#82ead8"/><path d="M32 32L-28 32A60 60 0 0 1 13.459 -25.063Z" fill="#c6b2ff"/></g><circle cx="32" cy="32" r="16.5" fill="#120b16"/><path d="M27.5 32H33a4.25 4.25 0 0 0 0-8.5H27.5V40.5H34a4.25 4.25 0 0 0 0-8.5H27.5" fill="none" stroke="#fff4fa" stroke-width="4.8" stroke-linecap="round" stroke-linejoin="round"/></svg></span><span><b id="hhN">Budgeteer</b><small id="hhS">Household budget</small></span></div>
-  <nav class="tabs" aria-label="Sections"><span class="ind" aria-hidden="true"></span><button data-act="tab" data-t="budget">Budget</button><button data-act="tab" data-t="loans">Loans</button><button data-act="tab" data-t="goals">Goals</button><button data-act="tab" data-t="wealth">Wealth</button><button data-act="tab" data-t="history">History</button><button data-act="tab" data-t="bank" id="tbank">Bank</button><button data-act="tab" data-t="settings" class="tset" aria-label="Settings" title="Settings"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09a1.65 1.65 0 0 0-1-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09a1.65 1.65 0 0 0 1.51-1 1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg></button></nav>
-  <div class="month"><button class="sp" id="spill" data-act="syncInfo" hidden></button><button class="today" data-act="mtoday" id="tbtn">This month</button><button data-act="mprev" aria-label="Previous month">‹</button><button class="ml" data-act="pick" id="mlab" aria-label="Choose month"></button><button data-act="mnext" aria-label="Next month">›</button><input type="month" id="mp" tabindex="-1" aria-hidden="true"></div>
-</header>
-
-<main>
-<div id="sync" aria-live="polite"></div>
-<section class="tab" data-tab="budget" id="T-budget"></section>
-<section class="tab" data-tab="loans" id="T-loans"></section>
-<section class="tab" data-tab="goals" id="T-goals"></section>
-<section class="tab" data-tab="wealth" id="T-wealth"></section>
-<section class="tab" data-tab="history" id="T-history"></section>
-<section class="tab" data-tab="bank" id="T-bank"></section>
-<section class="tab" data-tab="settings" id="T-settings"></section>
-</main>
-
-<footer><span id="saved"></span><span><button class="lnk" data-act="export">Download backup</button> · <button class="lnk" data-act="import">Restore backup</button><input type="file" id="file" accept="application/json" hidden></span></footer>
-
-<dialog id="dlg"><form method="dialog" id="dform"><h3 id="dt"></h3><p class="sub" id="ds"></p><div id="dsel"></div><div class="amt"><span>$</span><input class="in" id="da" inputmode="decimal" autocomplete="off" aria-label="Amount"></div><div class="chips" id="dc"></div><div class="prev" id="dp"></div><div class="dact"><button type="button" class="lnk" id="ddel" hidden>Remove</button><button type="button" class="btn g" data-act="dclose">Cancel</button><button type="submit" class="btn" id="dok">Save</button></div></form></dialog>
-<dialog id="ldlg"><form method="dialog" id="lform"><h3 id="lt"></h3><p class="sub" id="ls"></p><input class="in" id="lq" placeholder="Search transactions" autocomplete="off" aria-label="Search transactions"><div class="lpick" id="lpick"></div><div id="lrule"></div><div class="dact" style="margin-top:16px"><button type="button" class="lnk" id="ldel" hidden>Remove link</button><button type="button" class="btn g" data-act="lclose">Cancel</button><button type="submit" class="btn" id="lok" disabled>Save</button></div></form></dialog>
-<dialog id="tdlg"><form method="dialog"><h3 id="tdt"></h3><p class="sub" id="tds"></p><div class="clinks" id="tdr"></div><div class="seg" id="tdrg" style="margin-bottom:8px"></div><input class="in" id="tdq" placeholder="Search store, name or account" autocomplete="off" aria-label="Search these transactions" style="margin-bottom:8px"><p class="dim" id="tdf" hidden style="font-size:13px;margin:0 0 8px"></p><div class="tlist" id="tdl"></div><div class="dact"><button type="button" class="btn g" data-act="tclose">Close</button></div></form></dialog>
-<dialog id="fdlg"><form method="dialog"><h3 id="fdt"></h3><p class="sub" id="fds"></p><div id="fdb"></div></form></dialog>
-<div id="toast" role="status" aria-live="polite"></div>
-<canvas id="fx" aria-hidden="true"></canvas>
+<!-- The page (header, tabs, sections, footer, dialogs) is drawn by React: app/src/frame.jsx. -->
+<div id="app" style="display:contents"></div>
 
 <!-- Scripts load in this order and share one global scope; see CLAUDE.md. -->
 <script src="js/core.js"></script>

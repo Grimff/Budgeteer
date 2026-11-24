@@ -249,3 +249,62 @@ export const CHG = {
   },
 };
 export const ORDER_CHG = [['mm', (d) => d.mm], ['mv', (d) => d.mv], ['tx', (d, t) => d.tx && t.tagName === 'SELECT'], ['alacct', (d) => d.alacct], ['gacct', (d) => d.gacct], ['catchall', (d) => d.catchall], ['aladd', (d) => d.aladd], ['alrest', (d) => d.alrest], ['tops', (d) => d.tops], ['rule', (d) => d.rule], ['rulev', (d) => d.rulev], ['ruleshift', (d) => d.ruleshift], ['rulemm', (d) => d.rulemin || d.rulemax], ['al', (d) => d.al], ['c', (d) => d.c]];
+
+// Listeners of the page frame's own elements (were attached at load in flow.js, bank.js and events.js; moved here
+// unchanged): the amount dialog, the link dialog, the pop-up's search, the month picker and the backup file. The frame
+// (frame.jsx) attaches them as native listeners through refs, so they behave exactly as before.
+export const FRAME_ON = {
+  da: {
+    input: ()=>dprev(),
+  },
+  dc: {
+    click: e=>{const b=e.target.closest('button');if(!b)return;$('#da').value=b.dataset.v;dprev();$('#da').focus()},
+  },
+  dsel: {
+    change: ()=>{if(DLG&&DLG.onSel)DLG.onSel($('#dsl2').value);else dprev()},
+  },
+  dform: {
+    submit: e=>{e.preventDefault();if(!DLG)return;const v=$('#da').value.trim();if(v===''){$('#da').focus();return}DLG.save(num(v),$('#dsl2')?.value);$('#dlg').close();commit()},
+  },
+  ddel: {
+    click: ()=>{if(DLG&&DLG.del){DLG.del();$('#dlg').close();commit()}},
+  },
+  lq: {
+    input: e=>{if(!LK)return;LK.q=e.target.value;lnkList()},
+  },
+  lpick: {
+    change: e=>{const c=e.target;if(c.name!=='lp'||!LK)return;const p=c.value;
+ LK.sels=c.checked?[...LK.sels.filter(x=>x!==p),p]:LK.sels.filter(x=>x!==p);LK.sibOn=false;
+ if(lnkSingle()){const s=LK.sels[0];LK.pat=s;LK.ref=LK.refs[s]||0;LK.amtOn=!!LK.wide[s]}else{LK.pat='';LK.amtOn=false;LK.ref=0}
+ lnkRule()},
+  },
+  ldel: {
+    click: ()=>{if(!LK)return;S.rules=(S.rules||[]).filter(r=>r.v!==LK.v);toast('Link removed. Anything already filed stays.');$('#ldlg').close();LK=null;commit()},
+  },
+  ldlg: {
+    close: ()=>{LK=null},
+  },
+  lform: {
+    submit: e=>{e.preventDefault();if(!LK)return;const L=LK,P=lnkPats();if(!P.length)return;
+ // The ticked rows become this item's whole set of rules: unticked ones are removed, ticked ones added or kept.
+ S.rules=(S.rules||[]).filter(r=>r.v!==L.v||P.includes(r.p));
+ const one=lnkSingle(),lim=one&&L.amtOn&&L.ref;
+ P.forEach(p=>addRule(p,L.dir,L.v,lim?r2(L.ref*.75):null,lim?r2(L.ref*1.25):null,lnkExclFor(p)));
+ // Early-payment setting, then re-file what these rules already filed so it lands in the right month.
+ S.rules.filter(r=>r.v===L.v).forEach(r=>{if(L.shift&&L.kind!=='flex')r.shift='next';else delete r.shift;Object.entries(S.txd||{}).forEach(([tid,x])=>{if(x.auto===r.id)txUndo(tid)})});
+ const M=lnkMatches();
+ if(L.move)M.forEach(t=>{const x=S.txd&&S.txd[t.id];if(x&&x.v!==L.v){txUndo(t.id);if(S.noAuto)delete S.noAuto[t.id]}});
+ M.forEach(t=>{if(S.noAuto&&!(S.txd&&S.txd[t.id]))delete S.noAuto[t.id]});
+ autoFile();const n=M.filter(t=>S.txd[t.id]&&S.txd[t.id].v===L.v).length;$('#ldlg').close();
+ toast(`Linked${P.length>1?' '+P.length+' '+(L.kind==='flex'?'stores':'names'):''}. ${n} ${L.kind==='inc'?'deposit':L.kind==='flex'?'purchase':'payment'}${n===1?'':'s'} now filed to ${L.name}.`);commit()},
+  },
+  tdq: {
+    input: catFilter,
+  },
+  mp: {
+    change: e=>{if(e.target.value)go(e.target.value);e.target.style.pointerEvents='none'},
+  },
+  file: {
+    change: e=>{const f=e.target.files[0];if(!f)return;const r=new FileReader();r.onload=()=>{try{const v=JSON.parse(r.result);if(!((v.plans&&v.loans)||(v.data&&v.data.plans)))throw 0;if(!confirm('Replace everything in this browser with this backup?'))return;const d=v.data&&v.data.plans?v.data:v;S={...d,months:d.months||{},cur:S.cur,tab:S.tab,flow:S.flow};commit(true);toast('Backup restored')}catch(_){alert('That file isn’t a Budgeteer backup.')}};r.readAsText(f);e.target.value=''},
+  },
+};

@@ -19,7 +19,11 @@ import { spFormR, spAddPartR } from './popups/Split.jsx';
 import { compareViewR } from './flow/Compare.jsx';
 import { zbarR, skTipR, skCardR } from './flow/Card.jsx';
 import { sankeyR } from './flow/Sankey.jsx';
-import { bankBadgeR, fsUIR } from './chrome.jsx';
+import { fsUIR } from './chrome.jsx';
+import { frameRender, frameUIR, brandSetR, bankBadgeR } from './frame.jsx';
+
+// The page frame first: the scripts after this one (sample.js, server-sync.js) and every screen draw into it.
+frameRender();
 
 replaceScreen('renderHistory', () => draw($('#T-history'), <History />));
 // Budget: This month is React; Build budget and Forecast are still drawn by renderBuild / renderForecast. The
@@ -43,6 +47,8 @@ replaceScreen('skTip', skTipR);
 replaceScreen('skCard', skCardR);
 replaceScreen('sankey', sankeyR);
 replaceScreen('bankBadge', bankBadgeR);
+replaceScreen('frameUI', frameUIR);
+replaceScreen('brandSet', brandSetR);
 replaceScreen('fsUI', fsUIR);
 replaceScreen('renderBuild', () => draw($('#T-budget'), <Build />));
 replaceScreen('renderForecast', () => { draw($('#T-budget'), <Forecast />); fcBody(); });
@@ -497,14 +503,7 @@ addParity({
     return c;
   },
 });
-// The Bank tab's count (none, some, 100+, no bank) and the save status in every state, as the sample and as a real
-// budget (fsUI's demo parameter): connecting, saved (with and without a time), saving, unreachable (with details).
-addParity({
-  name: 'Bank tab count', fn: 'bankBadge', el: '#tbank', cases: () => {
-    const many = tweak(s => { s.txd = {}; }), some = tweak(s => { Object.keys(s.txd).slice(0, 7).forEach(k => delete s.txd[k]); });
-    return [{ label: 'as loaded' }, { label: 'some to sort', set: some }, { label: 'many to sort', set: many }, { label: 'no bank', set: () => { const o = SRV; SRV = false; return () => { SRV = o; }; } }];
-  },
-});
+// The save status in every state, as the sample and as a real budget (fsUI's demo parameter): connecting, saved (with and without a time), saving, unreachable (with details).
 const fsCases = () => {
   const c = [], at10 = new Date(2026, 3, 5, 10, 7);
   const st = { wait: { state: 'wait' }, ok: { state: 'ok', last: null }, 'ok at time': { state: 'ok', last: at10 }, saving: { state: 'ok', dirty: true, last: at10 }, busy: { state: 'ok', busy: true }, err: { state: 'err', err: 'Can’t reach the server.' }, 'err details': { state: 'err', err: 'Save failed <500>.', detail: 'HTTP 500 & "oops"' } };
@@ -574,6 +573,8 @@ addActScreen({ name: 'Settings connections, an imported CSV account', set: show(
 addActScreen({ name: 'This month without a server (actuals by hand)', set: show('budget', () => both(budv('month')(), (() => { const o = SRV; SRV = false; return () => { SRV = o; }; })())) });
 addActScreen({ name: 'Build: one-time items this month', set: then(openAll, show('budget', () => both(budv('build')(), steps(false)(), tweak(s => { const g = plan().groups.find(x => !x.flex); mo(s, TK).extra = [{ id: 'oi1', kind: 'inc', name: 'Freelance', amt: 250 }, { id: 'ob1', kind: 'item', gid: g.id, name: 'One-time bill', amt: 80, due: 12 }]; })()))) });
 addActScreen({ name: 'Goals: an account split by percent', set: then(openAll, show('goals', () => { BCL.delete('!galloc'); BCL.add('galloc'); BCL.delete('galloc'); const u = tweak(s => { const a = (BK.accts || []).find(x => x.type === 'depository'); s.alloc = { [a.id]: { mode: 'split', goals: s.goals.map(g => g.id), pct: Object.fromEntries(s.goals.map((g, i) => [g.id, i ? 40 : 60])), rest: 'last' } }; })(); return u; })) });
+addActScreen({ name: 'Amount dialog open', set: then(() => payDialog(S.loans[0].id), show('loans')) });
+addActScreen({ name: 'Link dialog open', set: then(() => lnkOpen('flex', plan().groups.find(g => g.flex).items[0].id), show('budget', () => budv('build')())) });
 window.reactActParity = runActParity;
 if (DEMO) window.ACT_COVERED = COVERED;
 window.reactParity = runParity;

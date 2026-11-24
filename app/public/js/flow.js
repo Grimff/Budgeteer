@@ -91,11 +91,6 @@ function openD(o){DLG=o;$('#dt').textContent=o.title;$('#ds').textContent=o.sub|
  $('#da').value=o.amt!=null?fmtAmt(r2(o.amt)):'';$('#dc').innerHTML=(o.chips||[]).map(c=>`<button type="button" data-v="${c.v}">${esc(c.l)}</button>`).join('');$('#ddel').hidden=!o.del;$('#dok').textContent=o.ok||'Save';dprev();$('#dlg').showModal();setTimeout(()=>{$('#da').focus();$('#da').select()},30)}
 // DLG.prev returns the line under the amount as text or a list of text and {b: bold text}, like a health check's message.
 function dprev(){const e=$('#dp');e.innerHTML=DLG&&DLG.prev?rtHtml(DLG.prev(num($('#da').value),$('#dsl2')?.value)):''}
-$('#da').addEventListener('input',()=>dprev());
-$('#dc').addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;$('#da').value=b.dataset.v;dprev();$('#da').focus()});
-$('#dsel').addEventListener('change',()=>{if(DLG&&DLG.onSel)DLG.onSel($('#dsl2').value);else dprev()});
-$('#dform').addEventListener('submit',e=>{e.preventDefault();if(!DLG)return;const v=$('#da').value.trim();if(v===''){$('#da').focus();return}DLG.save(num(v),$('#dsl2')?.value);$('#dlg').close();commit()});
-$('#ddel').addEventListener('click',()=>{if(DLG&&DLG.del){DLG.del();$('#dlg').close();commit()}});
 
 // Hand-added loans: which bank payments count toward this loan (rules filing to l:<id>), like a bill's Link payment.
 function loanLinkLine(l){if(!SRV||!bankSrc(l))return '';const R=rulesFor('l:'+l.id),n=Object.values(S.txd||{}).filter(x=>x.v==='l:'+l.id&&x.k===S.cur).length;

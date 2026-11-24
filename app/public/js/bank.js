@@ -148,25 +148,6 @@ function lnkCount(){const M=lnkMatches(),d=S.txd||{},here=M.filter(t=>d[t.id]&&d
  $('#lcount').innerHTML=M.length?`Matches <b>${M.length}</b> since ${dshort(bankFrom())}: ${un} not filed yet${here?`, ${here} already here`:''}${other?`, ${other} filed somewhere else`:''}.`:'Nothing matches that text.';
  if($('#lsibl')){const sb=lnkSibs(normT(LK.pat));$('#lsibl').hidden=!sb.length;$('#lsibt').textContent=`Also include ${sb.map(([q,n])=>titleC(q)+' ('+n+')').join(', ')}`}
  $('#lmovel').hidden=!other;$('#lmovet').textContent=`Also move the ${other} filed somewhere else to ${LK.name}`;$('#lok').disabled=!M.length}
-$('#lq').addEventListener('input',e=>{if(!LK)return;LK.q=e.target.value;lnkList()});
-$('#lpick').addEventListener('change',e=>{const c=e.target;if(c.name!=='lp'||!LK)return;const p=c.value;
- LK.sels=c.checked?[...LK.sels.filter(x=>x!==p),p]:LK.sels.filter(x=>x!==p);LK.sibOn=false;
- if(lnkSingle()){const s=LK.sels[0];LK.pat=s;LK.ref=LK.refs[s]||0;LK.amtOn=!!LK.wide[s]}else{LK.pat='';LK.amtOn=false;LK.ref=0}
- lnkRule()});
-$('#ldel').addEventListener('click',()=>{if(!LK)return;S.rules=(S.rules||[]).filter(r=>r.v!==LK.v);toast('Link removed. Anything already filed stays.');$('#ldlg').close();LK=null;commit()});
-$('#ldlg').addEventListener('close',()=>{LK=null});
-$('#lform').addEventListener('submit',e=>{e.preventDefault();if(!LK)return;const L=LK,P=lnkPats();if(!P.length)return;
- // The ticked rows become this item's whole set of rules: unticked ones are removed, ticked ones added or kept.
- S.rules=(S.rules||[]).filter(r=>r.v!==L.v||P.includes(r.p));
- const one=lnkSingle(),lim=one&&L.amtOn&&L.ref;
- P.forEach(p=>addRule(p,L.dir,L.v,lim?r2(L.ref*.75):null,lim?r2(L.ref*1.25):null,lnkExclFor(p)));
- // Early-payment setting, then re-file what these rules already filed so it lands in the right month.
- S.rules.filter(r=>r.v===L.v).forEach(r=>{if(L.shift&&L.kind!=='flex')r.shift='next';else delete r.shift;Object.entries(S.txd||{}).forEach(([tid,x])=>{if(x.auto===r.id)txUndo(tid)})});
- const M=lnkMatches();
- if(L.move)M.forEach(t=>{const x=S.txd&&S.txd[t.id];if(x&&x.v!==L.v){txUndo(t.id);if(S.noAuto)delete S.noAuto[t.id]}});
- M.forEach(t=>{if(S.noAuto&&!(S.txd&&S.txd[t.id]))delete S.noAuto[t.id]});
- autoFile();const n=M.filter(t=>S.txd[t.id]&&S.txd[t.id].v===L.v).length;$('#ldlg').close();
- toast(`Linked${P.length>1?' '+P.length+' '+(L.kind==='flex'?'stores':'names'):''}. ${n} ${L.kind==='inc'?'deposit':L.kind==='flex'?'purchase':'payment'}${n===1?'':'s'} now filed to ${L.name}.`);commit()});
 // Payments between your own accounts that were filed as spending or income before pairing existed.
 // Loan filings are left alone: a linked loan's balance wins, so they never double count.
 function pairIssues(){if(!BK.accts)return[];const P=txPairs(),out=[];P.forEach((o,id)=>{const r=S.txd&&S.txd[id];if(r&&(r.v.startsWith('i:')||r.v.startsWith('inc:')||r.v==='once'))out.push({id,o,r})});return out}
@@ -177,7 +158,6 @@ function catOpen(v){CT=v;CR='month';$('#tdq').value='';catRender();$('#tdlg').sh
 // Hides rows that don't match the search and shows the matching count and total.
 function catFilter(){const q=($('#tdq').value||'').trim().toLowerCase(),rows=[...document.querySelectorAll('#tdl .trow')];let n=0,t=0;
  rows.forEach(r=>{const ok=!q||(r.dataset.txt||'').includes(q);r.hidden=!ok;if(ok){n++;t+=+r.dataset.amt||0}});const f=$('#tdf');f.hidden=!q;f.textContent=q?`${n} of ${rows.length} match · ${f2(t)}`:''}
-$('#tdq').addEventListener('input',catFilter);
 let CR='month';
 // Does rule r match transaction t (same test as ruleFor, for one rule)?
 function ruleHit(r,t){if(r.dir!==tdir(t)||!r.p)return false;const nm=normName(t),a=Math.abs(t.amount);if(!nm.includes(r.p))return false;if(r.x&&r.x.some(x=>nm.includes(x)))return false;if(r.min!=null&&a<r.min-0.005)return false;if(r.max!=null&&a>r.max+0.005)return false;return true}
