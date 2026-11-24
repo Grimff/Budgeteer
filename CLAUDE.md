@@ -131,7 +131,7 @@ works (and `npm test` passes) after every step.
   the layout code is the old one; hl/zset still set classes and the viewBox on the drawn svg). `fsUI` moved from
   server-sync.js to linked-loans.js (before the bundle) with a `demo` parameter; it and bankBadge are `chrome.jsx`
   (#sync, #spill, #saved, #tbank). The old draw functions stay in LEGACY only for the parity check. The self-test now
-  takes about 40 s (parity runs twice); tools/test.js allows 90 s.
+  takes about 85 s (parity runs twice, plus a re-render pass per tab); tools/test.js allows 240 s.
 - **Phase 3 (in progress).** Step 1 (done): no logic builds HTML any more. Rich text is data (`rtParts`/`rtText`/
   `rtHtml` in core.js, `Rich` in ui.jsx): a string or a list of strings and `{b}`; buttons are `{act, label, ...data}`
   (`hcBtns` / `ActBtn`). healthChecks (`d`, `a[]`), alertsNow (`a`), DLG.prev (#dp, `dprevR`). The live sentences
