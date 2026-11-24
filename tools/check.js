@@ -2,11 +2,12 @@
 //   node tools/check.js
 // Catches the mistakes that have slipped through before:
 //  - syntax errors and stray control characters (a heredoc once turned \b into a backspace)
-//  - two `case'name':` with the same name in the click switch (v5: the schedule's Remove ran the
-//    accounts card's alDel, so nothing was removed)
-//  - buttons whose data-act has no handler
+//  - two click actions with the same name in ACT (app/src/actions.js; a JS object keeps only the last, like the old
+//    switch's second `case`: v5's schedule Remove ran the accounts card's alDel, so nothing was removed)
+//  - buttons whose data-act / onAct('x') has no handler
 //  - the same data-k / data-c / data-live key handled twice
-//  - change handlers placed after `if(!d.c)return;`, which never run (v5: schedule dropdowns didn't save)
+//  - another field kind handled inside the data-c handler (CHG.c), or CHG.c not last in ORDER_CHG: it would never run
+//    (v5: schedule dropdowns didn't save because their handler sat after `if(!d.c)return;`)
 'use strict';
 const fs = require('fs'), path = require('path');
 // The app's scripts are the js/ files index.html lists, run in that order in one shared scope; checked as one.
@@ -35,29 +36,36 @@ for (const [f, t] of [['index.html', html], ['css/app.css', fs.readFileSync(path
   if (ctl) bad.push(`${ctl} control character(s) in ${f}`);
 }
 
-const sw = js.indexOf('switch(d.act){');
-const cases = [...js.slice(sw).matchAll(/case'([A-Za-z0-9_]+)':/g)].map(m => m[1]), count = {};
+// Click actions: ACT's keys in actions.js (plus the aliases set after it, `ACT.x = ACT.y`).
+const A = jsx['src/actions.js'] || '', actBody = A.slice(A.indexOf('export const ACT = {'), A.indexOf('\n};', A.indexOf('export const ACT = {')));
+const cases = [...actBody.matchAll(/^  '([A-Za-z0-9_]+)': function \(d, b, e\) \{/gm), ...A.matchAll(/^ACT\.([A-Za-z0-9_]+) = ACT\./gm)].map(m => m[1]), count = {};
+if (!cases.length) bad.push('No click actions found in app/src/actions.js (check.js needs updating)');
 cases.forEach(c => count[c] = (count[c] || 0) + 1);
 const dup = Object.entries(count).filter(([, n]) => n > 1).map(([c, n]) => `${c}×${n}`);
 if (dup.length) bad.push('Duplicate click actions: ' + dup.join(', '));
-const used = new Set([...s.matchAll(/data-act="([A-Za-z0-9_]+)"/g)].map(m => m[1]));
+const used = new Set([...s.matchAll(/data-act="([A-Za-z0-9_]+)"/g), ...Object.entries(jsx).filter(([f]) => f.endsWith('.jsx')).flatMap(([, t]) => [...t.matchAll(/onAct\('([A-Za-z0-9_]+)'\)/g)])].map(m => m[1]));
 const orphan = [...used].filter(a => !count[a]);
 if (orphan.length) bad.push('Buttons with no handler: ' + orphan.join(', '));
 
 for (const [re, name] of [[/d\.k==='([A-Za-z0-9_]+)'/g, 'data-k'], [/d\.c==='([A-Za-z0-9_]+)'/g, 'data-c'], [/d\.live==='([A-Za-z0-9_]+)'/g, 'data-live']]) {
-  const c = {}; [...js.matchAll(re)].forEach(m => c[m[1]] = (c[m[1]] || 0) + 1);
+  const c = {}; [...(js + A).matchAll(re)].forEach(m => c[m[1]] = (c[m[1]] || 0) + 1);
   const rep = Object.entries(c).filter(([, n]) => n > 1).map(([k, n]) => `${k}×${n}`);
   if (rep.length) bad.push(`Same ${name} handled twice: ` + rep.join(', '));
 }
 
-const ch = js.indexOf("document.addEventListener('change',e=>{if(e.rx)return;const t=e.target,d=t.dataset;INB");
-if (ch >= 0) {
-  const body = js.slice(ch, js.indexOf('\ndocument.addEventListener(', ch + 10) >>> 0 || undefined), ret = body.indexOf('if(!d.c)return;');
-  if (ret >= 0) {
-    const after = [...body.slice(ret).matchAll(/\n\s*if\(d\.([a-zA-Z]+)\b/g)].map(m => m[1]).filter(k => k !== 'c');
-    if (after.length) bad.push('Change handlers after `if(!d.c)return;` (never run): d.' + [...new Set(after)].join(', d.'));
+// Field change handlers: each kind is its own CHG entry, tried in ORDER_CHG's order; data-c ('c') must be last and only
+// handle data-c fields.
+{ const ci = A.indexOf("export const CHG = {"), cb = A.slice(ci, A.indexOf('\n};', ci)), cc = cb.slice(cb.indexOf("  'c': function (t, d, e) {"));
+  const order = (A.match(/export const ORDER_CHG = \[(.*)\];/) || [])[1] || '', keys = [...order.matchAll(/\['([A-Za-z0-9_]+)',/g)].map(m => m[1]);
+  if (ci < 0 || !keys.length || !cb.includes("  'c': function")) bad.push('Field change handlers not found (check.js needs updating)');
+  else {
+    if (keys[keys.length - 1] !== 'c') bad.push('The data-c change handler must be the last one tried (ORDER_CHG)');
+    const other = [...new Set([...cc.matchAll(/\n\s*if\(d\.([a-zA-Z]+)\b/g)].map(m => m[1]).filter(k => k !== 'c'))];
+    if (other.length) bad.push('Other field kinds handled inside the data-c handler (never reached): d.' + other.join(', d.'));
+    const missing = [...cb.matchAll(/^  '([A-Za-z0-9_]+)': function/gm)].map(m => m[1]).filter(k => !keys.includes(k));
+    if (missing.length) bad.push('Change handlers not in ORDER_CHG (never run): ' + missing.join(', '));
   }
-} else bad.push('Change listener not found (check.js needs updating)');
+}
 
 if (bad.length) { console.log('FAIL\n - ' + bad.join('\n - ')); process.exit(1); }
 console.log(`OK · ${cases.length} actions, ${used.size} buttons, no duplicates, change handlers in order`);

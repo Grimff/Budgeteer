@@ -136,25 +136,31 @@ works (and `npm test` passes) after every step.
   `rtHtml` in core.js, `Rich` in ui.jsx): a string or a list of strings and `{b}`; buttons are `{act, label, ...data}`
   (`hcBtns` / `ActBtn`). healthChecks (`d`, `a[]`), alertsNow (`a`), DLG.prev (#dp, `dprevR`). The live sentences
   while typing / dragging are `pxLive` / `wiLive` (loans.js, React `pxLiveR`/`wiLiveR`).
-  Step 2 (in progress): handlers on elements. Every click action is a function in `app/src/actions.js` (`ACT`, the
-  old switch's case bodies moved there unchanged by a script, `(d = data-*, b = element, e = click)`); every React
-  element with `data-act` has `onClick={onAct('x')}` (bridge.js), which sets INB, closes the flow card on a click
-  outside it first (as the old listener did), runs the action and marks the click (`rx`, `skDone`) so the old
-  listener skips it; an inner element's action wins over its row's. The old switch in events.js stays, only for
-  index.html's static buttons and as the reference for the **action parity** check (`app/src/actparity.js`): screens
-  registered in main.jsx (`addActScreen`, ~45 states incl. open cards, editors, pop-ups, failing checks) have every
-  React-handled element (2 per action) clicked once with the old switch (`REACT_EVENTS=false`) and once with its
-  handler; S, the screen globals, folds, dialogs, toast, page text and focus must match. Seeded ids, confirm() =
-  yes, no scrolling/downloads; server actions are skipped. Fields too: the input/change listeners' branches are
-  `INP` / `CHG` in actions.js (unchanged bodies); a field gets `onInput={onInp}` and/or `ref={onChg}` (a native
-  `change` listener, so text/month fields still fire on commit) and runs the first handler that applies, in the old
-  order (`ORDER_INP` / `ORDER_CHG`); the harness changes each kind of field (next option, click a checkbox, middle of
-  a slider, a date, 1234.5, text + " & x") both ways. It is async (yields after each run: done in one task, what
-  actions leave for later piled up to hundreds of MB and stalled Chrome), clears focus and the typing debounce
-  (`inT`) between runs, and runs as `?selftest&act=n/4` (four page loads in npm test). `?aponly=<name>` runs one
-  screen, `&aplog` logs progress. Then: the static buttons in index.html, then state into React (handlers on elements instead of `data-act` switches, `S` in a store with
-  a hook, real re-renders instead of remounts); then the math into ES modules; then remove the old draw functions
-  and the classic-script globals.
+  Step 2 (done): handlers on elements. Every click action is a function in `app/src/actions.js` (`ACT`, the old
+  click switch's case bodies moved there unchanged by a script, `(d = data-*, b = element, e = click)`); every element
+  with `data-act` has `onClick={onAct('x')}` (bridge.js), which sets INB, closes the flow card on a click outside it
+  first (as the old listener did) and runs the action; an inner element's action wins over its row's (`rx`). Fields:
+  the old input/change listeners' branches are `INP` / `CHG` (unchanged bodies); a field gets `onInput={onInp}` and/or
+  `ref={onChg}` (a native `change` listener, so text/month fields still fire on commit) and runs the first handler
+  that applies, in the old order (`ORDER_INP` / `ORDER_CHG`). Before the old switch and listeners were deleted, an
+  action-parity harness clicked/edited every element in ~50 states both ways and compared S, screen globals, folds,
+  dialogs, toast, page text and focus (all equal; it went with them). check.js now reads actions.js: duplicate ACT
+  keys, data-act / onAct('x') with no handler, a key handled twice, and CHG's order (`c` last, nothing else inside it).
+  events.js keeps only page-wide listeners: folds (OPEN), keyboard, select-on-focus, amount formatting, the flow
+  chart's nodes, outside-click close of the flow card (skipped when `skDone`, the React handler did it first).
+  Step 3 (in progress): one root and a store. Piece 1 (done): the page frame is `frame.jsx`, one persistent root in
+  `#app` (index.html's body is just that and the scripts): header, tabs, month, `#sync` + the tab sections, footer,
+  the four dialogs' shells, toast. It re-renders (frameRender, flushSync) instead of being patched: `frameUI`
+  (renderAll's frame part), `brandSet` and `bankBadge` are swapped in by name; the Bank count is kept as bankBadge last
+  set it. Containers other roots draw into (tab sections, dialog parts, #sync/#saved/#spill) render without children,
+  and elements old code writes text/attributes into (dialog titles, #ddel.hidden, #lok.disabled, #mp.value, the header's
+  scroll class) get fixed contents and props React sets once. The frame's own element listeners (amount/link dialog,
+  pop-up search, month picker, backup file; were attached at load) are `FRAME_ON` in actions.js, attached natively by
+  refs. Checked: the frame's markup equals the old index.html (one-time comparison), and a browser script driving the
+  frame (tabs, months, keyboard, both dialogs end to end, search, picker, backup restore, rename, scroll, Bank count,
+  375px) gives the same results on the old and new versions. Then: piece 2, a store over S (commit() = "changed",
+  screens subscribe); piece 3, real re-renders screen by screen (controlled fields). Then the math into ES modules;
+  then remove the old draw functions and the classic-script globals.
 
 ## Server API (`server.js`)
 

@@ -1,6 +1,5 @@
 // Click handlers, one per action (were the cases of the click switch in js/events.js, moved here unchanged). Each takes
-// d = the element's data-* values, b = the element, e = the click. React elements call them through `on` (bridge.js);
-// static buttons in index.html still reach them through the delegated click listener in events.js.
+// d = the element's data-* values, b = the element, e = the click. Elements call them through onAct('name') (bridge.js).
 export const ACT = {
   'bankConnect': function (d, b, e) { return bankConnect(d.id||'',d.kind||''); },
   'invAllow': function (d, b, e) { return bankConnect(d.id,'investments'); },

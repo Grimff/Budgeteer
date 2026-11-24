@@ -30,15 +30,12 @@ export function replaceScreen(name, fn) {
 }
 
 // Click handlers on elements (phase 3). onAct('x') runs ACT.x (actions.js) with the element's data-* values, the element
-// and the native click, setting INB (inside Build budget) as the delegated listener did, and marks the click so the old
-// click switch in events.js skips it. REACT_EVENTS = false (only the action parity check) leaves the click to the old
-// switch instead, to compare the two.
+// and the native click, setting INB (inside Build budget) as the old delegated listener did.
 import { ACT } from './actions.js';
-window.REACT_EVENTS = true;
 export const onAct = name => e => {
   // only the innermost element with an action handles a click (a Delete button inside a row that opens), as the
   // old switch did with closest('[data-act]'); the click still reaches document (clicking elsewhere closes the flow card)
-  if (!window.REACT_EVENTS || e.nativeEvent.rx) return;
+  if (e.nativeEvent.rx) return;
   const b = e.currentTarget; e.nativeEvent.rx = true; INB = !!b.closest('[data-build]');
   // a click outside the money-flow card closes it before the action runs (the action may redraw the card)
   if (!b.closest('#skc') && !b.closest('dialog') && $('#skc:not([hidden])')) skClose();
@@ -48,19 +45,17 @@ export const onAct = name => e => {
 
 // Field handlers (phase 3): typing (onInput={onInp}) and change (ref={onChg}, the native change event, so text and
 // month fields still fire when the value is committed, not on every key). Each runs the first handler that applies
-// to the field's data-* values, in the old listeners' order (ORDER_INP / ORDER_CHG in actions.js), and marks the
-// event so the old listeners skip it. The amount-formatting input listener in events.js still runs for every field.
+// to the field's data-* values, in the old listeners' order (ORDER_INP / ORDER_CHG in actions.js). The amount-formatting
+// input listener in events.js still runs for every field.
 import { INP, CHG, ORDER_INP, ORDER_CHG } from './actions.js';
 export const onInp = e => {
-  if (!window.REACT_EVENTS) return;
   const t = e.currentTarget, d = t.dataset, h = ORDER_INP.find(([, f]) => f(d, t));
-  e.nativeEvent.rx = true; INB = !!t.closest('[data-build]');
+  INB = !!t.closest('[data-build]');
   if (h) INP[h[0]](t, d, e.nativeEvent);
 };
 const chg = e => {
-  if (!window.REACT_EVENTS) return;
   const t = e.currentTarget, d = t.dataset, h = ORDER_CHG.find(([, f]) => f(d, t));
-  e.rx = true; INB = !!t.closest('[data-build]');
+  INB = !!t.closest('[data-build]');
   if (h) CHG[h[0]](t, d, e);
 };
 export const onChg = el => { if (el && !el._chg) { el._chg = true; el.addEventListener('change', chg); } };
