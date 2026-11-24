@@ -1,16 +1,10 @@
 'use strict';
 /* ---------- render all ---------- */
-const TABR={budget:()=>renderBudget(),loans:()=>renderLoans(),goals:()=>renderGoals(),wealth:()=>renderWealth(),history:()=>renderHistory(),bank:()=>renderBank(),settings:()=>renderSettings()};
-// The page frame for the viewed month and tab: month label and picker, This month button, the active tab, which section shows.
-function frameUI(){$('#mlab').textContent=lab(S.cur);$('#mp').value=S.cur;$('#tbtn').hidden=S.cur===TK;
- $$('.tabs button').forEach(b=>b.classList.toggle('on',b.dataset.t===S.tab));document.body.className='tab-'+S.tab;$$('.tab').forEach(t=>{t.hidden=t.dataset.tab!==S.tab;t.classList.remove('enter')})}
 function renderAll(enter){LP={};GP={};XS=null;TXI=null;ALC={};loanSync();frameUI();
  // Only the visible tab is drawn; the others are redrawn when switched to (every tab switch goes through commit → renderAll).
  // Shown before it's drawn, so charts that size themselves to the tab (History) measure its real width.
    drawTab();brandSet();
  if(enter){const t=$('#T-'+S.tab);void t.offsetWidth;t.classList.add('enter')}moveInd();fmtAll()}
-// The tab step of renderAll (React: the store has drawn the visible tab already; this mounts one that has no root yet).
-function drawTab(){(TABR[S.tab]||renderBudget)()}
 function moveInd(){const b=$(`.tabs [data-t="${S.tab}"]`),i=$('.ind');if(!b)return;i.style.width=b.offsetWidth+'px';i.style.transform=`translateX(${b.offsetLeft-i.offsetLeft}px)`;const T=b.parentElement;if(T.scrollWidth>T.clientWidth+2){const x=b.offsetLeft-(T.clientWidth-b.offsetWidth)/2;T.scrollTo({left:Math.max(0,x),behavior:RM?'auto':'smooth'})}}
 function commit(enter){if(INB&&SRV){INB=false;if(autoFile()){LP={}}}save();rerender(enter)}
 function rerender(enter){const a=document.activeElement,k=a&&a.dataset?a.dataset.key:null,raw=k?a.value:null,ss=k&&'selectionStart' in a?[a.selectionStart,a.selectionEnd]:null;

@@ -24,8 +24,7 @@ Docker (`docker compose up -d --build`) on port 8095. Bank data comes from Plaid
   tools/build.js builds `lib/<name>.global.js` into `dist/<name>.js`, which index.html loads right after it (check.js
   enforces the place): it runs the module where the file used to run and puts its exports on the global object, so
   every other file and the React screens still call them by name. Moved so far: math. Edit a moved file's code in
-  app/src/lib, not js/. A function main.jsx swaps by name (replaceScreen) can't move yet (a call from inside its module
-  would skip the swap), nor can a name the window already has.
+  app/src/lib, not js/. A name the window already has can't be exported this way.
 - `app/server.js` – Node 18+, no npm dependencies. Reads `.env` (project folder or cwd) at start;
   real environment variables win. Relative `DATA_DIR` is resolved from the project folder.
 - **Settings and secrets:** `.env` (git-ignored; template `.env.example`) holds `PLAID_CLIENT_ID`, `PLAID_SECRET`,
@@ -91,8 +90,8 @@ server against a real `data/` folder while testing; use `tools/realtest.js`.
 Goal: the whole front end in React with no feature added, removed or changed. Done screen by screen so the app
 works (and `npm test` passes) after every step.
 - **Phase 1 (done): the tab screens.** Each `renderX` that built a tab with an HTML string becomes a component
-  in `app/src/screens/`; `main.jsx` swaps it in by name (`replaceScreen('renderX', …)`, so every caller, including
-  `renderAll`/`TABR` and click handlers, draws the React one). `draw(el, <X/>)` (bridge.js) renders with a fresh root
+  in `app/src/screens/`; `main.jsx` puts it in by name (`setGlobal('renderX', …)`, then `replaceScreen`, which kept the old one in
+  `LEGACY`), so every caller, including `renderAll` and click handlers, draws the React one. `draw(el, <X/>)` (bridge.js) renders with a fresh root
   and `flushSync`, i.e. exactly like `innerHTML=`: rebuilt each time, synchronous, so focus restore by `data-key`,
   `fmtAll`, open folds and inputs behave as before. Components are pure and read the globals (`S`, `plan`, caches)
   like the old code; buttons keep their `data-act`/`data-*` attributes, so the delegated click/change/input handlers
@@ -109,17 +108,17 @@ works (and `npm test` passes) after every step.
   the old fcChart meant to do but threw on). The schedule editor is `schedule.jsx` (`AlForm`, `AlList`, `AlAdds`;
   loan names in descriptions are now escaped text). Build budget (`Build`, with `BillLine`, `IncLine`, `RecCard`,
   `XmStep`); its ⋮⋮ drag/keyboard reordering still moves rows on the page and saves through orderRead/orderApply
-  (build.js), which redraws. Every tab is now drawn by React; the old draw functions stay (in `LEGACY`) only for the
-  parity check and for the pieces other code still calls (pop-ups, sankey, px/wi live text).
-- **Parity check** (`app/src/parity.js`, part of the self-test, run on the sample as loaded and again at the end):
-  every converted screen is drawn by the old function (kept in `LEGACY` until phase 1 is done) and by React for many
-  cases (every month, each range/view setting, an empty household) and must match: same elements, attributes (style
-  and class compared parsed), input values, text, and the text the browser shows (catches a lost space between inline
-  elements). Add cases to `main.jsx` for every view switch a screen has. Planted mistakes are caught; whitespace only
-  counts where it renders (a grid/flex row ignores it, so that isn't a difference).
-  A screen's `also: ['fcBody']` makes the old screen call the old helpers it calls by name.
-  `addPiece` compares one component against its old string function in a scratch tab, for parts no screen case
-  reaches (the phone-alerts card is hidden in sample mode).
+  (build.js), which redraws. Every tab is now drawn by React. (The old draw functions stayed in `LEGACY` for the parity
+  check until all of phases 1–3 were done; they and the string helpers only they used are now deleted.)
+- **Parity check** (`app/src/parity.js`): while the old draw functions existed, every converted screen was drawn by
+  the old function and by React for many cases (every month, each range/view setting, an empty household) and had to
+  match: same elements, attributes (style and class compared parsed), input values, text, and the text the browser
+  shows. The old functions are gone now; what's left, run by the self-test (on the sample as loaded and again at the
+  end): the tab screens (`live: true`) drawn fresh for every case, then one root re-rendered through all the cases in
+  a row must match each fresh draw. The same cases (main.jsx `addParity`; `addPiece` for parts no screen case reaches,
+  e.g. the phone-alerts card hidden in sample mode) are also a record: `__paritySnap()` (sample mode) returns every
+  case drawn by the current code, to compare two builds when changing code under the screens (it caught nothing
+  when the old code was deleted: 1088 cases identical). Add cases to `main.jsx` for every view switch a screen has.
   JSX notes: a `<table>` needs an explicit `<tbody>` (the HTML parser added one to the old markup), SVG attributes camelCase (`strokeWidth`), keep attribute strings exact (`fillOpacity=".35"`), lengths
   as strings (`'16px'`), `{' '}` where the old template had a line break between inline elements, `cond ? x : null`
   (never `cond && x`, which prints 0).
@@ -138,11 +137,10 @@ works (and `npm test` passes) after every step.
   `flow/Card.jsx`: #zb, #skt, #skc; skPos/skPlace still place them), and the chart itself (`sankeyR` in `flow/Sankey.jsx`;
   the layout code is the old one; hl/zset still set classes and the viewBox on the drawn svg). `fsUI` moved from
   server-sync.js to linked-loans.js (before the bundle) with a `demo` parameter; it and bankBadge are `chrome.jsx`
-  (#sync, #spill, #saved, #tbank). The old draw functions stay in LEGACY only for the parity check. The self-test now
-  takes about 85 s (parity runs twice, plus a re-render pass per tab); tools/test.js allows 240 s.
-- **Phase 3 (in progress).** Step 1 (done): no logic builds HTML any more. Rich text is data (`rtParts`/`rtText`/
-  `rtHtml` in core.js, `Rich` in ui.jsx): a string or a list of strings and `{b}`; buttons are `{act, label, ...data}`
-  (`hcBtns` / `ActBtn`). healthChecks (`d`, `a[]`), alertsNow (`a`), DLG.prev (#dp, `dprevR`). The live sentences
+  (#sync, #spill, #saved, #tbank). tools/test.js allows the self-test 240 s.
+- **Phase 3 (in progress).** Step 1 (done): no logic builds HTML any more. Rich text is data (`rtParts`/`rtText`
+  in core.js, `Rich` in ui.jsx): a string or a list of strings and `{b}`; buttons are `{act, label, ...data}`
+  (`ActBtn`). healthChecks (`d`, `a[]`), alertsNow (`a`), DLG.prev (#dp, `dprevR`). The live sentences
   while typing / dragging are `pxLive` / `wiLive` (loans.js, React `pxLiveR`/`wiLiveR`).
   Step 2 (done): handlers on elements. Every click action is a function in `app/src/actions.js` (`ACT`, the old
   click switch's case bodies moved there unchanged by a script, `(d = data-*, b = element, e = click)`); every element
@@ -212,7 +210,10 @@ works (and `npm test` passes) after every step.
 - **Step 4 (in progress): the js/ files into ES modules** (see Deploy: app/src/lib, dist/<name>.js). Checked with a
   snapshot of the sample household before and after (every tab and view's text for every month, totals, loan paths,
   goal projections, the schedule simulation, health checks: identical; a planted $1 slip changes 30 entries).
-  Then: explicit imports between the modules instead of globals, one bundle, and remove the old draw functions.
+  The old draw functions (the 31 names main.jsx used to swap, `replaceScreen`/`LEGACY`) and the 52 string helpers only
+  they used are deleted (old dead code kept: `confetti`, never called since the first version); the React versions
+  are defined by name with `setGlobal`. That came first because a module can't hold a function that's swapped by name.
+  Next: the other js/ files the same way, then explicit imports between the modules instead of globals, one bundle.
 
 ## Server API (`server.js`)
 
@@ -221,7 +222,7 @@ works (and `npm test` passes) after every step.
 - **Backups:** `dailyBackup` copies the budget before the first save of each local day (`today()`) to
   `backups/budgeteer-YYYY-MM-DD.json`. `GET /api/backups` (`listBackups`: daily + `budgeteer-before-restore-<time>.json`),
   `POST /api/backups/restore {id}` (listed ids only; saves the current budget as a before-restore copy, keeps 10, writes
-  the copy with a new rev). Client: `bkList`/`bkRestore`/`bkCard` in settings.js (Settings → General → Backups).
+  the copy with a new rev). Client: `bkList`/`bkRestore`/`BkCard` in settings.js (Settings → General → Backups).
 - **Phone alerts:** `NOTIFY_URL` (ntfy topic URL → JSON publish `{topic,title,message}` to the server root; a URL with
   `/api/webhook/` → `{title,message}`), optional `NOTIFY_AUTH`. `GET /api/notify` → `{configured,target}`, `POST
   /api/notify {alerts:[{key,title,message}]}` sends each key once (`data/notify-sent.json`, 62 days, serialized),
@@ -283,7 +284,7 @@ works (and `npm test` passes) after every step.
   rules), `snowR`. `xsBuild()` simulates month by month (set amounts first, then the pool, then left-over rules)
   into `XS{k:{pool, keep, snow, dest, 'p|'+dest, 'x|'+dest, 's|l:id'}}` (total / set / left-over / snowball part);
   `exShare` feeds `loanXtra` (= month override + shares) and `goalPlan` (= month override ?? share). `NOX` while it
-  runs; `LP`/`GP` dropped after. Editor `alList`/`alForm` (`ALE` = open item; actions `scAdd/scAddTo/scEdit/scDel/scSrc/
+  runs; `LP`/`GP` dropped after. Editor `AlList`/`AlForm` (`ALE` = open item; actions `scAdd/scAddTo/scEdit/scDel/scSrc/
   scMode/scHow/scMove` (renamed from `al*` in v7), change `data-al`, input `alv`) is in Build step 6 and the Forecast. Verified on live data:
   migration keeps every month's totals; a snowball on two loans with a stop date pays only those, rolls the
   first's minimum into the second, stops on time; left-over check passes.
@@ -308,7 +309,7 @@ works (and `npm test` passes) after every step.
   **Link-month opening** (`anchOpen`): once the lender's balance shows that month's payment (month over, payment
   from the lender, or balance read after the bank payment date) open = (balance + payment)/(1+rate); before that
   eob/(1+rate). (A lender's balance at linking can leave out accrued interest, which the old rule missed.)
-  **Extra payment plan** (Loans page card, `pxCard`/`pxSim`/`pxText`): X a month toward loans one at a time,
+  **Extra payment plan** (Loans page card, `PxCard`/`pxSim`/`PxText`): X a month toward loans one at a time,
   highest rate (`PS='rate'`, avalanche) or smallest balance (`'bal'`, snowball) first; a paid-off loan's minimum
   rolls into the next. Compared with minimums and no rollover. **Use this plan** (`pxApply`) writes each loan's
   `xp` versions from `xStart()` (+$1 in a payoff month so cents don't add a month) and saves `S.pxPlan{x,how,at}`
@@ -353,7 +354,7 @@ works (and `npm test` passes) after every step.
    chosen item (Build → Spending; default the Flex item). Left for review: deposits into
    checking, loan/card payments, account transfers.
 
-- **Pending** (`PSET`, `PND(id)` tag, `.pnd`): pending charges file like any other (filings get `pend:1`) but
+- **Pending** (`PSET`, `Pnd(id)` tag, `.pnd`): pending charges file like any other (filings get `pend:1`) but
   never pair as transfers. `pendCarry()` (start of `autoFile`): when one posts, a hand filing moves to the
   posted id (same category and month, posted amount) and an automatic one is redone; a pending charge that
   vanished without posting (released hold) is unfiled; same-id posting refreshes the amount. A bill paid
@@ -386,12 +387,12 @@ works (and `npm test` passes) after every step.
 
 ## Screens
 
-- **Needs a look** (`js/alerts.js`, `alertsCard` above the setup checklist, current month only): `alertsNow()` = banks
+- **Needs a look** (`js/alerts.js`, `AlertsCard` above the setup checklist, current month only): `alertsNow()` = banks
   with errors, linked bills (have a rule) not paid by their due day or due within 3 days (`isDue`, `billPaid`), flex
   items over plan (`flexAct`), transactions to sort (`inbox`). Keys carry the month; **Hide** (`ntHide`) stores keys
   in localStorage `pfb_alerts_hidden`. `notifyAlerts()` runs after each `bankLoad` and posts them to `/api/notify`
-  (skipped in sample mode). Settings → Connections → Phone alerts (`ntCard`, `ntTest`).
-- **CSV import screen** (`js/csv-import.js`, `csvCard` in Settings → Connections, also shown without Plaid keys):
+  (skipped in sample mode). Settings → Connections → Phone alerts (`NtCard`, `ntTest`).
+- **CSV import screen** (`js/csv-import.js`, `CsvCard` in Settings → Connections, also shown without Plaid keys):
   `cvSplit` (quotes, CRLF, BOM, `,`/`;`/tab), `cvNum` (parentheses, currency, decimal comma), `cvDate`
   (`ymd`/`mdy`/`dmy`), `cvLoadText` guesses columns, `cvRows` builds Plaid-signed rows, `cvImport`/`cvDel`. State in
   `CV` (not saved); selects use `data-cv` and inputs `data-cvt` with their own listeners (not the main change listener).
@@ -401,7 +402,7 @@ works (and `npm test` passes) after every step.
 - **Budget → This month** is read-only (no inputs): header with the This month / Build budget
   switch, summary bar, money-flow card, then **Budget lines**: a `.ledger` (CSS columns, so cards
   pack without gaps) of one card per section (income, each bill group, each spending group, loans,
-  savings), each row Planned / Actual / status. Hand-entered purchases (`rcList`, non-bank) below.
+  savings), each row Planned / Actual / status. Hand-entered purchases (`RcList`, non-bank) below.
   All editing is in Build budget (or Loans/Goals tabs).
   - **Money-flow card:** Planned / Actual (what's happened so far, `chartItem`) / Compare
     (`compareView`, worst first). v8: every node has an invisible `.hit` rect over its bar **and label**
@@ -422,26 +423,26 @@ works (and `npm test` passes) after every step.
     - "Same payee, filed somewhere else" (`samePayee`) with Move here
 
     Keep this true for any new kind of line.
-  - **Getting set up** (`guideCard`, collapsible key `guide`): checklist under the summary in the current
+  - **Getting set up** (`GuideCard`, collapsible key `guide`): checklist under the summary in the current
     month (bank, paychecks linked, bills linked, loans, goals, transactions to sort); hidden when all done.
   - **Suggestions:** `recurring()` → "Looks like a bill" (Add as bill / Ignore, restorable).
 - **Budget → Forecast** (`BUDV='fc'`, v5): KPIs (debt free, next goal, kept per month, months over budget);
-  **Your plan over time** (`fcLanes`: one lane per loan/goal + Snowball/Kept, bars = schedule items from/until,
+  **Your plan over time** (`FcLanes`: one lane per loan/goal + Snowball/Kept, bars = schedule items from/until,
   clipped at payoff/reached, striped = left-over source, light striped `fls` = months a snowball pays that loan;
   click a bar to edit; ticks = payoff/reached, diamonds = target dates; range `FR`); **Debt and savings** line chart
-  (`fcChart`), click a month → `fcDetail` (income, bills, spending, one-time items, each loan payment, each goal,
+  (`FcChart`), click a month → `FcDetail` (income, bills, spending, one-time items, each loan payment, each goal,
   kept; Edit in Build budget `fcEdit`); milestones; table; What if (collapsed; `WFS` → `WF` only while drawing).
   Lane classes are `.fcl*` (not `.fl`, which is the Bank tag style). v6: a **+** on each lane (`alAddTo`) adds an
-  item for that loan/goal; the open editor renders once, under its lane (`.fcle`; `alList(false)` in the list
+  item for that loan/goal; the open editor renders once, under its lane (`.fcle`; `AlList(false)` in the list
   below has no form) and scrolls into view (`FSC`); overlapping items in a lane stack on rows (`place`/`geo`,
   26px each; snowball stretches get their own row); the Snowball lane names its loans; range adds **All** (to the
   last payoff or goal); months-over-budget KPI opens that month; month detail lists that month's schedule items.
 - **Budget → This month summary** (v4, `SB`): current = Income arrived / Spent so far / Still to come / Left over
   (projected); future = Income / Planned out / Extra money or To goals / Left over (planned); past = Income / Spent /
-  Under or Over plan / Left over. **Monthly review** (`rvCard`, current month until Done): last month's result,
+  Under or Over plan / Left over. **Monthly review** (`RvCard`, current month until Done): last month's result,
   biggest overs (`cmpRows`, opens that month's pop-up via `catTx` `data-k`), unfiled count, and **Send by my rules**
   (`xSweep`: goal shares → `dep` this month, loan shares → this month's `lxp`; sets `swept`).
-- **Split a transaction** (v4, Move panel → Split between categories…, `spRows`/`spSave`): parts are normal filings
+- **Split a transaction** (v4, Move panel → Split between categories…, `SpForm`/`spSave`): parts are normal filings
   `<tx>~n` with `sp:<tx>`; the parent keeps `{v:'split', parts}` (amt 0) so it isn't to-review; Undo on a part
   (`byUser`) undoes the whole split; the Filed list hides parts; `catMove` keeps `sp`.
 - **No plan** (`hasPlan`, `unplannedA(k)` in math.js): an item whose amount is $0/blank is tracked only. It counts in Spent
@@ -457,7 +458,7 @@ works (and `npm test` passes) after every step.
   `ensureLoose`, listed first). It's an ordinary group to totals, filing and pop-ups; the Budget page labels its card
   "Not in a group", the money flow shows each of its items as its own node (`g<loose>~<item>`, `nodeKey` → `i:`), and
   History skips it when empty. **Ungroup** (`grpUngroup`) moves a group's items into it.
-- **Budget → Build budget** (`renderBuild`, `BUDV`): (v4: step 3 bills have a frequency/due-month select, step 5 goal monthly amounts are versions from `xStart()`, new step 6 Schedule (`xmStep` → `alList`), step 7
+- **Budget → Build budget** (`renderBuild`, `BUDV`): (v4: step 3 bills have a frequency/due-month select, step 5 goal monthly amounts are versions from `xStart()`, new step 6 Schedule (`XmStep` → `AlList`), step 7
   Just for <month>, whose savings/loan extras show only for this month and later) scope bar (all months | from this month;
   elements under `[data-build]` set `INB` so edits start at `scopeStart()` and `commit()` re-files),
   Start, Income (+ `recurringIn` suggestions), Bills, Spending (+ catch-all choice, `topStores`; steps 3 and 4 render through `bGroups(fx)` with `billRow`/`flexRow`),
@@ -465,16 +466,16 @@ works (and `npm test` passes) after every step.
   goal amounts for the viewed month only, outside `[data-build]`; **Plan ahead** adds a one-time item to any of the next 24 months (`onceAdd` → `extras(k)`) and lists upcoming ones with remove/Open). "Fill in past months"
   (`fillPast`) copies newer items into older versions.
 - **Loans:** header **Lenders** button (opens and scrolls to "Loans from your bank", `lenders`), total debt
-  chart first (`debtChart`; range switch 1M/3M/YTD/1Y/All like Wealth, `LR`, `pfb_lr`, default All: short
+  chart first (`DebtChart`; range switch 1M/3M/YTD/1Y/All like Wealth, `LR`, `pfb_lr`, default All: short
   ranges look back from the viewed month, label each month and fit the scale to the window; All starts at
   $0 and runs to the projected payoff; the readout says "Behind by" when above the minimum-only path), then interest saved / KPIs, best-rate tip, loan cards, "Loans from your bank" (track or
   link a Plaid loan; Allow for Liabilities; a lender connected twice is detected by same lender, type and
   balance and left out). A hand-added loan with a linked bank payment shows
   "From your bank" when the month's paid amount equals its bank filings, "logs itself…" / Not seen
   before it arrives, and its history marks bank months "from bank". The Budget tab's loan pop-up explains the paid
-  number (`loanNote`).
-- **Goals:** hero (projected in future months; On track; Next goal reached), **Goal timeline** (`goalChart`, % of
-  target, history solid / projection dashed, reached dots, target-date diamonds, `GR` 1Y/2Y/5Y/All `pfb_gr`); header **Accounts** button (`alGo`); "Accounts for goals" card (`allocCard`: add accounts, order or % split); goal cards
+  number (`LoanNote`).
+- **Goals:** hero (projected in future months; On track; Next goal reached), **Goal timeline** (`GoalChart`, % of
+  target, history solid / projection dashed, reached dots, target-date diamonds, `GR` 1Y/2Y/5Y/All `pfb_gr`); header **Accounts** button (`alGo`); "Accounts for goals" card (`AllocCard`: add accounts, order or % split); goal cards
   pick accounts (`data-gacct`) and Flag transfers (`lnkOpen('goal')`).
 - **Wealth:** header **Connections** button (Settings → Connections); net worth, investments chart with market gain (deposits removed), holdings, balances.
 - **History:** 6 months / 12 months / All switch (`HR`, `pfb_hr`, default 6, ending at the viewed month)
@@ -484,11 +485,11 @@ works (and `npm test` passes) after every step.
   review (+ double counts, How filing works), Filed (filters, search, Move / Undo).
 - **Settings** (gear tab, `renderSettings`, `SV`): General (household name `S.hh{name,sub}` shown
   by `brandSet` in the header and tab title; clicking the brand opens it; start date; catch-all
-  `catchSel`; backups), Rules (`filingCard` counts per filing step this month; `rulesCard` grouped
+  `CatchSel`; backups), Rules (`FilingCard` counts per filing step this month; `RulesCard` grouped
   by category, search `RQ`/`rulesFilter`, each rule lists what it filed with Undo), Connections
-  (`refreshCard` refresh time + open-app check, `syncWord`; `connCard`: Add accounts, Reconnect, Sync, Connect,
-  review-from date), Data & math (`dataView`, Version 36: Budget / Loan / Goal / Net worth math for the viewed
-  month, opened by the **Health check** (`healthChecks`/`healthCard`, v3: Budget and History agree for 7 months,
+  (`RefreshCard` refresh time + open-app check, `syncWord`; `ConnCard`: Add accounts, Reconnect, Sync, Connect,
+  review-from date), Data & math (`DataView`, Version 36: Budget / Loan / Goal / Net worth math for the viewed
+  month, opened by the **Health check** (`healthChecks`/`HealthCard`, v3: Budget and History agree for 7 months,
   linked loans within a few dollars of the lender, total owed the same everywhere, connections OK, no transfers
   counted as spending (`pairIssues`), **card purchases all in the budget** (a checking payment to a card is
   ignored, so a card that isn't connected, sends no transactions, or whose transactions start after the budget
@@ -516,7 +517,7 @@ works (and `npm test` passes) after every step.
   from your bank" (`lsetup`, open by default only when something needs action) and Goals →
   "Accounts for goals" (`galloc`, closed by default; `alGo` opens it).
 - Phones (≤760px): the tab row scrolls sideways (`moveInd` keeps the current tab in view); `.phead`
-  wraps its buttons under the title. Charts (`debtChart`, `areaChart`) draw at the width shown
+  wraps its buttons under the title. Charts (`DebtChart`, `AreaChart`) draw at the width shown
   (min 340) so labels stay readable.
 - The same transaction can be on the page twice (Bank Filed list + pop-up), so look up its parts relative to the clicked button, not with a page-wide `querySelector` (`mvShow`).
 - Class names: don't reuse `.fl` (Bank tag style) for layout; Build spending rows are `.brow.bfl`.
@@ -563,12 +564,11 @@ width (375px) with no sideways scrolling.
   offers to move the start back; the start balance is walked back from the current opening balance
   (anchor) with those payments (minimum where none). The anchor still resets the link month.
 - **Hand-added loans** (no `acct`) can link bank payments like bills (`lnkOpen('loan')` → rules to
-  `l:<id>`; `loanLinkLine` on the loan card, Build step 5, the pop-up). When a bank payment files
+  `l:<id>`; `LoanLinkLine` on the loan card, Build step 5, the pop-up). When a bank payment files
   into a month that only had a hand-logged amount, it replaces it (`rec.hand` keeps the old value;
   `txUndo` restores it), so a payment is never counted twice.
 - Filing only covers transactions on/after `bankFrom`. Balance/investment history starts at the
   first sync after connecting.
 - Liabilities covers student loans, mortgages and cards only; enter APR/minimum for auto and
   personal loans by hand.
-- **Ideas not built yet:** health-check dot on the gear; separate logins per household member; a React rewrite
-  (could go tab by tab, one `TABR` entry at a time, with the budget math moved into shared modules first).
+- **Ideas not built yet:** health-check dot on the gear; separate logins per household member.

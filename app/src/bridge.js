@@ -72,16 +72,11 @@ export function resync(root) {
 // React escapes the rest itself.
 export const tx = s => String(s ?? '').replace(/�/g, '');
 
-// The old draw functions are replaced by name, so every caller (renderAll, click handlers, other screens) now draws
-// the React screen. The old ones are kept in LEGACY only for the parity check, until the move to React is done.
-// (A top-level function in a classic script is a writable property of window, so assigning it here changes what the
-// name means everywhere.)
-export const LEGACY = {};
-export function replaceScreen(name, fn) {
-  if (typeof window[name] !== 'function') throw new Error('No screen function ' + name);
-  LEGACY[name] = window[name];
-  window[name] = fn;
-}
+// Functions the classic files call by name that are written here in React (renderBudget, catRender, sankey, fsUI…):
+// setGlobal puts them on the global object, so every caller (renderAll, click handlers, other screens) reaches them.
+// The old string-building versions they replaced are gone; the files that call them load before this bundle but only
+// call them from functions that run later (server-sync.js's fsUI() at load comes after it).
+export function setGlobal(name, fn) { window[name] = fn; }
 
 // Click handlers on elements (phase 3). onAct('x') runs ACT.x (actions.js) with the element's data-* values, the element
 // and the native click, setting INB (inside Build budget) as the old delegated listener did.

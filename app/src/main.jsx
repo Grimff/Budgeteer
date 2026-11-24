@@ -1,8 +1,8 @@
 // The React screens. Loaded by index.html after the other js files (which it uses by name: S, plan, f0, …) and
 // before sample.js / server-sync.js, so the app starts with these screens in place.
-import { draw, replaceScreen, LEGACY, drawNo } from './bridge.js';
+import { draw, setGlobal, drawNo } from './bridge.js';
 import { redraw, drawTabR } from './tabs.jsx';
-import { addParity, addPiece, runParity, monthsToTry, emptyHousehold, withS, at } from './parity.js';
+import { addParity, addPiece, runParity, paritySnap, monthsToTry, emptyHousehold, withS, at } from './parity.js';
 import { History } from './screens/History.jsx';
 import { Wealth } from './screens/Wealth.jsx';
 import { Goals } from './screens/Goals.jsx';
@@ -25,48 +25,48 @@ import * as store from './store.js';
 
 // The page frame first: the scripts after this one (sample.js, server-sync.js) and every screen draw into it.
 frameMount();
-if (DEMO) { window.__store = store; window.__drawNo = drawNo; }   // for the self-test's store and tab checks
+if (DEMO) { window.__store = store; window.__drawNo = drawNo; window.__paritySnap = paritySnap; }   // the self-test's store and tab checks; snapshots
 
 // The tab screens are subscribed roots (tabs.jsx): renderAll's tab step only mounts a tab that has no root yet, and
 // renderX by name redraws that tab now.
-replaceScreen('drawTab', drawTabR);
-replaceScreen('renderHistory', () => redraw('history'));
+setGlobal('drawTab', drawTabR);
+setGlobal('renderHistory', () => redraw('history'));
 // Budget: This month is React; Build budget and Forecast are still drawn by renderBuild / renderForecast. The
 // money-flow chart is drawn into #sk by sankey() afterwards, as before.
-replaceScreen('renderBudget', () => redraw('budget'));   // the view BUDV says; This month then sankey()
+setGlobal('renderBudget', () => redraw('budget'));   // the view BUDV says; This month then sankey()
 // Forecast: the frame, then the body into #fcb (the what-if sliders, range and month buttons redraw only the body);
 // FSC: scroll the open schedule editor or the month detail into view after adding/opening.
-replaceScreen('fcBody', () => { const el = $('#fcb'); if (!el) return; draw(el, <FcBody />); if (FSC) { FSC = false; const t = $('.fcle') || ($('.fcd') && FDK ? $('.fcd') : null); if (t) t.scrollIntoView({ block: 'nearest', behavior: RM ? 'auto' : 'smooth' }); } });
+setGlobal('fcBody', () => { const el = $('#fcb'); if (!el) return; draw(el, <FcBody />); if (FSC) { FSC = false; const t = $('.fcle') || ($('.fcd') && FDK ? $('.fcd') : null); if (t) t.scrollIntoView({ block: 'nearest', behavior: RM ? 'auto' : 'smooth' }); } });
 // Pop-ups (phase 2): drawn into the parts of their dialogs in index.html.
-replaceScreen('catRender', catRenderR);
-replaceScreen('flowRender', flowRenderR);
-replaceScreen('lnkList', lnkListR);
-replaceScreen('lnkRule', lnkRuleR);
-replaceScreen('openD', openDR);
-replaceScreen('dprev', dprevR);
-replaceScreen('spForm', spFormR);
-replaceScreen('spAddPart', spAddPartR);
-replaceScreen('compareView', compareViewR);
-replaceScreen('zbar', zbarR);
-replaceScreen('skTip', skTipR);
-replaceScreen('skCard', skCardR);
-replaceScreen('sankey', sankeyR);
-replaceScreen('bankBadge', bankBadgeR);
-replaceScreen('frameUI', frameUIR);
-replaceScreen('brandSet', brandSetR);
-replaceScreen('fsUI', fsUIR);
-replaceScreen('renderBuild', () => redraw('budget', 'build'));
-replaceScreen('renderForecast', () => redraw('budget', 'fc'));   // then fcBody()
+setGlobal('catRender', catRenderR);
+setGlobal('flowRender', flowRenderR);
+setGlobal('lnkList', lnkListR);
+setGlobal('lnkRule', lnkRuleR);
+setGlobal('openD', openDR);
+setGlobal('dprev', dprevR);
+setGlobal('spForm', spFormR);
+setGlobal('spAddPart', spAddPartR);
+setGlobal('compareView', compareViewR);
+setGlobal('zbar', zbarR);
+setGlobal('skTip', skTipR);
+setGlobal('skCard', skCardR);
+setGlobal('sankey', sankeyR);
+setGlobal('bankBadge', bankBadgeR);
+setGlobal('frameUI', frameUIR);
+setGlobal('brandSet', brandSetR);
+setGlobal('fsUI', fsUIR);
+setGlobal('renderBuild', () => redraw('budget', 'build'));
+setGlobal('renderForecast', () => redraw('budget', 'fc'));   // then fcBody()
 window.wfLive = wfLiveR;
 // bankBadge (the count on the Bank tab) ran at the end of the old renderBank once the bank was set up.
-replaceScreen('renderBank', () => redraw('bank'));   // then bankBadge() when the bank is set up
-replaceScreen('renderSettings', () => redraw('settings'));
-replaceScreen('rulesFilter', rulesFilterR);
-replaceScreen('renderLoans', () => redraw('loans'));
-replaceScreen('pxLive', pxLiveR);
-replaceScreen('wiLive', wiLiveR);
-replaceScreen('renderGoals', () => redraw('goals'));
-replaceScreen('renderWealth', () => redraw('wealth'));
+setGlobal('renderBank', () => redraw('bank'));   // then bankBadge() when the bank is set up
+setGlobal('renderSettings', () => redraw('settings'));
+setGlobal('rulesFilter', rulesFilterR);
+setGlobal('renderLoans', () => redraw('loans'));
+setGlobal('pxLive', pxLiveR);
+setGlobal('wiLive', wiLiveR);
+setGlobal('renderGoals', () => redraw('goals'));
+setGlobal('renderWealth', () => redraw('wealth'));
 
 // Parity cases: the same data drawn both ways (self-test only).
 const setHR = v => { const o = HR; HR = v; return () => { HR = o; }; };
@@ -174,7 +174,7 @@ const sv = setVar(() => SV, v => { SV = v; }), rq = setVar(() => RQ, v => { RQ =
 const cvSet = (text, more) => () => { const o = CV; CV = {}; cvLoadText(text, 'my bank & co.csv'); if (more) Object.assign(CV, more); return () => { CV = o; }; };
 const CSV = 'Date,Description,Amount,Credit\n01/05/2026,COFFEE & CO,-4.50,\n01/06/2026,PAYROLL,,1200.00\n13/45/2026,BAD DATE,-1,\n01/07/2026,ZERO,0,\n';
 addParity({
-  name: 'Settings', fn: 'renderSettings', el: '#T-settings', live: true, also: ['rulesFilter'], cases: () => {
+  name: 'Settings', fn: 'renderSettings', el: '#T-settings', live: true, cases: () => {
     const c = [], V = ['general', 'rules', 'connections', 'data', 'bogus'];
     for (const v of V) c.push({ label: v, set: sv(v) });
     for (const k of monthsToTry()) for (const v of ['rules', 'data']) c.push({ label: `${k} ${v}`, set: () => both(sv(v)(), at(k)) });
@@ -225,7 +225,7 @@ addParity({
 });
 // The phone-alerts card is hidden in sample mode; compared on its own with sample mode off.
 addPiece({
-  name: 'Phone alerts card', html: () => (0, eval)('(function(DEMO){return (' + ntCard.toString() + ')()})')(false), node: () => <NtCard demo={false} />,
+  name: 'Phone alerts card', node: () => <NtCard demo={false} />,
   cases: () => [null, { configured: false }, { configured: true, target: 'ntfy.sh/our-topic & <x>' }, { configured: true }].map(n => ({ label: JSON.stringify(n), set: nt(n) })),
 });
 const bv = setVar(() => BV, v => { BV = v; }), flf = setVar(() => FLF, v => { FLF = v; }), flq = setVar(() => FLQ, v => { FLQ = v; }), fln = setVar(() => FLN, v => { FLN = v; });
@@ -288,8 +288,7 @@ addParity({
 });
 // The purchases list (rcList) as other callers use it, bank rows included.
 addPiece({
-  name: 'Purchases list', html: () => rcList({ rc: [{ id: 'a', store: 'Shop & <co>', amt: 12.5, item: (allItems(S.cur)[0] || { i: {} }).i.id, date: S.cur + '-03' }, { id: 'b', amt: 4, item: 'gone', bank: true, txid: 'p1' }, { id: 'c', store: 'X', amt: 1, bank: true, txid: 'p2', date: S.cur + '-09' }] }),
-  node: () => <RcList m={{ rc: [{ id: 'a', store: 'Shop & <co>', amt: 12.5, item: (allItems(S.cur)[0] || { i: {} }).i.id, date: S.cur + '-03' }, { id: 'b', amt: 4, item: 'gone', bank: true, txid: 'p1' }, { id: 'c', store: 'X', amt: 1, bank: true, txid: 'p2', date: S.cur + '-09' }] }} />,
+  name: 'Purchases list', node: () => <RcList m={{ rc: [{ id: 'a', store: 'Shop & <co>', amt: 12.5, item: (allItems(S.cur)[0] || { i: {} }).i.id, date: S.cur + '-03' }, { id: 'b', amt: 4, item: 'gone', bank: true, txid: 'p1' }, { id: 'c', store: 'X', amt: 1, bank: true, txid: 'p2', date: S.cur + '-09' }] }} />,
   cases: () => [{ label: 'closed' }, { label: 'open, one pending', set: () => { OPEN.add('rcl'); PSET.add('p1'); return () => { OPEN.delete('rcl'); PSET.delete('p1'); }; } }],
 });
 const fr = setVar(() => FR, v => { FR = v; }), wfs = setVar(() => WFS, v => { WFS = v; }), ale = setVar(() => ALE, v => { ALE = v; }), fdk = setVar(() => FDK, v => { FDK = v; });
@@ -302,7 +301,7 @@ const sched = tweak(s => { const g = s.goals, l = s.loans.filter(x => !loanGone(
   { id: 'sx', to: 'snow', src: 'extra', mode: '%', v: 40, how: 'rate', roll: true, loans: [], from: TK, until: '' },
   { id: 'sk', to: 'keep', src: 'extra', mode: '%', v: 100, from: TK, until: '' }]; g.forEach((x, i) => { x.by = addM(TK, i ? 6 : 48); }); });
 addParity({
-  name: 'Budget (Forecast)', fn: 'renderForecast', also: ['fcBody'], el: '#T-budget', live: true, cases: () => {
+  name: 'Budget (Forecast)', fn: 'renderForecast', el: '#T-budget', live: true, cases: () => {
     const c = [];
     for (const r of ['12', '24', '60', 'all']) { c.push({ label: 'range ' + r, set: fr(r) }); c.push({ label: 'range ' + r + ', full schedule', set: () => both(fr(r)(), sched()) }); }
     for (const w of [{ inc: -800, cost: 0, extra: 0 }, { inc: 500, cost: 300, extra: 0 }, { inc: 0, cost: 0, extra: 700 }, { inc: -3000, cost: 3000, extra: 0 }]) c.push({ label: 'what if ' + JSON.stringify(w), set: () => both(wfs(w)(), sched()) });
@@ -351,7 +350,7 @@ const allLines = (k = S.cur) => [...plan(k).income.map(i => 'inc:' + i.id), ...p
 const ct = setVar(() => CT, v => { CT = v; }), cr = setVar(() => CR, v => { CR = v; }), fd = setVar(() => FD, v => { FD = v; });
 const tdq = v => () => { const e = $('#tdq'), o = e.value; e.value = v; return () => { e.value = o; }; };
 addParity({
-  name: 'Line pop-up', fn: 'catRender', also: ['flowRender'], el: '#tdlg form', dialog: '#tdlg', cases: () => {
+  name: 'Line pop-up', fn: 'catRender', el: '#tdlg form', dialog: '#tdlg', cases: () => {
     const c = [];
     for (const v of allLines()) for (const r of ['month', 'all', 'trend']) c.push({ label: `${v} ${r}`, set: () => both(ct(v)(), cr(r)(), tdq('')()) });
     for (const v of allLines().slice(0, 6)) for (const k of [addM(TK, -1), addM(TK, -4), addM(TK, 1)]) c.push({ label: `${v} ${k}`, set: () => both(ct(v)(), cr('month')(), at(k), tdq('')()) });
@@ -381,7 +380,7 @@ const lkOpen = (kind, id, fn) => () => { const d = $('#ldlg'), o = LK, q = $('#l
 const lkLines = () => { const p = plan(), C = []; p.income.forEach(i => C.push(['inc', i.id])); p.groups.forEach(g => g.items.forEach(i => C.push([g.flex ? 'flex' : 'bill', i.id]))); S.loans.forEach(l => C.push(['loan', l.id])); S.goals.forEach(g => C.push(['goal', g.id])); return C; };
 const lkTick = n => L => { const C = lnkCands(); L.sels = C.slice(0, n).map(g => g.p); L.sibOn = false; if (L.sels.length === 1) { const s = L.sels[0]; L.pat = s; L.ref = L.refs[s] || 0; L.amtOn = !!L.wide[s]; } else { L.pat = ''; L.amtOn = false; L.ref = 0; } };
 addParity({
-  name: 'Link dialog', fn: 'lnkList', also: ['lnkRule'], el: '#lform', dialog: '#ldlg', cases: () => {
+  name: 'Link dialog', fn: 'lnkList', el: '#lform', dialog: '#ldlg', cases: () => {
     const c = [];
     for (const [kind, id] of lkLines()) {
       c.push({ label: `${kind} ${id}`, set: lkOpen(kind, id) });
@@ -404,7 +403,7 @@ addParity({
 // suggested amount, an amount already logged, other months, odd names, a typed amount, and one with no choices.
 const noModal = () => { const d = $('#dlg'); d.showModal = () => {}; return () => { delete d.showModal; }; };
 addParity({
-  name: 'Amount dialog', fn: 'openD', also: ['dprev'], el: '#dform', dialog: '#dlg', cases: () => {
+  name: 'Amount dialog', fn: 'openD', el: '#dform', dialog: '#dlg', cases: () => {
     const c = [], add = (label, call, ...set) => c.push({ label, call, set: () => both(noModal(), ...set.map(f => f())) });
     for (const l of S.loans) {
       add('pay ' + l.id, () => payDialog(l.id));
@@ -431,7 +430,7 @@ addParity({
 // item): as opened, after Add a part twice, and with values typed and chosen before adding (they must stay).
 const spBox = id => () => { const b = document.createElement('div'); b.className = 'spf'; b.id = 'spx'; b.dataset.spf = id; $('main').appendChild(b); return () => b.remove(); };
 addParity({
-  name: 'Split form', fn: 'spForm', also: ['spAddPart'], el: '#spx', cases: () => {
+  name: 'Split form', fn: 'spForm', el: '#spx', cases: () => {
     const c = [], E = Object.entries(S.txd || {}).filter(([, r]) => r.v !== 'split' && !r.sp && Math.abs(+r.amt || 0) > 0.02), seen = new Set();
     const pick = E.filter(([, r]) => { const t = (r.amt < 0 ? 'in ' : 'out ') + r.v.split(':')[0]; if (seen.has(t)) return false; seen.add(t); return true; });
     for (const [id, r] of pick) {
@@ -496,7 +495,7 @@ addParity({
 // The chart itself: every month planned, actual and Compare, over budget, odd names, items not in a group, zoomed in,
 // and a household with nothing planned.
 addParity({
-  name: 'Money-flow chart', fn: 'sankey', el: '#sk', also: ['compareView'], cases: () => {
+  name: 'Money-flow chart', fn: 'sankey', el: '#sk', cases: () => {
     const c = [];
     for (const k of monthsToTry()) for (const f of ['plan', 'actual', 'compare']) c.push({ label: `${f} ${k}`, set: skSet(f, k) });
     for (const [f, k, tw] of skViews().slice(4)) c.push({ label: 'over budget ' + f, set: skSet(f, k, tw) });
@@ -523,11 +522,11 @@ const loansTab = () => { const o = S.tab; S.tab = 'loans'; renderAll(); return (
 addParity({
   // Each case draws the tab with other values, then does what the px / wi input handler does on that side: old =
   // PX/WI, the #wo- text and the old pxLive/wiLive writing into the page; new = PX/WI and the tick (wiLive draws #wo-).
-  name: 'Loans live text', fn: 'pxLive', also: ['wiLive', 'renderLoans'], el: '#T-loans', cases: () => {
+  name: 'Loans live text', fn: 'pxLive', el: '#T-loans', cases: () => {
     const c = [], pv = (x, s) => () => { const o = [PX, PS]; PX = x; PS = s; return () => { PX = o[0]; PS = o[1]; }; };
     const keepWI = () => { const o = { ...WI }; return () => { for (const k of Object.keys(WI)) delete WI[k]; Object.assign(WI, o); }; };
     const px = () => { const x = PX; PX = x === 0 ? 50 : 0; renderLoans(); PX = x; pxLive(); };
-    const wi = (l, w) => { const i = $('#wi-' + l.id); if (!i) return; i.value = w; WI[l.id] = +i.value; if (wiLive === LEGACY.wiLive) $('#wo-' + l.id).textContent = f0(+i.value); wiLive(l, +i.value); };
+    const wi = (l, w) => { const i = $('#wi-' + l.id); if (!i) return; i.value = w; WI[l.id] = +i.value; wiLive(l, +i.value); };
     const wis = (ls, w) => { ls.forEach(l => { WI[l.id] = 0; }); renderLoans(); ls.forEach(l => wi(l, w)); };
     for (const x of [0, 25, 300, 5000, null]) for (const s of ['rate', 'bal']) c.push({ label: `plan ${x} ${s}`, set: () => both(loansTab(), pv(x, s)()), call: px });
     for (const l of S.loans) for (const w of [0, 5, 250, 4000]) c.push({ label: `what-if ${l.id} ${w}`, set: () => both(loansTab(), keepWI()), call: () => wis([l], w) });
@@ -536,4 +535,3 @@ addParity({
   },
 });
 window.reactParity = runParity;
-if (DEMO) window.LEGACY_SCREENS = LEGACY;   // sample mode only: the old draw functions, for comparing by hand
