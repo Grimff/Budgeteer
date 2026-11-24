@@ -161,7 +161,8 @@ function totals(k=S.cur){const p=plan(k),m=MO(k);let inc=0,incA=0,incN=0,fixed=0
 
 /* ---------- small helpers ---------- */
 const PV={};
-function cu(el,k,to,fmt=f0){if(!el)return;const from=PV[k];PV[k]=to;if(from===undefined||from===to||RM){el.textContent=fmt(to);return}const t0=performance.now();const step=t=>{const p=Math.min(1,(t-t0)/800),e=1-Math.pow(1-p,4);el.textContent=fmt(from+(to-from)*e);if(p<1)requestAnimationFrame(step)};el.textContent=fmt(from);requestAnimationFrame(step)}
+// el._cu: a newer cu on the same element (a React re-render keeps it) stops the older animation, as a redraw did.
+function cu(el,k,to,fmt=f0){if(!el)return;const from=PV[k],id=el._cu=(el._cu||0)+1;PV[k]=to;if(from===undefined||from===to||RM){el.textContent=fmt(to);return}const t0=performance.now();const step=t=>{if(el._cu!==id)return;const p=Math.min(1,(t-t0)/800),e=1-Math.pow(1-p,4);el.textContent=fmt(from+(to-from)*e);if(p<1)requestAnimationFrame(step)};el.textContent=fmt(from);requestAnimationFrame(step)}
 let toastT;function toast(t){const e=$('#toast');e.textContent=t;e.classList.add('on');clearTimeout(toastT);toastT=setTimeout(()=>e.classList.remove('on'),2600)}
 const OPEN=new Set(),WI={};
 // Collapsible setup areas (Build steps, Loans setup, Accounts for goals). BCL holds 'k' (closed) or '!k' (open on

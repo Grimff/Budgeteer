@@ -9,7 +9,8 @@ export const Gear = () => <svg viewBox="0 0 24 24" width="16" height="16" fill="
 // after drawing. Starts empty, like the old markup.
 export function CountUp({ as: T = 'b', k, to, fmt, ...rest }) {
   const ref = useRef(null);
-  useLayoutEffect(() => { cu(ref.current, k, to, fmt); }, [k, to, fmt]);
+  // after every render, like the old draw called cu every time (same value: sets the text; else counts from PV[k])
+  useLayoutEffect(() => { cu(ref.current, k, to, fmt); });
   return <T ref={ref} {...rest}></T>;
 }
 

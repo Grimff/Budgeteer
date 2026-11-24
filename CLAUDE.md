@@ -168,10 +168,11 @@ works (and `npm test` passes) after every step.
   input values/checks and select choice (from defaultValue/defaultChecked), `hidden`, inner scroll offsets; it skips
   nested roots. `liveReset(el)` drops the root (parity does before each old draw). A parity screen with `live: true`
   also gets a re-render pass: one root re-rendered through every case in order must equal a fresh draw of each.
-  Intended differences from the old draw: the clicked button keeps focus, and the page no longer jumps to the top
+  Intended differences from the old draw: the clicked button (or the field tabbed to) keeps focus, and the page no longer jumps to the top
   (the old draw emptied the section first, collapsing the page while charts measured). Component state that a fresh draw reset must reset the same way: a chart that measures its box re-measures after
   every render, and one keyed by its range starts over when the range changes (Wealth's `AreaChart key={from}`).
-  Done: History, Wealth. Next: the other
+  `CountUp` calls cu after every render, as each old draw did; cu stops an older animation on the same element (`el._cu`).
+  Done: History, Wealth, Goals. Next: the other
   tabs, then subscribing to the store and controlled fields. Then the math into ES modules;
   then remove the old draw functions and the classic-script globals.
 

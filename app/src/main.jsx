@@ -59,7 +59,7 @@ replaceScreen('renderSettings', () => { const el = $('#T-settings'); if (el) dra
 replaceScreen('renderLoans', () => draw($('#T-loans'), <Loans />));
 replaceScreen('pxLive', pxLiveR);
 replaceScreen('wiLive', wiLiveR);
-replaceScreen('renderGoals', () => draw($('#T-goals'), <Goals />));
+replaceScreen('renderGoals', () => live($('#T-goals'), <Goals />));
 replaceScreen('renderWealth', () => live($('#T-wealth'), <Wealth />));
 
 // Parity cases: the same data drawn both ways (self-test only).
@@ -106,7 +106,7 @@ addParity({
 const tweak = fn => () => { const c = clone(S); fn(c); return withS(c); };
 const goalAccts = () => (BK.accts || []).filter(a => ['depository', 'investment'].includes(a.type));
 addParity({
-  name: 'Goals', fn: 'renderGoals', el: '#T-goals', cases: () => {
+  name: 'Goals', fn: 'renderGoals', el: '#T-goals', live: true, cases: () => {
     const c = [];
     for (const k of monthsToTry()) c.push({ label: k, set: () => at(k) });
     for (const r of ['1y', '2y', '5y', 'all']) for (const k of [TK, addM(TK, 2)]) c.push({ label: `${k} ${r}`, set: () => at(k, () => { const o = GR; GR = r; return () => { GR = o; }; }) });

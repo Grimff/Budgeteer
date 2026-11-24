@@ -13,7 +13,8 @@ function GoalChart({ G }) {
   const st = addM(TK, -6), etas = G.map(goalEta).filter(Boolean).sort(), far = etas.length ? etas[etas.length - 1] : addM(TK, 60), en = GR === '1y' ? addM(TK, 12) : GR === '2y' ? addM(TK, 24) : GR === '5y' ? addM(TK, 60) : (far > addM(TK, 24) ? (far < addM(TK, 360) ? addM(far, 3) : addM(TK, 360)) : addM(TK, 24)), N = mdiff(st, en) + 1, ks = [];
   for (let i = 0; i < N; i++) ks.push(addM(st, i));
   const ci = mdiff(st, TK), [at, setAt] = useState(ci);
-  useLayoutEffect(() => { setW(Math.round(Math.min(1000, Math.max(340, ref.current.clientWidth || Math.max(0, (document.querySelector('main') || document.body).clientWidth - 90) || 1000)))); }, []);
+  // Measured again after every render (a re-render in place must size like a fresh draw did); setW skips equal values.
+  useLayoutEffect(() => { setW(Math.round(Math.min(1000, Math.max(340, ref.current.clientWidth || Math.max(0, (document.querySelector('main') || document.body).clientWidth - 90) || 1000)))); });
   if (W == null) return <><div id="gch" ref={ref}></div><div className="dread" id="gread"></div></>;
   const P = G.map(g => ks.map(k => { const t = target(g, k) || 1, v = k <= TK ? (k === TK ? goalSaved(g, TK) : goalSaved(g, k)) : goalProj(g, k); return { v, p: Math.max(0, Math.min(1, v / t)) }; }));
   const H = W < 640 ? 240 : 290, pl = 48, pr = 16, pt = 14, pb = 34, X = i => pl + i / Math.max(1, N - 1) * (W - pl - pr), Y = p => pt + (1 - p) * (H - pt - pb);
@@ -110,7 +111,7 @@ export function Goals() {
         <div className="kpi"><small>Emergency fund covers</small><b>{em ? ((bal(em) / (ess || 1)).toFixed(1) + ' months') : '—'}</b><span>of your {f0(ess)}/mo budget{fut ? ' (projected)' : ''}</span></div>{' '}
         <div className="kpi"><small>On track</small><b>{dated.length ? `${dated.length - late.length} of ${dated.length}` : '—'}</b><span>{late.length ? tx(late.map(g => g.name).join(', ')) + ' behind its date' : dated.length ? 'every dated goal on time' : 'add target dates to check'}</span></div>{' '}
         <div className="kpi"><small>Next goal reached</small>{n ? <><b>{labS(n[1])}</b><span>{tx(n[0].name)}</span></> : <><b>—</b><span>set monthly amounts</span></>}</div></div></div>
-    {tg.length ? <section className="card" style={{ '--i': 1, marginBottom: '16px' }}><div className="bh"><div><h2>Goal timeline</h2><p>Each goal’s progress toward its target, projected with its monthly plan. Dots mark when it’s reached; diamonds mark target dates.</p></div><div className="seg" role="group" aria-label="Time range">{[['1y', '1Y'], ['2y', '2Y'], ['5y', '5Y'], ['all', 'All']].map(([k, l]) => <button key={k} className={GR === k ? 'on' : ''} data-act="grng" onClick={onAct('grng')} data-r={k}>{l}</button>)}</div></div><GoalChart G={tg} /></section> : null}
+    {tg.length ? <section className="card" style={{ '--i': 1, marginBottom: '16px' }}><div className="bh"><div><h2>Goal timeline</h2><p>Each goal’s progress toward its target, projected with its monthly plan. Dots mark when it’s reached; diamonds mark target dates.</p></div><div className="seg" role="group" aria-label="Time range">{[['1y', '1Y'], ['2y', '2Y'], ['5y', '5Y'], ['all', 'All']].map(([k, l]) => <button key={k} className={GR === k ? 'on' : ''} data-act="grng" onClick={onAct('grng')} data-r={k}>{l}</button>)}</div></div><GoalChart key={GR} G={tg} /></section> : null}
     <div className="ggrid" style={{ '--i': 2 }}>{G.map(g => <GoalCard key={g.id} g={g} />)}</div><button className="add" data-act="addGoal" onClick={onAct('addGoal')} style={{ marginTop: '16px' }}>Add a goal</button><AllocCard />
   </>;
 }
