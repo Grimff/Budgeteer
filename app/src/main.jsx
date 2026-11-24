@@ -1,6 +1,7 @@
 // The React screens. Loaded by index.html after the other js files (which it uses by name: S, plan, f0, …) and
 // before sample.js / server-sync.js, so the app starts with these screens in place.
-import { draw, live, replaceScreen, LEGACY } from './bridge.js';
+import { draw, replaceScreen, LEGACY, drawNo } from './bridge.js';
+import { redraw, drawTabR } from './tabs.jsx';
 import { addParity, addPiece, runParity, monthsToTry, emptyHousehold, withS, at } from './parity.js';
 import { History } from './screens/History.jsx';
 import { Wealth } from './screens/Wealth.jsx';
@@ -24,12 +25,15 @@ import * as store from './store.js';
 
 // The page frame first: the scripts after this one (sample.js, server-sync.js) and every screen draw into it.
 frameMount();
-if (DEMO) window.__store = store;   // for the self-test's store check
+if (DEMO) { window.__store = store; window.__drawNo = drawNo; }   // for the self-test's store and tab checks
 
-replaceScreen('renderHistory', () => live($('#T-history'), <History />));
+// The tab screens are subscribed roots (tabs.jsx): renderAll's tab step only mounts a tab that has no root yet, and
+// renderX by name redraws that tab now.
+replaceScreen('drawTab', drawTabR);
+replaceScreen('renderHistory', () => redraw('history'));
 // Budget: This month is React; Build budget and Forecast are still drawn by renderBuild / renderForecast. The
 // money-flow chart is drawn into #sk by sankey() afterwards, as before.
-replaceScreen('renderBudget', () => { if (BUDV === 'build') return renderBuild(); if (BUDV === 'fc') return renderForecast(); live($('#T-budget'), <ThisMonth />); sankey(); });
+replaceScreen('renderBudget', () => redraw('budget'));   // the view BUDV says; This month then sankey()
 // Forecast: the frame, then the body into #fcb (the what-if sliders, range and month buttons redraw only the body);
 // FSC: scroll the open schedule editor or the month detail into view after adding/opening.
 replaceScreen('fcBody', () => { const el = $('#fcb'); if (!el) return; draw(el, <FcBody />); if (FSC) { FSC = false; const t = $('.fcle') || ($('.fcd') && FDK ? $('.fcd') : null); if (t) t.scrollIntoView({ block: 'nearest', behavior: RM ? 'auto' : 'smooth' }); } });
@@ -51,18 +55,18 @@ replaceScreen('bankBadge', bankBadgeR);
 replaceScreen('frameUI', frameUIR);
 replaceScreen('brandSet', brandSetR);
 replaceScreen('fsUI', fsUIR);
-replaceScreen('renderBuild', () => live($('#T-budget'), <Build />));
-replaceScreen('renderForecast', () => { live($('#T-budget'), <Forecast />); fcBody(); });
+replaceScreen('renderBuild', () => redraw('budget', 'build'));
+replaceScreen('renderForecast', () => redraw('budget', 'fc'));   // then fcBody()
 window.wfLive = wfLiveR;
 // bankBadge (the count on the Bank tab) ran at the end of the old renderBank once the bank was set up.
-replaceScreen('renderBank', () => { const el = $('#T-bank'); if (!el) return; live(el, <Bank />); if (SRV && BK.st && BK.st.configured) bankBadge(); });
-replaceScreen('renderSettings', () => live($('#T-settings'), <Settings />));
+replaceScreen('renderBank', () => redraw('bank'));   // then bankBadge() when the bank is set up
+replaceScreen('renderSettings', () => redraw('settings'));
 replaceScreen('rulesFilter', rulesFilterR);
-replaceScreen('renderLoans', () => live($('#T-loans'), <Loans />));
+replaceScreen('renderLoans', () => redraw('loans'));
 replaceScreen('pxLive', pxLiveR);
 replaceScreen('wiLive', wiLiveR);
-replaceScreen('renderGoals', () => live($('#T-goals'), <Goals />));
-replaceScreen('renderWealth', () => live($('#T-wealth'), <Wealth />));
+replaceScreen('renderGoals', () => redraw('goals'));
+replaceScreen('renderWealth', () => redraw('wealth'));
 
 // Parity cases: the same data drawn both ways (self-test only).
 const setHR = v => { const o = HR; HR = v; return () => { HR = o; }; };

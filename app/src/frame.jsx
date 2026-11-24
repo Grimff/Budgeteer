@@ -10,7 +10,7 @@ import { createRoot } from 'react-dom/client';
 import { flushSync } from 'react-dom';
 import { tx, onAct } from './bridge.js';
 import { FRAME_ON } from './actions.js';
-import { useBudget, changed } from './store.js';
+import { useBudget, useFrame, changed, frameChanged } from './store.js';
 
 // The frame elements' own listeners (FRAME_ON), attached natively once per element.
 const REFS = {};
@@ -23,7 +23,7 @@ const LOGO = <svg className="lgo" aria-hidden="true" xmlns="http://www.w3.org/20
 const on = t => S.tab === t ? 'on' : undefined;
 
 export function Frame() {
-  useBudget();
+  useBudget(); useFrame();
   return <>
     <header className="bar" id="bar">
       <div className="brand" data-act="sview" data-v="general" title="Change the name in Settings" onClick={onAct('sview')}><span className="mark" aria-hidden="true">{LOGO}</span><span><b id="hhN">{tx(hhName())}</b><small id="hhS">{tx(hhSub())}</small></span></div>
@@ -46,8 +46,10 @@ export function Frame() {
 
 // Mounted once, when the bundle loads (main.jsx); after that it follows the store.
 export function frameMount() { flushSync(() => createRoot($('#app')).render(<Frame />)); }
-// renderAll's frame part: tells the store the page changed (the frame re-renders with it), then sets what React doesn't
-// own (the month picker's value, the body's tab class, the tabs' entry animation class).
-export function frameUIR() { changed(); $('#mp').value = S.cur; document.body.className = 'tab-' + S.tab; $$('.tab').forEach(t => t.classList.remove('enter')); }
-export function brandSetR() { changed(); document.title = (hhName() + ' ' + hhSub()).trim(); }
-export function bankBadgeR() { BADGE = SRV && BK.st && BK.st.configured ? inbox().length : 0; changed(); moveInd(); }
+// renderAll's frame part: sets what React doesn't own (the month picker's value, the body's tab class, the tabs' entry
+// animation class), then tells the store the page changed: the frame re-renders, then the visible tab (tabs.jsx), in
+// that order, as frameUI ran before the tab was drawn.
+export function frameUIR() { $('#mp').value = S.cur; document.body.className = 'tab-' + S.tab; $$('.tab').forEach(t => t.classList.remove('enter')); changed(); }
+// The header alone (frameChanged): Bank calls bankBadge after drawing, so these must not redraw the tab.
+export function brandSetR() { frameChanged(); document.title = (hhName() + ' ' + hhSub()).trim(); }
+export function bankBadgeR() { BADGE = SRV && BK.st && BK.st.configured ? inbox().length : 0; frameChanged(); moveInd(); }

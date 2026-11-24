@@ -187,8 +187,18 @@ works (and `npm test` passes) after every step.
   build.js counts them (`ORDN`) and the `.bgrps` lists use it as their key, so the redraw after a move (save or cancel)
   gets new lists (without it, moving an item to another group made React throw; a self-test check covers it).
   `CountUp` calls cu after every render, as each old draw did; cu stops an older animation on the same element (`el._cu`).
-  Done: every tab (History, Wealth, Goals, Loans, Settings, Bank, Budget's three views). Next: screens subscribe to
-  the store instead of being called by renderAll, and fields become controlled. Then the math into ES modules;
+  Done: every tab (History, Wealth, Goals, Loans, Settings, Bank, Budget's three views).
+  The tabs are on the store (`tabs.jsx`): each section holds one root, a `TabScreen` subscribed to the store and to its
+  own tick. It draws its screen when the store changes and its tab is showing (renderAll → frameUIR → `changed()`, so
+  every commit/view switch; a hidden tab keeps what it showed), or when its renderX is called by name (`redraw(t)`,
+  shown or not, as before; renderBuild/renderForecast ask for that Budget view, renderBudget follows BUDV). `Body` is
+  memo'd on a draw count (`drawStep`/`drawNo`). After React is done (end of changed() via `afterFlush`, or of redraw;
+  never inside React's commit) each screen that drew gets resync() and its old after-draw step: This month → sankey(),
+  Forecast → fcBody(), Bank → bankBadge(). renderAll's tab step is `drawTab` (= drawTabR: only mounts a tab with no
+  root yet, the store drew the rest). brandSet/bankBadge update the header alone (`frameChanged`/`useFrame`), so
+  Bank's bankBadge doesn't redraw Bank. frameUIR sets the body's tab class before changed(), as frameUI ran before the
+  tab was drawn. Self-test: one draw per change (the visible tab), a hidden tab keeps its content, renderX draws a
+  hidden tab (`__drawNo` in sample mode). Then the math into ES modules;
   then remove the old draw functions and the classic-script globals.
 
 ## Server API (`server.js`)
@@ -372,8 +382,8 @@ works (and `npm test` passes) after every step.
   `cvSplit` (quotes, CRLF, BOM, `,`/`;`/tab), `cvNum` (parentheses, currency, decimal comma), `cvDate`
   (`ymd`/`mdy`/`dmy`), `cvLoadText` guesses columns, `cvRows` builds Plaid-signed rows, `cvImport`/`cvDel`. State in
   `CV` (not saved); selects use `data-cv` and inputs `data-cvt` with their own listeners (not the main change listener).
-- **Only the visible tab is drawn:** `renderAll` shows the tab, then calls `TABR[S.tab]`; hidden tabs keep stale HTML
-  until switched to. Every tab switch must go through `commit()`/`renderAll` (all `S.tab=` sites do). Calling one
+- **Only the visible tab is drawn:** `renderAll` shows the tab and the store redraws it (tabs.jsx); hidden tabs keep stale
+  content until switched to. Every tab switch must go through `commit()`/`renderAll` (all `S.tab=` sites do). Calling one
   tab's `renderX()` directly is fine. Tab draw functions must stay free of side effects (no saves or data changes).
 - **Budget → This month** is read-only (no inputs): header with the This month / Build budget
   switch, summary bar, money-flow card, then **Budget lines**: a `.ledger` (CSS columns, so cards

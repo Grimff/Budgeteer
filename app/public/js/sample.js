@@ -194,6 +194,12 @@ async function selfTest(){const T=[],ok=(c,name,detail='')=>T.push({ok:!!c,name,
     const P=plan(S.cur).groups.filter(g=>!g.flex).map(g=>g.items.map(i=>i.id).join(',')).join('|'),D=[...document.querySelectorAll('.bgrps[data-kind=fixed]>.bgrp')].map(g=>[...g.querySelectorAll('.brow[data-iid]')].map(x=>x.dataset.iid).join(',')).join('|');
     good=P===D&&plan(S.cur).groups.filter(g=>!g.flex)[1].items[0].id===id;why=P+' vs '+D}
    BUDV=ob;renderAll();ok(good,'A Build row moved to another group by hand redraws in the saved order',why)}
+  // Tabs follow the store (app/src/tabs.jsx): a change redraws the visible tab only, a hidden one keeps what it showed
+  // (as when only the visible tab was drawn), and renderX draws its tab now even while hidden.
+  if(window.__drawNo){const o=[S.tab,S.cur],L=$('#T-loans');S.tab='loans';S.cur=TK;renderAll();const l0=L.textContent;
+   S.tab='history';let n=__drawNo();S.cur=addM(TK,-1);renderAll();const one=__drawNo()-n,kept=L.textContent===l0;
+   n=__drawNo();renderLoans();const byName=__drawNo()-n===1&&L.textContent!==l0&&L.hidden;S.tab=o[0];S.cur=o[1];renderAll();
+   ok(one===1&&kept&&byName,'Only the visible tab follows a change; a tab drawn by name draws even while hidden',`draws per change ${one}, hidden kept ${kept}, by name ${byName}`)}
   // The store (app/src/store.js): every redraw moves its version on and the page frame follows; the frame stays mounted,
   // so a focused tab button keeps focus through a redraw.
   if(window.__store){const v0=__store.version(),o=S.cur,tb=$('.tabs [data-t="'+S.tab+'"]');S.cur=addM(TK,-1);renderAll();

@@ -15,23 +15,19 @@ export function draw(el, node) {
   flushSync(() => r.render(node));
 }
 
-// A persistent root (phase 3, step 3, piece 3): the first call mounts, later calls re-render in place, so elements
-// stay (focus stays on a clicked button). After each render, resync() puts back what a fresh draw used to reset and a
-// re-render doesn't: folds open or shut, field values / ticks / choices, `hidden`, and scroll positions, all as the
-// screen says now. liveReset() drops the root (the parity check, whose old-draw side overwrites the container).
+// Persistent roots (phase 3, step 3, piece 3): the tab screens (tabs.jsx) each keep one root in their section and
+// re-render it in place, so elements stay (focus stays on a clicked button). After each draw, resync() puts back what a
+// fresh draw used to reset and a re-render doesn't: folds open or shut, field values / ticks / choices, `hidden`, and
+// scroll positions, all as the screen says now. liveReset() drops a root (the parity check, whose old-draw side
+// overwrites the container); the next draw mounts a new one.
 const ROOTS = new WeakMap();
-// drawNo(): counts live() draws. A box another root fills by hand (the split form's .spf) uses it as its key, so each
-// draw of the screen gives it a new, empty element, as the old innerHTML= did.
+export const hasRoot = el => ROOTS.has(el);
+export function mountRoot(el, node) { el.textContent = ''; const r = createRoot(el); ROOTS.set(el, r); flushSync(() => r.render(node)); }
+// drawNo(): counts the tab screens' draws (drawStep, tabs.jsx). A box another root fills by hand (the split form's
+// .spf) uses it as its key, so each draw of the screen gives it a new, empty element, as the old innerHTML= did.
 let DN = 0;
 export const drawNo = () => DN;
-export function live(el, node) {
-  if (!el) return;
-  DN++;
-  let r = ROOTS.get(el);
-  if (!r) { el.textContent = ''; r = createRoot(el); ROOTS.set(el, r); }
-  flushSync(() => r.render(node));
-  resync(el);
-}
+export const drawStep = () => ++DN;
 // A tick for parts of a live screen that change while typing / dragging (Loans' plan text, the rules search): the
 // part calls use() and re-renders when bump() runs, inside its own root, instead of a second root drawn into it.
 export function tick() {
