@@ -177,9 +177,13 @@ works (and `npm test` passes) after every step.
   (`PxLive`/`WiOut`/`WiLive`; pxLive/wiLive bump it) and the rules search (rulesFilter = `rulesFilterR`, the rules
   card redraws from RQ). `tick()` in bridge.js makes one ({use, bump}). Never draw() into an element a live root renders.
   resync also rebuilds selects as a mount would: only the option matching defaultValue keeps the `selected` attribute.
+  A container another root draws into keeps its own element state reset by resync (hidden, scroll) but not what's
+  inside; a box filled by hand that a fresh draw emptied gets `key={'…' + drawNo()}` (Bank's split box `.spf`), so each
+  draw of the screen gives it a new element. Hand-toggled `hidden` (Move panel `mvShow`, `spOpen`) goes back to the
+  prop on every draw, as before.
   `CountUp` calls cu after every render, as each old draw did; cu stops an older animation on the same element (`el._cu`).
-  Done: History, Wealth, Goals, Loans, Settings. Next: the other
-  tabs, then subscribing to the store and controlled fields. Then the math into ES modules;
+  Done: History, Wealth, Goals, Loans, Settings, Bank. Next: Budget (This month, Forecast, Build),
+  then subscribing to the store and controlled fields. Then the math into ES modules;
   then remove the old draw functions and the classic-script globals.
 
 ## Server API (`server.js`)

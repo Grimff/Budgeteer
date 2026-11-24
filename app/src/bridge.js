@@ -20,8 +20,13 @@ export function draw(el, node) {
 // re-render doesn't: folds open or shut, field values / ticks / choices, `hidden`, and scroll positions, all as the
 // screen says now. liveReset() drops the root (the parity check, whose old-draw side overwrites the container).
 const ROOTS = new WeakMap();
+// drawNo(): counts live() draws. A box another root fills by hand (the split form's .spf) uses it as its key, so each
+// draw of the screen gives it a new, empty element, as the old innerHTML= did.
+let DN = 0;
+export const drawNo = () => DN;
 export function live(el, node) {
   if (!el) return;
+  DN++;
   let r = ROOTS.get(el);
   if (!r) { el.textContent = ''; r = createRoot(el); ROOTS.set(el, r); }
   flushSync(() => r.render(node));
@@ -39,7 +44,9 @@ const otherRoot = el => { for (const k in el) if (k.startsWith('__reactContainer
 export function resync(root) {
   const walk = el => {
     for (let c = el.firstElementChild; c; c = c.nextElementSibling) {
-      if (otherRoot(c)) continue;   // drawn by its own root (the money-flow chart, a dialog part): not ours
+      // a container another root draws into (the money-flow chart, a split form): its own element is ours (hidden, scroll
+      // reset as a fresh draw made it), what's inside is that root's
+      const own = otherRoot(c);
       const p = propsOf(c);
       if (p) {
         const t = c.tagName;
@@ -59,7 +66,7 @@ export function resync(root) {
       }
       if (c.scrollTop) c.scrollTop = 0;
       if (c.scrollLeft) c.scrollLeft = 0;
-      walk(c);
+      if (!own) walk(c);
     }
   };
   walk(root);

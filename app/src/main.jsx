@@ -54,7 +54,7 @@ replaceScreen('fsUI', fsUIR);
 replaceScreen('renderBuild', () => draw($('#T-budget'), <Build />));
 replaceScreen('renderForecast', () => { draw($('#T-budget'), <Forecast />); fcBody(); });
 // bankBadge (the count on the Bank tab) ran at the end of the old renderBank once the bank was set up.
-replaceScreen('renderBank', () => { const el = $('#T-bank'); if (!el) return; draw(el, <Bank />); if (SRV && BK.st && BK.st.configured) bankBadge(); });
+replaceScreen('renderBank', () => { const el = $('#T-bank'); if (!el) return; live(el, <Bank />); if (SRV && BK.st && BK.st.configured) bankBadge(); });
 replaceScreen('renderSettings', () => live($('#T-settings'), <Settings />));
 replaceScreen('rulesFilter', rulesFilterR);
 replaceScreen('renderLoans', () => live($('#T-loans'), <Loans />));
@@ -227,7 +227,7 @@ const bv = setVar(() => BV, v => { BV = v; }), flf = setVar(() => FLF, v => { FL
 // Some transactions back in To review (unfiled), some pending, some moved to another month.
 const unfile = n => tweak(s => { Object.keys(s.txd || {}).filter(id => !s.txd[id].sp && s.txd[id].v !== 'split').slice(0, n).forEach(id => delete s.txd[id]); });
 addParity({
-  name: 'Bank', fn: 'renderBank', el: '#T-bank', cases: () => {
+  name: 'Bank', fn: 'renderBank', el: '#T-bank', live: true, cases: () => {
     const c = [];
     for (const k of monthsToTry()) for (const v of ['review', 'filed', null]) c.push({ label: `${k} ${v}`, set: () => both(bv(v)(), at(k)) });
     for (const f of FLKIND.map(x => x[0])) c.push({ label: 'filter ' + f, set: () => both(bv('filed')(), flf(f)()) });

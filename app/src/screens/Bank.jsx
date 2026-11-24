@@ -1,6 +1,6 @@
 // Bank tab (was renderBank in js/linked-loans.js, pairCard and mvPanel in js/bank.js). Filing logic (inbox,
 // suggestTx, pairIssues, …) stays in bank.js. The Move panel's buttons and selects keep their data-* hooks.
-import { tx, onAct, onInp, onChg } from '../bridge.js';
+import { tx, onAct, onInp, onChg, drawNo } from '../bridge.js';
 import { Gear, TxOpts } from '../ui.jsx';
 
 // The "Pending" tag after a name (was PND).
@@ -11,7 +11,7 @@ export const ruleTagT = id => { const x = (S.rules || []).find(y => y.id === id)
 // Move a filed transaction to another category or month (hidden until Move; was mvPanel).
 export function MvPanel({ id, r, dir }) {
   const base = (r.d || '').slice(0, 7) || r.k, ms = [...new Set([addM(base, -1), base, addM(base, 1), r.k].filter(Boolean))].sort(), eid = tx(id);
-  return <div className="mvp" data-mvp={eid} hidden>{r.v !== 'split' && !r.sp && Math.abs(+r.amt || 0) > 0.02 ? <><button className="lnk" data-act="spOpen" onClick={onAct('spOpen')} data-id={eid} style={{ gridColumn: '1/-1', justifySelf: 'start' }}>Split between categories…</button><div className="spf" data-spf={eid} hidden></div></> : null}<label>Category<select className="in" data-mv={eid} aria-label={`Category for ${tx(r.n)}`} defaultValue={r.v} ref={onChg}><TxOpts k={r.k} dir={dir} /></select></label><label>Counts in<select className="in" data-mm={eid} aria-label={`Month ${tx(r.n)} counts in`} defaultValue={r.k} ref={onChg}>{ms.map(m => <option key={m} value={m}>{lab(m) + (m === base ? ' (when paid)' : '')}</option>)}</select></label></div>;
+  return <div className="mvp" data-mvp={eid} hidden>{r.v !== 'split' && !r.sp && Math.abs(+r.amt || 0) > 0.02 ? <><button className="lnk" data-act="spOpen" onClick={onAct('spOpen')} data-id={eid} style={{ gridColumn: '1/-1', justifySelf: 'start' }}>Split between categories…</button><div className="spf" key={'spf' + drawNo()} data-spf={eid} hidden></div></> : null}<label>Category<select className="in" data-mv={eid} aria-label={`Category for ${tx(r.n)}`} defaultValue={r.v} ref={onChg}><TxOpts k={r.k} dir={dir} /></select></label><label>Counts in<select className="in" data-mm={eid} aria-label={`Month ${tx(r.n)} counts in`} defaultValue={r.k} ref={onChg}>{ms.map(m => <option key={m} value={m}>{lab(m) + (m === base ? ' (when paid)' : '')}</option>)}</select></label></div>;
 }
 
 // Payments between your own accounts filed as spending or income (was pairCard).
