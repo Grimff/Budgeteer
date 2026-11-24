@@ -19,10 +19,12 @@ import { compareViewR } from './flow/Compare.jsx';
 import { zbarR, skTipR, skCardR } from './flow/Card.jsx';
 import { sankeyR } from './flow/Sankey.jsx';
 import { fsUIR } from './chrome.jsx';
-import { frameRender, frameUIR, brandSetR, bankBadgeR } from './frame.jsx';
+import { frameMount, frameUIR, brandSetR, bankBadgeR } from './frame.jsx';
+import * as store from './store.js';
 
 // The page frame first: the scripts after this one (sample.js, server-sync.js) and every screen draw into it.
-frameRender();
+frameMount();
+if (DEMO) window.__store = store;   // for the self-test's store check
 
 replaceScreen('renderHistory', () => draw($('#T-history'), <History />));
 // Budget: This month is React; Build budget and Forecast are still drawn by renderBuild / renderForecast. The

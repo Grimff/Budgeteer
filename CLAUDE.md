@@ -150,16 +150,20 @@ works (and `npm test` passes) after every step.
   chart's nodes, outside-click close of the flow card (skipped when `skDone`, the React handler did it first).
   Step 3 (in progress): one root and a store. Piece 1 (done): the page frame is `frame.jsx`, one persistent root in
   `#app` (index.html's body is just that and the scripts): header, tabs, month, `#sync` + the tab sections, footer,
-  the four dialogs' shells, toast. It re-renders (frameRender, flushSync) instead of being patched: `frameUI`
-  (renderAll's frame part), `brandSet` and `bankBadge` are swapped in by name; the Bank count is kept as bankBadge last
+  the four dialogs' shells, toast. Mounted once (`frameMount`); it re-renders instead of being patched: `frameUI`
+  (renderAll's frame part), `brandSet` and `bankBadge` are swapped in by name and tell the store; the Bank count is kept as bankBadge last
   set it. Containers other roots draw into (tab sections, dialog parts, #sync/#saved/#spill) render without children,
   and elements old code writes text/attributes into (dialog titles, #ddel.hidden, #lok.disabled, #mp.value, the header's
   scroll class) get fixed contents and props React sets once. The frame's own element listeners (amount/link dialog,
   pop-up search, month picker, backup file; were attached at load) are `FRAME_ON` in actions.js, attached natively by
   refs. Checked: the frame's markup equals the old index.html (one-time comparison), and a browser script driving the
   frame (tabs, months, keyboard, both dialogs end to end, search, picker, backup restore, rename, scroll, Bank count,
-  375px) gives the same results on the old and new versions. Then: piece 2, a store over S (commit() = "changed",
-  screens subscribe); piece 3, real re-renders screen by screen (controlled fields). Then the math into ES modules;
+  375px) gives the same results on the old and new versions. Piece 2 (done): the store, `store.js`, a thin layer over
+  S (which stays global): a version, `subscribe`, `changed()` (bumps it and re-renders subscribers inside flushSync)
+  and `useBudget()` (useSyncExternalStore). renderAll's frame step calls `changed()` first, so every commit() and view
+  switch reaches subscribers before the tab is drawn. The frame is the first subscriber; a self-test check covers it
+  (version moves, frame follows, a focused tab button keeps focus). Then: piece 3, real re-renders screen by screen
+  (screens subscribe instead of being drawn into fresh roots; fields become controlled). Then the math into ES modules;
   then remove the old draw functions and the classic-script globals.
 
 ## Server API (`server.js`)

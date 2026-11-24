@@ -1,5 +1,6 @@
 // The page frame (was the markup of index.html): header (brand, tabs, month), the tab sections, footer, the four
-// dialogs' shells, toast. One root that stays mounted and re-renders (frameRender), so its buttons keep focus; the tab
+// dialogs' shells, toast. One root that stays mounted and re-renders when the store changes (useBudget, store.js), so
+// its buttons keep focus; the tab
 // contents and the dialogs' parts are drawn into their containers by their own roots (draw), which this root never
 // touches: containers are rendered without children. Old code still writes some text and attributes straight into
 // frame elements (dialog titles, #ddel.hidden, #lok.disabled, #mp.value, the header's scroll class): those elements
@@ -9,6 +10,7 @@ import { createRoot } from 'react-dom/client';
 import { flushSync } from 'react-dom';
 import { tx, onAct } from './bridge.js';
 import { FRAME_ON } from './actions.js';
+import { useBudget, changed } from './store.js';
 
 // The frame elements' own listeners (FRAME_ON), attached natively once per element.
 const REFS = {};
@@ -21,6 +23,7 @@ const LOGO = <svg className="lgo" aria-hidden="true" xmlns="http://www.w3.org/20
 const on = t => S.tab === t ? 'on' : undefined;
 
 export function Frame() {
+  useBudget();
   return <>
     <header className="bar" id="bar">
       <div className="brand" data-act="sview" data-v="general" title="Change the name in Settings" onClick={onAct('sview')}><span className="mark" aria-hidden="true">{LOGO}</span><span><b id="hhN">{tx(hhName())}</b><small id="hhS">{tx(hhSub())}</small></span></div>
@@ -41,10 +44,10 @@ export function Frame() {
   </>;
 }
 
-let ROOT = null;
-export function frameRender() { if (!ROOT) ROOT = createRoot($('#app')); flushSync(() => ROOT.render(<Frame />)); }
-// renderAll's frame part: what React doesn't own (the month picker's value, the body's tab class, the tabs' entry
-// animation class) is still set here.
-export function frameUIR() { frameRender(); $('#mp').value = S.cur; document.body.className = 'tab-' + S.tab; $$('.tab').forEach(t => t.classList.remove('enter')); }
-export function brandSetR() { frameRender(); document.title = (hhName() + ' ' + hhSub()).trim(); }
-export function bankBadgeR() { BADGE = SRV && BK.st && BK.st.configured ? inbox().length : 0; frameRender(); moveInd(); }
+// Mounted once, when the bundle loads (main.jsx); after that it follows the store.
+export function frameMount() { flushSync(() => createRoot($('#app')).render(<Frame />)); }
+// renderAll's frame part: tells the store the page changed (the frame re-renders with it), then sets what React doesn't
+// own (the month picker's value, the body's tab class, the tabs' entry animation class).
+export function frameUIR() { changed(); $('#mp').value = S.cur; document.body.className = 'tab-' + S.tab; $$('.tab').forEach(t => t.classList.remove('enter')); }
+export function brandSetR() { changed(); document.title = (hhName() + ' ' + hhSub()).trim(); }
+export function bankBadgeR() { BADGE = SRV && BK.st && BK.st.configured ? inbox().length : 0; changed(); moveInd(); }

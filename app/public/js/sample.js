@@ -187,6 +187,11 @@ async function selfTest(){const T=[],ok=(c,name,detail='')=>T.push({ok:!!c,name,
   // A loan whose payment never covers its interest: the extra payment plan says Never instead of crashing.
   {const keep=S.loans;S.loans=[...keep,{id:'stk',name:'Stuck',apr:30,bal:100000,min:50,due:0,start:TK,color:'#abc'}];LP={};let txt='',err='';try{renderLoans();txt=$('#T-loans').textContent}catch(e){err=e.message}S.loans=keep;LP={};renderAll();
    ok(!err&&/Never/.test(txt)&&/not paid off at this rate/.test(txt),'A loan that never gets paid off shows Never in the extra payment plan',err)}
+  // The store (app/src/store.js): every redraw moves its version on and the page frame follows; the frame stays mounted,
+  // so a focused tab button keeps focus through a redraw.
+  if(window.__store){const v0=__store.version(),o=S.cur,tb=$('.tabs [data-t="'+S.tab+'"]');S.cur=addM(TK,-1);renderAll();
+   const moved=__store.version()>v0&&$('#mlab').textContent===lab(S.cur)&&!$('#tbtn').hidden;tb.focus();S.cur=o;renderAll();
+   ok(moved&&$('#mlab').textContent===lab(o)&&$('#tbtn').hidden===(o===TK)&&document.activeElement===tb&&tb.isConnected,'The store: a redraw moves its version on, the frame follows, and its buttons stay put (focus kept)')}
   parity('after the other checks');
   ok(!errs.length,'No errors while drawing',errs.slice(0,3).join(' · '))}
  catch(e){ok(false,'Self-test crashed',e.stack||e.message)}
