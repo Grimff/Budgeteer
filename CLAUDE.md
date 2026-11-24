@@ -170,9 +170,13 @@ works (and `npm test` passes) after every step.
   also gets a re-render pass: one root re-rendered through every case in order must equal a fresh draw of each.
   Intended differences from the old draw: the clicked button (or the field tabbed to) keeps focus, and the page no longer jumps to the top
   (the old draw emptied the section first, collapsing the page while charts measured). Component state that a fresh draw reset must reset the same way: a chart that measures its box re-measures after
-  every render, and one keyed by its range starts over when the range changes (Wealth's `AreaChart key={from}`).
+  every render, one keyed by its range starts over when the range changes (Wealth's `AreaChart key={from}`), and a
+  chart's hover readout keeps only the hovered point (`hv`, null when not hovering) so its default point is recomputed.
+  Parts that change while typing / dragging inside a live screen follow a small tick of their own instead of drawing a
+  second root into it: Loans' plan text, what-if output (#wo-, no longer written by the wi handler) and sentence
+  (`PxLive`/`WiOut`/`WiLive`; pxLive/wiLive = `lvBump`). Never draw() into an element a live root renders.
   `CountUp` calls cu after every render, as each old draw did; cu stops an older animation on the same element (`el._cu`).
-  Done: History, Wealth, Goals. Next: the other
+  Done: History, Wealth, Goals, Loans. Next: the other
   tabs, then subscribing to the store and controlled fields. Then the math into ES modules;
   then remove the old draw functions and the classic-script globals.
 

@@ -56,7 +56,7 @@ replaceScreen('renderForecast', () => { draw($('#T-budget'), <Forecast />); fcBo
 // bankBadge (the count on the Bank tab) ran at the end of the old renderBank once the bank was set up.
 replaceScreen('renderBank', () => { const el = $('#T-bank'); if (!el) return; draw(el, <Bank />); if (SRV && BK.st && BK.st.configured) bankBadge(); });
 replaceScreen('renderSettings', () => { const el = $('#T-settings'); if (el) draw(el, <Settings />); });
-replaceScreen('renderLoans', () => draw($('#T-loans'), <Loans />));
+replaceScreen('renderLoans', () => live($('#T-loans'), <Loans />));
 replaceScreen('pxLive', pxLiveR);
 replaceScreen('wiLive', wiLiveR);
 replaceScreen('renderGoals', () => live($('#T-goals'), <Goals />));
@@ -128,7 +128,7 @@ addParity({
   },
 });
 addParity({
-  name: 'Loans', fn: 'renderLoans', el: '#T-loans', cases: () => {
+  name: 'Loans', fn: 'renderLoans', el: '#T-loans', live: true, cases: () => {
     const c = [], ids = () => S.loans.map(l => 'l-' + l.id);
     const shutK = (key, v) => () => { const a = BCL.has(key), b = BCL.has('!' + key); BCL.delete(key); BCL.delete('!' + key); BCL.add(v ? key : '!' + key); return () => { BCL.delete(key); BCL.delete('!' + key); if (a) BCL.add(key); if (b) BCL.add('!' + key); }; };
     const folds = () => { const L = ids(); L.forEach(i => OPEN.add(i)); return () => L.forEach(i => OPEN.delete(i)); };
@@ -515,11 +515,17 @@ for (const [n, el] of [['banner', '#sync'], ['footer', '#saved'], ['header pill'
 // The Loans tab's live sentences while typing the plan's amount (pxLive) or dragging a what-if slider (wiLive).
 const loansTab = () => { const o = S.tab; S.tab = 'loans'; renderAll(); return () => { S.tab = o; }; };
 addParity({
-  name: 'Loans live text', fn: 'pxLive', also: ['wiLive'], el: '#T-loans', cases: () => {
+  // Each case draws the tab with other values, then does what the px / wi input handler does on that side: old =
+  // PX/WI, the #wo- text and the old pxLive/wiLive writing into the page; new = PX/WI and the tick (wiLive draws #wo-).
+  name: 'Loans live text', fn: 'pxLive', also: ['wiLive', 'renderLoans'], el: '#T-loans', cases: () => {
     const c = [], pv = (x, s) => () => { const o = [PX, PS]; PX = x; PS = s; return () => { PX = o[0]; PS = o[1]; }; };
-    for (const x of [0, 25, 300, 5000, null]) for (const s of ['rate', 'bal']) c.push({ label: `plan ${x} ${s}`, set: () => both(loansTab(), pv(x, s)()), call: () => pxLive() });
-    for (const l of S.loans) for (const w of [0, 5, 250, 4000]) c.push({ label: `what-if ${l.id} ${w}`, set: loansTab, call: () => wiLive(l, w) });
-    c.push({ label: 'odd loan name', set: () => both(tweak(s => { s.loans.forEach(l => { l.name += ' & <x>'; }); })(), loansTab()), call: () => { pxLive(); S.loans.forEach(l => wiLive(l, 100)); } });
+    const keepWI = () => { const o = { ...WI }; return () => { for (const k of Object.keys(WI)) delete WI[k]; Object.assign(WI, o); }; };
+    const px = () => { const x = PX; PX = x === 0 ? 50 : 0; renderLoans(); PX = x; pxLive(); };
+    const wi = (l, w) => { const i = $('#wi-' + l.id); if (!i) return; i.value = w; WI[l.id] = +i.value; if (wiLive === LEGACY.wiLive) $('#wo-' + l.id).textContent = f0(+i.value); wiLive(l, +i.value); };
+    const wis = (ls, w) => { ls.forEach(l => { WI[l.id] = 0; }); renderLoans(); ls.forEach(l => wi(l, w)); };
+    for (const x of [0, 25, 300, 5000, null]) for (const s of ['rate', 'bal']) c.push({ label: `plan ${x} ${s}`, set: () => both(loansTab(), pv(x, s)()), call: px });
+    for (const l of S.loans) for (const w of [0, 5, 250, 4000]) c.push({ label: `what-if ${l.id} ${w}`, set: () => both(loansTab(), keepWI()), call: () => wis([l], w) });
+    c.push({ label: 'odd loan name', set: () => both(tweak(s => { s.loans.forEach(l => { l.name += ' & <x>'; }); })(), loansTab(), keepWI()), call: () => { px(); wis(S.loans, 100); } });
     return c;
   },
 });

@@ -8,7 +8,8 @@ const bigN = { font: "700 24px 'Inter Display',Inter,sans-serif" };
 // Investment value over time. Draws at the width the box has once it's on the page (measured before the first paint,
 // as the old code did), with a hover readout.
 function AreaChart({ pts, col }) {
-  const ref = useRef(null), N = pts.length, [W, setW] = useState(null), [at, setAt] = useState(N - 1);
+  // hv: the hovered point, null when not hovering, so the default point is worked out on every render, as a fresh draw did
+  const ref = useRef(null), N = pts.length, [W, setW] = useState(null), [hv, setAt] = useState(null), at = hv ?? N - 1;
   // Measured again after every render (a re-render in place must size like a fresh draw did); setW skips equal values.
   useLayoutEffect(() => { if (N >= 2) setW(Math.round(Math.min(1000, Math.max(340, ref.current.clientWidth || Math.max(0, (document.querySelector('main') || document.body).clientWidth - 90) || 1000)))); });
   if (N < 2) return <div id="wch"><p className="dim" style={{ fontSize: '14px', margin: '8px 0' }}>The chart fills in as values are saved after each sync, one point a day.</p></div>;
@@ -17,7 +18,7 @@ function AreaChart({ pts, col }) {
   const line = pts.map((q, i) => (i ? 'L' : 'M') + X(i).toFixed(1) + ',' + Y(q.v).toFixed(1)).join('');
   const i = Math.max(0, Math.min(N - 1, at)), x = X(i);
   const move = e => { const r = e.currentTarget.getBoundingClientRect(); setAt(Math.round(((e.clientX - r.left) / r.width * W - pl) / (W - pl - pr) * (N - 1))); };
-  return <div id="wch" ref={ref}><svg viewBox={`0 0 ${W} ${H}`} className="wsv" role="img" aria-label="Investment value over time" onPointerMove={move} onPointerLeave={() => setAt(N - 1)}>
+  return <div id="wch" ref={ref}><svg viewBox={`0 0 ${W} ${H}`} className="wsv" role="img" aria-label="Investment value over time" onPointerMove={move} onPointerLeave={() => setAt(null)}>
     <defs><linearGradient id="wgr" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor={col} stopOpacity=".32" /><stop offset="1" stopColor={col} stopOpacity="0" /></linearGradient></defs>
     {[0, .5, 1].map(f => { const v = mn + (mx - mn) * f; return [
       <line key={'l' + f} x1={pl} x2={W - pr} y1={Y(v)} y2={Y(v)} stroke="var(--line)" />,

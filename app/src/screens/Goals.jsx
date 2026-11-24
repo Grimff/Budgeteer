@@ -12,7 +12,8 @@ function GoalChart({ G }) {
   const ref = useRef(null), [W, setW] = useState(null);
   const st = addM(TK, -6), etas = G.map(goalEta).filter(Boolean).sort(), far = etas.length ? etas[etas.length - 1] : addM(TK, 60), en = GR === '1y' ? addM(TK, 12) : GR === '2y' ? addM(TK, 24) : GR === '5y' ? addM(TK, 60) : (far > addM(TK, 24) ? (far < addM(TK, 360) ? addM(far, 3) : addM(TK, 360)) : addM(TK, 24)), N = mdiff(st, en) + 1, ks = [];
   for (let i = 0; i < N; i++) ks.push(addM(st, i));
-  const ci = mdiff(st, TK), [at, setAt] = useState(ci);
+  // hv: the hovered point, null when not hovering, so the default point is worked out on every render, as a fresh draw did
+  const ci = mdiff(st, TK), [hv, setAt] = useState(null), at = hv ?? ci;
   // Measured again after every render (a re-render in place must size like a fresh draw did); setW skips equal values.
   useLayoutEffect(() => { setW(Math.round(Math.min(1000, Math.max(340, ref.current.clientWidth || Math.max(0, (document.querySelector('main') || document.body).clientWidth - 90) || 1000)))); });
   if (W == null) return <><div id="gch" ref={ref}></div><div className="dread" id="gread"></div></>;
@@ -22,7 +23,7 @@ function GoalChart({ G }) {
   const ln = (arr, a, b) => arr.slice(a, b + 1).map((o, j) => (j ? 'L' : 'M') + X(a + j).toFixed(1) + ',' + Y(o.p).toFixed(1)).join('');
   const i = Math.max(0, Math.min(N - 1, at));
   const move = e => { const r = e.currentTarget.getBoundingClientRect(), vx = (e.clientX - r.left) / r.width * W; setAt(Math.round((vx - pl) / (W - pl - pr) * (N - 1))); };
-  return <><div id="gch" ref={ref}><svg viewBox={`0 0 ${W} ${H}`} id="gsv" role="img" aria-label="Goal progress over time" onPointerMove={move} onPointerLeave={() => setAt(ci)}>
+  return <><div id="gch" ref={ref}><svg viewBox={`0 0 ${W} ${H}`} id="gsv" role="img" aria-label="Goal progress over time" onPointerMove={move} onPointerLeave={() => setAt(null)}>
     {[0, .5, 1].map(f => [
       <line key={'l' + f} x1={pl} x2={W - pr} y1={Y(f)} y2={Y(f)} stroke="var(--line)" strokeDasharray={f === 1 ? '4 4' : undefined} />,
       <text key={'t' + f} x={pl - 8} y={Y(f) + 5} textAnchor="end" fill="var(--dim)" fontSize="13">{f * 100}%</text>])}

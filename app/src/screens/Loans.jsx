@@ -1,8 +1,10 @@
 // Loans tab (was renderLoans, loanCard, pxCard/pxText, wiText, debtChart in js/loans.js, bankLoansPanel in
 // js/linked-loans.js, loanLinkLine in js/flow.js). The math (lp, row, savedL, pxSim, …) stays in those files.
-// While typing / dragging, the live inputs (data-live px / wi) redraw only #pxr and #wp-… (pxLiveR, wiLiveR).
-import { Fragment, useLayoutEffect, useRef, useState } from 'react';
-import { draw, tx, onAct, onInp, onChg } from '../bridge.js';
+// While typing / dragging, the live inputs (data-live px / wi) redraw only the plan's text and the what-if output and
+// sentence: those follow a small tick of their own (pxLiveR / wiLiveR bump it), not the whole tab.
+import { Fragment, useLayoutEffect, useRef, useState, useSyncExternalStore } from 'react';
+import { flushSync } from 'react-dom';
+import { tx, onAct, onInp, onChg } from '../bridge.js';
 import { Gear, CountUp, Clh } from '../ui.jsx';
 
 // Read-only fields filled in by the lender (was RO/FL).
@@ -21,8 +23,10 @@ function DebtChart() {
     for (let i = 0; i < N; i++) { const k = addM(st, i); ks.push(k); let a = 0, b = 0; L.forEach(l => { if (k < l.start) { const v = pre(l, k); a += v; b += v; return; } const ia = mdiff(l.start, k), pa = lp(l).a, pb = lp(l).b; a += ia < pa.length ? pa[ia].close : 0; b += ia < pb.length ? pb[ia].close : 0; }); A.push(a); B.push(b); }
     if (LR !== 'all') { const e = S.cur < st ? st : S.cur > ks[N - 1] ? ks[N - 1] : S.cur; let s0 = LR === '1m' ? addM(e, -1) : LR === '3m' ? addM(e, -3) : LR === 'ytd' ? addM(e.slice(0, 4) + '-01', -1) : addM(e, -12); if (s0 < st) s0 = st; const i0 = mdiff(st, s0), i1 = Math.max(i0 + 1, mdiff(st, e)); ks = ks.slice(i0, i1 + 1); A = A.slice(i0, i1 + 1); B = B.slice(i0, i1 + 1); N = ks.length; }
   }
-  const ci = N ? Math.max(0, Math.min(N - 1, mdiff(ks[0], S.cur))) : 0, [at, setAt] = useState(ci);
-  useLayoutEffect(() => { if (L.length) setW(Math.round(Math.min(1000, Math.max(340, ref.current.clientWidth || Math.max(0, (document.querySelector('main') || document.body).clientWidth - 90) || 1000)))); }, []);
+  // hv: the hovered point, null when not hovering, so the default point is worked out on every render, as a fresh draw did
+  const ci = N ? Math.max(0, Math.min(N - 1, mdiff(ks[0], S.cur))) : 0, [hv, setAt] = useState(null), at = hv ?? ci;
+  // measured again after every render (a re-render in place must size like a fresh draw did); setW skips equal values
+  useLayoutEffect(() => { if (L.length) setW(Math.round(Math.min(1000, Math.max(340, ref.current.clientWidth || Math.max(0, (document.querySelector('main') || document.body).clientWidth - 90) || 1000)))); });
   if (!L.length) return <><div id="dch"><p className="mut">Add a loan to see your path to debt free.</p></div><div className="dread" id="dread"></div></>;
   if (W == null) return <><div id="dch" ref={ref}></div><div className="dread" id="dread"></div></>;
   const H = W < 640 ? 260 : 320, pl = 64, pr = 16, pt = 16, pb = 34, hi0 = Math.max(...B, ...A, 1), lo0 = LR === 'all' ? 0 : Math.min(...B, ...A), pd = LR === 'all' ? hi0 * .05 : Math.max((hi0 - lo0) * .15, hi0 * .004), M = hi0 + pd, lo = LR === 'all' ? 0 : Math.max(0, lo0 - pd), X = i => pl + i / Math.max(1, N - 1) * (W - pl - pr), Y = v => pt + (1 - (v - lo) / (M - lo)) * (H - pt - pb);
@@ -33,7 +37,7 @@ function DebtChart() {
   const mStep = Math.ceil(N / Math.max(1, Math.floor((W - pl - pr) / 46))), short = N <= 16, mlab = k => new Date(+k.slice(0, 4), +k.slice(5) - 1, 1).toLocaleDateString('en-US', { month: 'short' }) + (k.endsWith('-01') || k === ks[0] ? ' ' + k.slice(2, 4).replace(/^/, '’') : '');
   const ti = Math.min(N - 1, mdiff(ks[0], ts)), i = Math.max(0, Math.min(N - 1, at)), x = X(i), nearEnd = X(ci) > W - pr - 40;
   const move = e => { const r = e.currentTarget.getBoundingClientRect(), vx = (e.clientX - r.left) / r.width * W; setAt(Math.round((vx - pl) / (W - pl - pr) * (N - 1))); };
-  return <><div id="dch" ref={ref}><svg viewBox={`0 0 ${W} ${H}`} id="dsv" role="img" aria-label="Total debt over time" onPointerMove={move} onPointerLeave={() => setAt(ci)}>
+  return <><div id="dch" ref={ref}><svg viewBox={`0 0 ${W} ${H}`} id="dsv" role="img" aria-label="Total debt over time" onPointerMove={move} onPointerLeave={() => setAt(null)}>
     <defs><linearGradient id="ga" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor="#ffb6d9" stopOpacity=".35" /><stop offset="1" stopColor="#ffb6d9" stopOpacity="0" /></linearGradient></defs>
     {ti > 0 ? <><rect x={X(0)} y={pt} width={X(ti) - X(0)} height={H - pt - pb} fill="rgba(255,255,255,.035)" /><text x={X(0) + 8} y={H - pb - 10} fill="var(--dim)" fontSize="13">Before tracking (estimated)</text></> : null}
     {[0, .5, 1].map(f => [
@@ -63,7 +67,7 @@ function PxCard() {
   const m0 = xStart(), X = PX ?? pxNow(), hand = Object.keys(S.months).some(k => k >= m0 && S.months[k].lxp && Object.keys(S.months[k].lxp).length), how = pxHow();
   return <section className="card pxc" style={{ '--i': 2 }}><div className="bh"><div><h2>Extra payment plan</h2><p>Put a set amount toward your loans each month, one loan at a time. When a loan is paid off, its payment rolls into the next one.</p></div></div>{' '}
     <div className="pxf"><label className="f">Extra each month<input className="in a" data-live="px" data-key="px" inputMode="decimal" defaultValue={X || ''} placeholder="$0" onInput={onInp} /></label><div className="seg" role="group" aria-label="Order"><button data-act="ps" onClick={onAct('ps')} data-v="rate" className={how === 'rate' ? 'on' : ''}>Highest rate first</button><button data-act="ps" onClick={onAct('ps')} data-v="bal" className={how === 'bal' ? 'on' : ''}>Smallest balance first</button></div></div>{' '}
-    <div id="pxr"><PxText /></div>{' '}
+    <div id="pxr"><PxLive /></div>{' '}
     <div className="pxa">{snowR() && PX == null && !PS ? <><span className="pill ok">In your schedule</span><button className="lnk" data-act="pxClear" onClick={onAct('pxClear')}>Stop the plan</button></> : <button className="btn sm" data-act="pxApply" onClick={onAct('pxApply')}>Use this plan</button>}<small className="dim">Adds a planned snowball to your schedule from {labS(m0)}; set a stop month or pick loans in Forecast → Your plan over time{how === 'rate' ? ' (highest rate first saves the most interest)' : ' (quicker wins, a little more interest)'}. It goes in the budget.{hand ? ' Months you set by hand in Build budget keep their amounts.' : ''}</small></div></section>;
 }
 
@@ -112,7 +116,7 @@ function LoanCard({ l }) {
     <details className="more" data-key={'l-' + l.id} open={ok}><summary>Payments, what-if and details</summary>{' '}
       {l.acct && SRV ? <div className="psrc"><small>Count payments from</small><div className="seg"><button type="button" data-act="paySrc" onClick={onAct('paySrc')} data-id={l.id} data-v="lender" className={BS ? '' : 'on'}>{inst}</button><button type="button" data-act="paySrc" onClick={onAct('paySrc')} data-id={l.id} data-v="bank" className={BS ? 'on' : ''}>Your bank</button></div></div> : null}{' '}
       <LoanLinkLine l={l} />{' '}
-      {r ? <div className="wi"><label htmlFor={'wi-' + l.id}>What if we add {xu > 0 ? 'even more' : 'extra'} each month? <output id={'wo-' + l.id}>{f0(w)}</output></label><input type="range" id={'wi-' + l.id} data-live="wi" data-id={l.id} min="0" max={Math.floor(cap / 5) * 5} step="5" defaultValue={w} disabled={cap < 5} onInput={onInp} /><p id={'wp-' + l.id}>{cap < 5 ? 'Your budget has nothing left over this month to put toward extra payments.' : <WiText l={l} w={w} />}</p>{cap < 5 ? null : <button className="btn g sm" data-act="wiPlan" onClick={onAct('wiPlan')} data-id={l.id}>Add to the plan</button>}</div> : null}{' '}
+      {r ? <div className="wi"><label htmlFor={'wi-' + l.id}>What if we add {xu > 0 ? 'even more' : 'extra'} each month? <output id={'wo-' + l.id}><WiOut l={l} /></output></label><input type="range" id={'wi-' + l.id} data-live="wi" data-id={l.id} min="0" max={Math.floor(cap / 5) * 5} step="5" defaultValue={w} disabled={cap < 5} onInput={onInp} /><p id={'wp-' + l.id}>{cap < 5 ? 'Your budget has nothing left over this month to put toward extra payments.' : <WiLive l={l} />}</p>{cap < 5 ? null : <button className="btn g sm" data-act="wiPlan" onClick={onAct('wiPlan')} data-id={l.id}>Add to the plan</button>}</div> : null}{' '}
       <div className="fields"><label className="f">Original loan amount<Fl l={l} f="orig" /><input className="in a" data-c="loan" data-id={l.id} data-f="orig" {...ro(l, 'orig')} data-key={'lo-' + l.id} inputMode="decimal" defaultValue={l.orig || ''} placeholder="e.g. 160000" ref={onChg} /></label><label className="f">Loan started (optional)<Fl l={l} f="origStart" /><input className="in" type="month" data-c="loan" data-id={l.id} data-f="origStart" {...ro(l, 'origStart')} defaultValue={l.origStart || ''} ref={onChg} /></label>{' '}
         <label className="f">Balance when tracking started<input className="in a" data-c="loan" data-id={l.id} data-f="bal" inputMode="decimal" defaultValue={`${l.bal}`} ref={onChg} /></label><label className="f">Tracking started<input className="in" type="month" data-c="loan" data-id={l.id} data-f="start" defaultValue={`${l.start}`} ref={onChg} /></label>{' '}
         <label className="f">Interest rate (APR %)<Fl l={l} f="apr" /><input className="in a" data-c="loan" data-id={l.id} data-f="apr" {...ro(l, 'apr')} inputMode="decimal" defaultValue={`${l.apr}`} ref={onChg} /></label><label className="f">Minimum payment<Fl l={l} f="min" /><input className="in a" data-c="loan" data-id={l.id} data-f="min" {...ro(l, 'min')} inputMode="decimal" defaultValue={`${l.min}`} ref={onChg} /></label>{' '}
@@ -133,8 +137,16 @@ function BankLoansPanel() {
     {dup.length ? <p className="dim" style={{ fontSize: '13px', marginTop: '10px' }}>Left out: {dup.map(a => tx(a.institution) + ' · ' + tx(a.official || a.name)).join(', ')} {dup.length === 1 ? 'looks like the same loan as one' : 'look like the same loans as ones'} you already track (same lender, type and balance), connected a second time.</p> : null}</section>;
 }
 
-export const pxLiveR = () => draw($('#pxr'), <PxText />);
-export const wiLiveR = (l, w) => draw($('#wp-' + l.id), <WiText l={l} w={w} />);
+let LV = 0; const LS = new Set();
+const lvSub = f => { LS.add(f); return () => LS.delete(f); }, useLv = () => useSyncExternalStore(lvSub, () => LV);
+const lvBump = () => { LV++; flushSync(() => LS.forEach(f => f())); };
+function PxLive() { useLv(); return <PxText />; }
+// the what-if amount shown and used while dragging: WI as the card computes it (the slider never goes past the cap)
+const wiW = l => Math.min(WI[l.id] || 0, wiCap());
+function WiOut({ l }) { useLv(); return f0(wiW(l)); }
+function WiLive({ l }) { useLv(); return <WiText l={l} w={wiW(l)} />; }
+export const pxLiveR = lvBump;
+export const wiLiveR = lvBump;
 
 export function Loans() {
   const L = S.loans, lm = mon(S.cur), saved = L.reduce((a, l) => a + savedL(l), 0), extra = L.reduce((a, l) => a + extraPaid(l), 0);
@@ -146,7 +158,7 @@ export function Loans() {
   const LA = L.filter(l => !loanGone(l)), LG0 = L.filter(l => loanGone(l)), psh = isShut('lpaid', true);
   return <>
     <div className="phead" style={{ '--i': 0 }}><div><h1>Loans</h1><p className="mut">Balances, payments, and how much paying early saves you.</p></div><div className="phact"><button className="btn g sm ib" data-act="lenders" onClick={onAct('lenders')} title="Connect lenders and link loan accounts"><Gear />Lenders</button></div></div>{' '}
-    <section className="card" style={{ '--i': 0 }}><div className="bh"><div><h2>Total debt over time</h2><p>Your path compared with paying only the minimums. The green gap is debt you got rid of early. Move across the chart.</p></div><div className="seg" role="group" aria-label="Time range">{RANGES.map(([k, l]) => <button key={k} className={LR === k ? 'on' : ''} data-act="lr" onClick={onAct('lr')} data-r={k}>{l}</button>)}</div></div><DebtChart /></section>{' '}
+    <section className="card" style={{ '--i': 0 }}><div className="bh"><div><h2>Total debt over time</h2><p>Your path compared with paying only the minimums. The green gap is debt you got rid of early. Move across the chart.</p></div><div className="seg" role="group" aria-label="Time range">{RANGES.map(([k, l]) => <button key={k} className={LR === k ? 'on' : ''} data-act="lr" onClick={onAct('lr')} data-r={k}>{l}</button>)}</div></div><DebtChart key={LR + '|' + S.cur} /></section>{' '}
     <div className="hero hl" style={{ '--i': 1 }}><div><p className="lbl">Interest saved by paying early{S.cur > TK ? ' (by ' + lm + ', with planned extras)' : ''}</p><CountUp className="big" id="lSaved" k="lSaved" to={Math.max(0, saved)} fmt={f2} />{' '}
       <p className="note">{extra > 0.5 ? <>From {f0(extra)} paid above the minimums. Every extra dollar has saved about <b style={{ color: 'var(--lime)' }}>{Math.round(saved / extra * 100)}¢</b> in interest so far.</> : 'Log a payment above the minimum and watch this number grow. Every extra dollar goes straight to principal.'}</p>{' '}
       <div className="acts"><button className="btn lime" data-act="logPay" onClick={onAct('logPay')} data-id={best ? best.id : ''} disabled={!best}>Log a payment</button></div></div>{' '}
