@@ -18,6 +18,14 @@ Docker (`docker compose up -d --build`) on port 8095. Bank data comes from Plaid
   `app/public/dist/app.js` (git-ignored), which index.html loads as one more classic script after csv-import.js and
   before sample.js (check.js enforces the place). The bundle reads the shared globals by name like every other file.
   See "Moving to React" below.
+- **Moving the js/ files into ES modules** (step 4 of the move to React, in progress): a moved file's code is
+  `app/src/lib/<name>.js` (unchanged except `export` on each top-level function and const). `js/<name>.js` keeps only
+  its top-level let/var (shared state other files reassign, e.g. the caches LP/GP/XS that renderAll resets), and
+  tools/build.js builds `lib/<name>.global.js` into `dist/<name>.js`, which index.html loads right after it (check.js
+  enforces the place): it runs the module where the file used to run and puts its exports on the global object, so
+  every other file and the React screens still call them by name. Moved so far: math. Edit a moved file's code in
+  app/src/lib, not js/. A function main.jsx swaps by name (replaceScreen) can't move yet (a call from inside its module
+  would skip the swap), nor can a name the window already has.
 - `app/server.js` – Node 18+, no npm dependencies. Reads `.env` (project folder or cwd) at start;
   real environment variables win. Relative `DATA_DIR` is resolved from the project folder.
 - **Settings and secrets:** `.env` (git-ignored; template `.env.example`) holds `PLAID_CLIENT_ID`, `PLAID_SECRET`,
@@ -198,8 +206,13 @@ works (and `npm test` passes) after every step.
   root yet, the store drew the rest). brandSet/bankBadge update the header alone (`frameChanged`/`useFrame`), so
   Bank's bankBadge doesn't redraw Bank. frameUIR sets the body's tab class before changed(), as frameUI ran before the
   tab was drawn. Self-test: one draw per change (the visible tab), a hidden tab keeps its content, renderX draws a
-  hidden tab (`__drawNo` in sample mode). Then the math into ES modules;
-  then remove the old draw functions and the classic-script globals.
+  hidden tab (`__drawNo` in sample mode). Fields stay uncontrolled (defaultValue + resync): the amount formatter,
+  select-on-focus and rerender's restore of typed text and caret work on them as before; controlled fields would mean
+  a draft per field rebuilding all of that, for no visible change, so that step was dropped.
+- **Step 4 (in progress): the js/ files into ES modules** (see Deploy: app/src/lib, dist/<name>.js). Checked with a
+  snapshot of the sample household before and after (every tab and view's text for every month, totals, loan paths,
+  goal projections, the schedule simulation, health checks: identical; a planted $1 slip changes 30 entries).
+  Then: explicit imports between the modules instead of globals, one bundle, and remove the old draw functions.
 
 ## Server API (`server.js`)
 

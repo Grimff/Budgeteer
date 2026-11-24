@@ -20,6 +20,12 @@ if (!files.length) bad.push('No <script src> files found in index.html');
 { const r = scripts.indexOf('dist/app.js');
   if (r < 0) bad.push('index.html must load dist/app.js (the React screens)');
   else if (!(r > scripts.indexOf('js/events.js') && r < scripts.indexOf('js/sample.js'))) bad.push('dist/app.js must load after js/events.js and before js/sample.js'); }
+// A js/ file whose code moved to app/src/lib/<name>.js keeps its shared let/var; dist/<name>.js (that module, built by
+// tools/build.js) must load right after it, where the code used to run.
+for (const f of fs.existsSync(path.join(PUB, '..', 'src', 'lib')) ? fs.readdirSync(path.join(PUB, '..', 'src', 'lib')).filter(f => f.endsWith('.global.js')) : []) {
+  const n = f.replace('.global.js', ''), i = scripts.indexOf('js/' + n + '.js');
+  if (i < 0 || scripts[i + 1] !== 'dist/' + n + '.js') bad.push(`index.html must load dist/${n}.js right after js/${n}.js`); }
+for (const s of scripts.filter(s => s.startsWith('dist/') && s !== 'dist/app.js')) if (!fs.existsSync(path.join(PUB, '..', 'src', 'lib', path.basename(s, '.js') + '.global.js'))) bad.push(s + ' has no app/src/lib/' + path.basename(s, '.js') + '.global.js');
 // The React screens' sources (app/src): their buttons count, and they get the control-character check.
 const SRC = path.join(__dirname, '..', 'app', 'src'), jsx = {};
 (function walk(d) { for (const f of fs.readdirSync(d, { withFileTypes: true })) { const p = path.join(d, f.name); if (f.isDirectory()) walk(p); else if (/\.jsx?$/.test(f.name)) jsx[path.relative(path.join(SRC, '..'), p)] = fs.readFileSync(p, 'utf8'); } })(SRC);
