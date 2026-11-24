@@ -5,26 +5,31 @@ Docker (`docker compose up -d --build`) on port 8095. Bank data comes from Plaid
 
 ## Deploy
 
-- `app/public/` – the front end. No build step, no frameworks; the only CDN is Plaid Link (`cdn.plaid.com`),
-  loaded on demand. `index.html` (markup only) loads `css/app.css` (with `fonts/` Inter woff files), `icons/`, and
-  the `js/` files as **classic scripts, in the order listed**: core, math, budget, loans, goals, history, flow,
-  events, bank, build, goal-accounts, compare, settings, wealth, linked-loans, sample, server-sync. They share one
-  global scope (top-level `let`/`const`/functions are visible across files), exactly like the single script they
-  were split from. Function declarations are only hoisted within their own file, so code that runs at load must
-  not call a function from a later file; calls inside functions and handlers are fine. `server-sync.js` is last
-  and starts the app (`renderAll` + `fsInit`). A new js file must be added to index.html (check.js fails otherwise).
+- `app/public/` – the front end; the only CDN is Plaid Link (`cdn.plaid.com`), loaded on demand. `index.html` (markup
+  only) loads `css/app.css` (with `fonts/` Inter woff files), `icons/`, and **scripts in the order listed**: for each
+  of core, math, budget, loans, goals, history, flow, events, bank, build, goal-accounts, compare, settings, wealth,
+  linked-loans, alerts, csv-import, sample, server-sync, its `js/<name>.js` (only that file's shared let/var) then
+  `dist/<name>.js` (its code, built from the ES module `app/src/lib/<name>.js`); the React screens' `dist/app.js`
+  after csv-import. They share one global scope, exactly like the single script they were split from: each module
+  puts its functions on the global object before any of its code runs and each const right after its line, as a
+  classic script would. Code that runs at load must not call a function from a later file; calls inside functions
+  and handlers are fine. server-sync is last and starts the app (`renderAll` + `fsInit`). A new js/lib file must be
+  added to index.html (check.js fails otherwise).
 - **React screens** (`app/src/`, the move to React in progress): JSX built by `tools/build.js` (esbuild; `npm install`
   once; `npm run build`/`watch`; `npm start`, `npm test`, realtest and livetest build first) into
   `app/public/dist/app.js` (git-ignored), which index.html loads as one more classic script after csv-import.js and
   before sample.js (check.js enforces the place). The bundle reads the shared globals by name like every other file.
   See "Moving to React" below.
-- **Moving the js/ files into ES modules** (step 4 of the move to React, in progress): a moved file's code is
-  `app/src/lib/<name>.js` (unchanged except `export` on each top-level function and const). `js/<name>.js` keeps only
-  its top-level let/var (shared state other files reassign, e.g. the caches LP/GP/XS that renderAll resets), and
-  tools/build.js builds `lib/<name>.global.js` into `dist/<name>.js`, which index.html loads right after it (check.js
-  enforces the place): it runs the module where the file used to run and puts its exports on the global object, so
-  every other file and the React screens still call them by name. Moved so far: math. Edit a moved file's code in
-  app/src/lib, not js/. A name the window already has can't be exported this way.
+- **The app's code is ES modules** (step 4 of the move to React): `app/src/lib/<name>.js` is what `js/<name>.js` held,
+  unchanged except `export` on each top-level function and const and the lines that put them on the global object
+  (`// globals:` at the top, `globalThis.X=X;` after each const). `js/<name>.js` keeps only its top-level let/var
+  (shared state other files reassign, e.g. the caches LP/GP/XS that renderAll resets: a module's own variable can't
+  be reassigned from outside). tools/build.js builds `lib/<name>.global.js` into `dist/<name>.js`, loaded right after
+  it (check.js enforces the place). **Edit code in app/src/lib, not js/.** New shared state that other files reassign
+  goes in js/<name>.js as a `let`; a new function or const goes in the module with `export` and a global line. A
+  moved const is now a window property (a classic const wasn't): don't reuse its name as a `window.X` property (the
+  self-test's results are `window.SELFTEST_RESULT`, since `SELFTEST` is core's flag), and don't use a name the window
+  already has.
 - `app/server.js` – Node 18+, no npm dependencies. Reads `.env` (project folder or cwd) at start;
   real environment variables win. Relative `DATA_DIR` is resolved from the project folder.
 - **Settings and secrets:** `.env` (git-ignored; template `.env.example`) holds `PLAID_CLIENT_ID`, `PLAID_SECRET`,
@@ -53,7 +58,7 @@ server against a real `data/` folder while testing; use `tools/realtest.js`.
   employers or lenders in code, comments or docs. The starting budget (`seedPlan`/`seedLoans`/`seedGoals`) is
   empty on purpose. Use generic examples.
 
-- The js files are mostly long one-line functions. Make edits with small Python scripts that do
+- The code files (app/src/lib/*.js, what used to be the js/ files) are mostly long one-line functions. Make edits with small Python scripts that do
   exact `str.replace` with a count assertion (write the script with the Write tool, run with
   `python -I`). Keep new code in the same compact style, with a short comment on anything non-obvious.
 - **Shell pitfall:** passing code through Bash heredocs can collapse `\\` → `\`, which turned `\b`
@@ -63,7 +68,7 @@ server against a real `data/` folder while testing; use `tools/realtest.js`.
   data-k/data-c/data-live keys, and change handlers after `if(!d.c)return;`. Name new actions with a prefix no
   other feature uses (schedule = `sc*`, accounts card = `al*`). check.js reads the js files in index.html order and
   also checks each file parses alone and starts with `'use strict';`. Use the Write tool for JSON/launch files.
-- **`npm test`** before every push: check.js, `tools/test-server.js` (server vs a fake Plaid, twice), and the in-app
+- **`npm test`** before every push (check its exit code, not a piped tail): check.js, `tools/test-server.js` (server vs a fake Plaid, twice), and the in-app
   self-test in headless Chrome (`--dump-dom` of `/?selftest`; skipped with a note if no Chrome/Chromium/Edge).
 - **Sample household / self-test** (`js/sample.js`): `?demo` installs `demoFetch` over `window.fetch`, answering every
   `api/` call in the page from `sampleData()` (seeded, 7 months, 5 accounts, rules that file everything), and uses
@@ -213,7 +218,9 @@ works (and `npm test` passes) after every step.
   The old draw functions (the 31 names main.jsx used to swap, `replaceScreen`/`LEGACY`) and the 52 string helpers only
   they used are deleted (old dead code kept: `confetti`, never called since the first version); the React versions
   are defined by name with `setGlobal`. That came first because a module can't hold a function that's swapped by name.
-  Next: the other js/ files the same way, then explicit imports between the modules instead of globals, one bundle.
+  Then every js/ file moved the same way (19 modules); the record of all 1088 parity cases, the snapshot and the
+  click-through of every tab were identical. Next: explicit imports between the modules instead of globals, one
+  bundle.
 
 ## Server API (`server.js`)
 

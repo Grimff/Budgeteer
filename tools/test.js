@@ -37,7 +37,6 @@ function findChrome() {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'budgeteer-test-')), port = 18299;
   const srv = spawn(process.execPath, [path.join(ROOT, 'app', 'server.js')], { env: { ...process.env, DATA_DIR: dir, PORT: String(port), PLAID_CLIENT_ID: '', PLAID_SECRET: '', BASIC_AUTH: '' }, stdio: 'ignore' });
   await new Promise(r => { const t0 = Date.now(), tryIt = () => http.get(`http://127.0.0.1:${port}/api/health`, () => r()).on('error', () => Date.now() - t0 < 5000 ? setTimeout(tryIt, 100) : r()); tryIt(); });
-  // Two page loads: the self-test, then (?selftest&act) the click-handler comparison of the move to React.
   for (const [q, what, ms] of [['selftest', 'self-test', 240000]]) {
     const args = ['--headless=new', '--disable-gpu', '--virtual-time-budget=30000', '--dump-dom', `http://127.0.0.1:${port}/?${q}`];
     if (process.getuid && process.getuid() === 0) args.unshift('--no-sandbox');
