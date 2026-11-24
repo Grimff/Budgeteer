@@ -174,9 +174,11 @@ works (and `npm test` passes) after every step.
   chart's hover readout keeps only the hovered point (`hv`, null when not hovering) so its default point is recomputed.
   Parts that change while typing / dragging inside a live screen follow a small tick of their own instead of drawing a
   second root into it: Loans' plan text, what-if output (#wo-, no longer written by the wi handler) and sentence
-  (`PxLive`/`WiOut`/`WiLive`; pxLive/wiLive = `lvBump`). Never draw() into an element a live root renders.
+  (`PxLive`/`WiOut`/`WiLive`; pxLive/wiLive bump it) and the rules search (rulesFilter = `rulesFilterR`, the rules
+  card redraws from RQ). `tick()` in bridge.js makes one ({use, bump}). Never draw() into an element a live root renders.
+  resync also rebuilds selects as a mount would: only the option matching defaultValue keeps the `selected` attribute.
   `CountUp` calls cu after every render, as each old draw did; cu stops an older animation on the same element (`el._cu`).
-  Done: History, Wealth, Goals, Loans. Next: the other
+  Done: History, Wealth, Goals, Loans, Settings. Next: the other
   tabs, then subscribing to the store and controlled fields. Then the math into ES modules;
   then remove the old draw functions and the classic-script globals.
 

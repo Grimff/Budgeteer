@@ -1,8 +1,11 @@
 // Settings tab (was renderSettings, bkCard, refreshCard, connCard, filingCard, rulesCard, healthCard, dataView in
-// js/settings.js, csvCard in js/csv-import.js, ntCard in js/alerts.js). healthChecks, bkList, the CSV reader and the
-// rules search (rulesFilter, still run while typing) stay there.
+// js/settings.js, csvCard in js/csv-import.js, ntCard in js/alerts.js). healthChecks, bkList and the CSV reader stay
+// there. The rules search's input listener (settings.js) sets RQ and calls rulesFilter, which is rulesFilterR here:
+// the rules card follows a tick and redraws its rows' hidden state and the "No rules match" line from RQ.
 import { Fragment } from 'react';
-import { tx, onAct, onChg } from '../bridge.js';
+import { tx, onAct, onChg, tick } from '../bridge.js';
+const RT = tick();
+export const rulesFilterR = RT.bump;
 import { TxOpts, CatchSel, ActBtn, Rich } from '../ui.jsx';
 
 const card16 = { marginBottom: '16px' }, note14 = { fontSize: '14px', margin: '4px 0 12px' };
@@ -44,8 +47,9 @@ function FilingCard() {
 }
 
 // All rules, grouped by the category they file to. Each lists what it filed, with Undo (back to To review).
-// The search (RQ) hides rows and groups as rulesFilter() does after drawing and while typing.
+// The search (RQ) hides rows and groups as the old rulesFilter() did after drawing and while typing.
 function RulesCard() {
+  RT.use();
   const R = (S.rules || []).slice().sort((a, b) => a.dir.localeCompare(b.dir) || txLabel({ v: a.v, k: TK }).localeCompare(txLabel({ v: b.v, k: TK })) || a.p.localeCompare(b.p));
   if (!R.length) return null;
   const cnt = r => BK.tx.filter(t => ruleFor(t) === r).length, TXD = Object.entries(S.txd || {}), by = {};

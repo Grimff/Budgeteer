@@ -2,9 +2,8 @@
 // js/linked-loans.js, loanLinkLine in js/flow.js). The math (lp, row, savedL, pxSim, …) stays in those files.
 // While typing / dragging, the live inputs (data-live px / wi) redraw only the plan's text and the what-if output and
 // sentence: those follow a small tick of their own (pxLiveR / wiLiveR bump it), not the whole tab.
-import { Fragment, useLayoutEffect, useRef, useState, useSyncExternalStore } from 'react';
-import { flushSync } from 'react-dom';
-import { tx, onAct, onInp, onChg } from '../bridge.js';
+import { Fragment, useLayoutEffect, useRef, useState } from 'react';
+import { tx, onAct, onInp, onChg, tick } from '../bridge.js';
 import { Gear, CountUp, Clh } from '../ui.jsx';
 
 // Read-only fields filled in by the lender (was RO/FL).
@@ -137,9 +136,7 @@ function BankLoansPanel() {
     {dup.length ? <p className="dim" style={{ fontSize: '13px', marginTop: '10px' }}>Left out: {dup.map(a => tx(a.institution) + ' · ' + tx(a.official || a.name)).join(', ')} {dup.length === 1 ? 'looks like the same loan as one' : 'look like the same loans as ones'} you already track (same lender, type and balance), connected a second time.</p> : null}</section>;
 }
 
-let LV = 0; const LS = new Set();
-const lvSub = f => { LS.add(f); return () => LS.delete(f); }, useLv = () => useSyncExternalStore(lvSub, () => LV);
-const lvBump = () => { LV++; flushSync(() => LS.forEach(f => f())); };
+const LT = tick(), useLv = LT.use, lvBump = LT.bump;
 function PxLive() { useLv(); return <PxText />; }
 // the what-if amount shown and used while dragging: WI as the card computes it (the slider never goes past the cap)
 const wiW = l => Math.min(WI[l.id] || 0, wiCap());

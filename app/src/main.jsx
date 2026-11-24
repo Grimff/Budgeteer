@@ -6,7 +6,7 @@ import { History } from './screens/History.jsx';
 import { Wealth } from './screens/Wealth.jsx';
 import { Goals } from './screens/Goals.jsx';
 import { Loans, pxLiveR, wiLiveR } from './screens/Loans.jsx';
-import { Settings, NtCard } from './screens/Settings.jsx';
+import { Settings, NtCard, rulesFilterR } from './screens/Settings.jsx';
 import { Bank } from './screens/Bank.jsx';
 import { ThisMonth, RcList } from './screens/Budget.jsx';
 import { Forecast, FcBody } from './screens/Forecast.jsx';
@@ -55,7 +55,8 @@ replaceScreen('renderBuild', () => draw($('#T-budget'), <Build />));
 replaceScreen('renderForecast', () => { draw($('#T-budget'), <Forecast />); fcBody(); });
 // bankBadge (the count on the Bank tab) ran at the end of the old renderBank once the bank was set up.
 replaceScreen('renderBank', () => { const el = $('#T-bank'); if (!el) return; draw(el, <Bank />); if (SRV && BK.st && BK.st.configured) bankBadge(); });
-replaceScreen('renderSettings', () => { const el = $('#T-settings'); if (el) draw(el, <Settings />); });
+replaceScreen('renderSettings', () => live($('#T-settings'), <Settings />));
+replaceScreen('rulesFilter', rulesFilterR);
 replaceScreen('renderLoans', () => live($('#T-loans'), <Loans />));
 replaceScreen('pxLive', pxLiveR);
 replaceScreen('wiLive', wiLiveR);
@@ -168,7 +169,7 @@ const sv = setVar(() => SV, v => { SV = v; }), rq = setVar(() => RQ, v => { RQ =
 const cvSet = (text, more) => () => { const o = CV; CV = {}; cvLoadText(text, 'my bank & co.csv'); if (more) Object.assign(CV, more); return () => { CV = o; }; };
 const CSV = 'Date,Description,Amount,Credit\n01/05/2026,COFFEE & CO,-4.50,\n01/06/2026,PAYROLL,,1200.00\n13/45/2026,BAD DATE,-1,\n01/07/2026,ZERO,0,\n';
 addParity({
-  name: 'Settings', fn: 'renderSettings', el: '#T-settings', cases: () => {
+  name: 'Settings', fn: 'renderSettings', el: '#T-settings', live: true, also: ['rulesFilter'], cases: () => {
     const c = [], V = ['general', 'rules', 'connections', 'data', 'bogus'];
     for (const v of V) c.push({ label: v, set: sv(v) });
     for (const k of monthsToTry()) for (const v of ['rules', 'data']) c.push({ label: `${k} ${v}`, set: () => both(sv(v)(), at(k)) });

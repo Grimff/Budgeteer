@@ -1,6 +1,7 @@
 // How the React screens plug into the rest of the app (see CLAUDE.md, "React screens").
 import { createRoot } from 'react-dom/client';
 import { flushSync } from 'react-dom';
+import { useSyncExternalStore } from 'react';
 
 // Draw a React tree into el the way `el.innerHTML = …` did: the old content is thrown away and built fresh, at once
 // (flushSync), so code that runs right after a draw (focus restore by data-key, scrolling, fmtAll) finds the new
@@ -26,6 +27,12 @@ export function live(el, node) {
   flushSync(() => r.render(node));
   resync(el);
 }
+// A tick for parts of a live screen that change while typing / dragging (Loans' plan text, the rules search): the
+// part calls use() and re-renders when bump() runs, inside its own root, instead of a second root drawn into it.
+export function tick() {
+  let v = 0; const subs = new Set(), sub = f => { subs.add(f); return () => subs.delete(f); };
+  return { use: () => useSyncExternalStore(sub, () => v), bump: () => { v++; flushSync(() => subs.forEach(f => f())); } };
+}
 export function liveReset(el) { const r = el && ROOTS.get(el); if (r) { ROOTS.delete(el); try { r.unmount(); } catch (_) { } el.textContent = ''; } }
 const propsOf = el => { for (const k in el) if (k.startsWith('__reactProps$')) return el[k]; return null; };
 const otherRoot = el => { for (const k in el) if (k.startsWith('__reactContainer$')) return true; return false; };
@@ -41,8 +48,11 @@ export function resync(root) {
           if (c.type === 'checkbox' || c.type === 'radio') { if (!('checked' in p) && c.checked !== !!p.defaultChecked) c.checked = !!p.defaultChecked; }
           else if (c.type !== 'file' && !('value' in p)) { const v = p.defaultValue == null ? '' : String(p.defaultValue); if (c.value !== v) c.value = v; }
         } else if (t === 'SELECT' && !('value' in p)) {
-          const o = [...c.options], want = p.defaultValue == null ? null : String(p.defaultValue);
-          let i = want == null ? o.findIndex(x => x.defaultSelected) : o.findIndex(x => x.value === want); if (i < 0) i = 0;
+          // a fresh mount marks the first option matching defaultValue defaultSelected (the selected attribute) and selects
+          // it, else the first enabled option; React's updates add the new mark but never clear the old one
+          const o = [...c.options], want = p.defaultValue == null ? null : String(p.defaultValue), m = want == null ? -1 : o.findIndex(x => x.value === want);
+          o.forEach((x, j) => { if (x.defaultSelected !== (j === m)) x.defaultSelected = j === m; });
+          let i = m >= 0 ? m : o.findIndex(x => !x.disabled); if (i < 0) i = 0;
           if (o.length && c.selectedIndex !== i) c.selectedIndex = i;
         }
         if (c instanceof HTMLElement && c.hidden !== !!p.hidden) c.hidden = !!p.hidden;
