@@ -4,7 +4,7 @@
 //     checked/selected states, and text (whitespace collapsed);
 //  2. the text as the browser shows it (innerText, all folds opened), which catches a missing space between inline
 //     elements that 1 can't see.
-import { LEGACY, draw } from './bridge.js';
+import { LEGACY, draw, liveReset } from './bridge.js';
 
 const SCREENS = [];
 // screen: {name, fn: 'renderX', el: '#T-x', also?: ['renderY'], dialog?: '#dlg' (opened while measured), call?(),
@@ -104,7 +104,7 @@ function runPieces(out) {
 export function runParity() {
   const out = [], keep = { S, cur: S.cur };
   for (const sc of SCREENS) {
-    let n = 0; const fails = [];
+    let n = 0; const fails = [], fresh1 = [];
     for (const c of sc.cases()) {
       let undo;
       try {
@@ -119,15 +119,32 @@ export function runParity() {
         // call: how a case draws (a dialog opener called by name with its options); default sc.fn()
         const call = c.call || sc.call || (() => window[sc.fn]());
         const sw = [sc.fn, ...(sc.also || [])].map(n => [n, window[n]]); sw.forEach(([n]) => { window[n] = LEGACY[n]; });
+        liveReset(el);   // a persistent root (live) would be overwritten by the old draw
         try { fresh(); call(); } finally { sw.forEach(([n, f]) => { window[n] = f; }); }
         const A = snap(el);
         back(); fresh(); call(); const B = snap(el);
+        if (sc.live) fresh1.push({ c, B, pv });
         n++;
         const d = diff(A, B);
         if (d) fails.push(c.label + ' ' + d);
         } finally { if (shut) dlg.close(); }
       } catch (e) { fails.push(c.label + ' crashed: ' + (e.stack || e.message)); }
       finally { try { if (undo) undo(); } catch (_) { } }
+    }
+    // live screens: one root re-rendered through every case in a row (no remount) must give what a fresh draw gave
+    if (sc.live) {
+      const el0 = document.querySelector(sc.el), rf = []; liveReset(el0);
+      for (const { c, B, pv } of fresh1) {
+        let undo;
+        try {
+          undo = c.set && c.set(); const el = document.querySelector(sc.el);
+          for (const k of Object.keys(PV)) delete PV[k]; Object.assign(PV, pv);
+          fresh(); (c.call || sc.call || (() => window[sc.fn]()))();
+          const d = diff(B, snap(el)); if (d) rf.push(c.label + ' ' + d);
+        } catch (e) { rf.push(c.label + ' crashed: ' + (e.stack || e.message)); }
+        finally { try { if (undo) undo(); } catch (_) { } }
+      }
+      out.push({ ok: !rf.length && fresh1.length > 0, name: `React ${sc.name} screen re-rendered in place through every case matches a fresh draw (${fresh1.length} cases)`, detail: rf.length ? rf.length + ' differ: ' + rf.slice(0, 3).join(' ‖ ') : '' });
     }
     out.push({ ok: !fails.length && n > 0, name: `React ${sc.name}${sc.dialog ? '' : ' screen'} draws what the old one did (${n} cases)`, detail: fails.length ? fails.length + ' differ: ' + fails.slice(0, 3).join(' ‖ ') : '' });
   }

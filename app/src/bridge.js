@@ -14,6 +14,47 @@ export function draw(el, node) {
   flushSync(() => r.render(node));
 }
 
+// A persistent root (phase 3, step 3, piece 3): the first call mounts, later calls re-render in place, so elements
+// stay (focus stays on a clicked button). After each render, resync() puts back what a fresh draw used to reset and a
+// re-render doesn't: folds open or shut, field values / ticks / choices, `hidden`, and scroll positions, all as the
+// screen says now. liveReset() drops the root (the parity check, whose old-draw side overwrites the container).
+const ROOTS = new WeakMap();
+export function live(el, node) {
+  if (!el) return;
+  let r = ROOTS.get(el);
+  if (!r) { el.textContent = ''; r = createRoot(el); ROOTS.set(el, r); }
+  flushSync(() => r.render(node));
+  resync(el);
+}
+export function liveReset(el) { const r = el && ROOTS.get(el); if (r) { ROOTS.delete(el); try { r.unmount(); } catch (_) { } el.textContent = ''; } }
+const propsOf = el => { for (const k in el) if (k.startsWith('__reactProps$')) return el[k]; return null; };
+const otherRoot = el => { for (const k in el) if (k.startsWith('__reactContainer$')) return true; return false; };
+export function resync(root) {
+  const walk = el => {
+    for (let c = el.firstElementChild; c; c = c.nextElementSibling) {
+      if (otherRoot(c)) continue;   // drawn by its own root (the money-flow chart, a dialog part): not ours
+      const p = propsOf(c);
+      if (p) {
+        const t = c.tagName;
+        if (t === 'DETAILS') { if (c.open !== !!p.open) c.open = !!p.open; }
+        else if (t === 'INPUT' || t === 'TEXTAREA') {
+          if (c.type === 'checkbox' || c.type === 'radio') { if (!('checked' in p) && c.checked !== !!p.defaultChecked) c.checked = !!p.defaultChecked; }
+          else if (c.type !== 'file' && !('value' in p)) { const v = p.defaultValue == null ? '' : String(p.defaultValue); if (c.value !== v) c.value = v; }
+        } else if (t === 'SELECT' && !('value' in p)) {
+          const o = [...c.options], want = p.defaultValue == null ? null : String(p.defaultValue);
+          let i = want == null ? o.findIndex(x => x.defaultSelected) : o.findIndex(x => x.value === want); if (i < 0) i = 0;
+          if (o.length && c.selectedIndex !== i) c.selectedIndex = i;
+        }
+        if (c instanceof HTMLElement && c.hidden !== !!p.hidden) c.hidden = !!p.hidden;
+      }
+      if (c.scrollTop) c.scrollTop = 0;
+      if (c.scrollLeft) c.scrollLeft = 0;
+      walk(c);
+    }
+  };
+  walk(root);
+}
+
 // Text as the old screens printed it with esc(): null/undefined → '', and U+FFFD (a bad byte from a bank) removed.
 // React escapes the rest itself.
 export const tx = s => String(s ?? '').replace(/�/g, '');

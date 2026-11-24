@@ -162,8 +162,15 @@ works (and `npm test` passes) after every step.
   S (which stays global): a version, `subscribe`, `changed()` (bumps it and re-renders subscribers inside flushSync)
   and `useBudget()` (useSyncExternalStore). renderAll's frame step calls `changed()` first, so every commit() and view
   switch reaches subscribers before the tab is drawn. The frame is the first subscriber; a self-test check covers it
-  (version moves, frame follows, a focused tab button keeps focus). Then: piece 3, real re-renders screen by screen
-  (screens subscribe instead of being drawn into fresh roots; fields become controlled). Then the math into ES modules;
+  (version moves, frame follows, a focused tab button keeps focus). Piece 3 (in progress): real re-renders screen by
+  screen. `live(el, <X/>)` (bridge.js) keeps one root per container and re-renders it in place (flushSync), then
+  `resync(el)` puts back what a fresh mount would have shown and React doesn't control: details `open`, uncontrolled
+  input values/checks and select choice (from defaultValue/defaultChecked), `hidden`, inner scroll offsets; it skips
+  nested roots. `liveReset(el)` drops the root (parity does before each old draw). A parity screen with `live: true`
+  also gets a re-render pass: one root re-rendered through every case in order must equal a fresh draw of each.
+  Intended differences from the old draw: the clicked button keeps focus, and the page no longer jumps to the top
+  (the old draw emptied the section first, collapsing the page while charts measured). Done: History. Next: the other
+  tabs, then subscribing to the store and controlled fields. Then the math into ES modules;
   then remove the old draw functions and the classic-script globals.
 
 ## Server API (`server.js`)

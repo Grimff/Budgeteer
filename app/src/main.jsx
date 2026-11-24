@@ -1,6 +1,6 @@
 // The React screens. Loaded by index.html after the other js files (which it uses by name: S, plan, f0, …) and
 // before sample.js / server-sync.js, so the app starts with these screens in place.
-import { draw, replaceScreen, LEGACY } from './bridge.js';
+import { draw, live, replaceScreen, LEGACY } from './bridge.js';
 import { addParity, addPiece, runParity, monthsToTry, emptyHousehold, withS, at } from './parity.js';
 import { History } from './screens/History.jsx';
 import { Wealth } from './screens/Wealth.jsx';
@@ -26,7 +26,7 @@ import * as store from './store.js';
 frameMount();
 if (DEMO) window.__store = store;   // for the self-test's store check
 
-replaceScreen('renderHistory', () => draw($('#T-history'), <History />));
+replaceScreen('renderHistory', () => live($('#T-history'), <History />));
 // Budget: This month is React; Build budget and Forecast are still drawn by renderBuild / renderForecast. The
 // money-flow chart is drawn into #sk by sankey() afterwards, as before.
 replaceScreen('renderBudget', () => { if (BUDV === 'build') return renderBuild(); if (BUDV === 'fc') return renderForecast(); draw($('#T-budget'), <ThisMonth />); sankey(); });
@@ -65,7 +65,7 @@ replaceScreen('renderWealth', () => { const el = $('#T-wealth'); if (el) draw(el
 // Parity cases: the same data drawn both ways (self-test only).
 const setHR = v => { const o = HR; HR = v; return () => { HR = o; }; };
 addParity({
-  name: 'History', fn: 'renderHistory', el: '#T-history', cases: () => {
+  name: 'History', fn: 'renderHistory', el: '#T-history', live: true, cases: () => {
     const c = [];
     for (const k of monthsToTry()) for (const r of ['6', '12', 'all']) c.push({ label: `${k} ${r}`, set: () => at(k, () => setHR(r)) });
     c.push({ label: 'folds open', set: () => { OPEN.add('h-' + addM(TK, -1)); OPEN.add('h-' + addM(TK, -2)); return () => { OPEN.delete('h-' + addM(TK, -1)); OPEN.delete('h-' + addM(TK, -2)); }; } });
