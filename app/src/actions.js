@@ -170,7 +170,8 @@ export const INP = {
   },
   'live': function (t, d, e) {
     if(d.live==='sp'){const box=t.closest('.spf');if(box)spLeft(box);return}
-    if(d.live==='wf'){WFS[d.f]=+t.value;const o=$('#wfo-'+d.f);if(o)o.textContent=(WFS[d.f]<0?'−':d.f==='inc'&&WFS[d.f]>0?'+':'')+f0(Math.abs(WFS[d.f]));clearTimeout(inT);inT=setTimeout(fcBody,250);return}
+    if(d.live==='wf'){WFS[d.f]=+t.value;wfLive();clearTimeout(inT);   // wfLive redraws the output (#wfo-)
+      inT=setTimeout(fcBody,250);return}
     if(d.live==='px'){PX=num(t.value);pxLive();return}
     if(d.live==='wi'){const l=S.loans.find(x=>x.id===d.id);WI[l.id]=+t.value;wiLive(l,+t.value);return}   // wiLive redraws the output (#wo-) and the sentence
   },

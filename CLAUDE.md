@@ -180,10 +180,15 @@ works (and `npm test` passes) after every step.
   A container another root draws into keeps its own element state reset by resync (hidden, scroll) but not what's
   inside; a box filled by hand that a fresh draw emptied gets `key={'…' + drawNo()}` (Bank's split box `.spf`), so each
   draw of the screen gives it a new element. Hand-toggled `hidden` (Move panel `mvShow`, `spOpen`) goes back to the
-  prop on every draw, as before.
+  prop on every draw, as before. This month's money-flow card keeps its hand-managed part (#zb, .skw with #sk/#skt/#skc)
+  in a Fragment keyed by drawNo(), so sankey(), skPos/skPlace, hl/zset and drag-pan start from new elements each draw;
+  Forecast's #fcb (FcBody, still its own root redrawn alone by the what-if sliders) is keyed the same way, and the
+  what-if outputs (#wfo-) follow a tick (`wfLive`, no longer written by the wf handler). Build's ⋮⋮ moves rows by hand:
+  build.js counts them (`ORDN`) and the `.bgrps` lists use it as their key, so the redraw after a move (save or cancel)
+  gets new lists (without it, moving an item to another group made React throw; a self-test check covers it).
   `CountUp` calls cu after every render, as each old draw did; cu stops an older animation on the same element (`el._cu`).
-  Done: History, Wealth, Goals, Loans, Settings, Bank. Next: Budget (This month, Forecast, Build),
-  then subscribing to the store and controlled fields. Then the math into ES modules;
+  Done: every tab (History, Wealth, Goals, Loans, Settings, Bank, Budget's three views). Next: screens subscribe to
+  the store instead of being called by renderAll, and fields become controlled. Then the math into ES modules;
   then remove the old draw functions and the classic-script globals.
 
 ## Server API (`server.js`)

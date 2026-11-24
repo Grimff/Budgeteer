@@ -9,7 +9,7 @@ import { Loans, pxLiveR, wiLiveR } from './screens/Loans.jsx';
 import { Settings, NtCard, rulesFilterR } from './screens/Settings.jsx';
 import { Bank } from './screens/Bank.jsx';
 import { ThisMonth, RcList } from './screens/Budget.jsx';
-import { Forecast, FcBody } from './screens/Forecast.jsx';
+import { Forecast, FcBody, wfLiveR } from './screens/Forecast.jsx';
 import { Build } from './screens/Build.jsx';
 import { catRenderR, flowRenderR } from './popups/Category.jsx';
 import { lnkListR, lnkRuleR } from './popups/Link.jsx';
@@ -29,7 +29,7 @@ if (DEMO) window.__store = store;   // for the self-test's store check
 replaceScreen('renderHistory', () => live($('#T-history'), <History />));
 // Budget: This month is React; Build budget and Forecast are still drawn by renderBuild / renderForecast. The
 // money-flow chart is drawn into #sk by sankey() afterwards, as before.
-replaceScreen('renderBudget', () => { if (BUDV === 'build') return renderBuild(); if (BUDV === 'fc') return renderForecast(); draw($('#T-budget'), <ThisMonth />); sankey(); });
+replaceScreen('renderBudget', () => { if (BUDV === 'build') return renderBuild(); if (BUDV === 'fc') return renderForecast(); live($('#T-budget'), <ThisMonth />); sankey(); });
 // Forecast: the frame, then the body into #fcb (the what-if sliders, range and month buttons redraw only the body);
 // FSC: scroll the open schedule editor or the month detail into view after adding/opening.
 replaceScreen('fcBody', () => { const el = $('#fcb'); if (!el) return; draw(el, <FcBody />); if (FSC) { FSC = false; const t = $('.fcle') || ($('.fcd') && FDK ? $('.fcd') : null); if (t) t.scrollIntoView({ block: 'nearest', behavior: RM ? 'auto' : 'smooth' }); } });
@@ -51,8 +51,9 @@ replaceScreen('bankBadge', bankBadgeR);
 replaceScreen('frameUI', frameUIR);
 replaceScreen('brandSet', brandSetR);
 replaceScreen('fsUI', fsUIR);
-replaceScreen('renderBuild', () => draw($('#T-budget'), <Build />));
-replaceScreen('renderForecast', () => { draw($('#T-budget'), <Forecast />); fcBody(); });
+replaceScreen('renderBuild', () => live($('#T-budget'), <Build />));
+replaceScreen('renderForecast', () => { live($('#T-budget'), <Forecast />); fcBody(); });
+window.wfLive = wfLiveR;
 // bankBadge (the count on the Bank tab) ran at the end of the old renderBank once the bank was set up.
 replaceScreen('renderBank', () => { const el = $('#T-bank'); if (!el) return; live(el, <Bank />); if (SRV && BK.st && BK.st.configured) bankBadge(); });
 replaceScreen('renderSettings', () => live($('#T-settings'), <Settings />));
@@ -252,7 +253,7 @@ addParity({
 });
 const budv = setVar(() => BUDV, v => { BUDV = v; }), flow = setVar(() => S.flow, v => { S.flow = v; });
 addParity({
-  name: 'Budget (This month)', fn: 'renderBudget', el: '#T-budget', cases: () => {
+  name: 'Budget (This month)', fn: 'renderBudget', el: '#T-budget', live: true, cases: () => {
     const c = [];
     for (const k of monthsToTry()) for (const f of ['plan', 'actual', 'compare']) c.push({ label: `${k} ${f}`, set: () => both(budv('month')(), flow(f)(), at(k)) });
     const guide = v => () => { const a = BCL.has('guide'), b = BCL.has('!guide'); BCL.delete('guide'); BCL.delete('!guide'); BCL.add(v ? 'guide' : '!guide'); return () => { BCL.delete('guide'); BCL.delete('!guide'); if (a) BCL.add('guide'); if (b) BCL.add('!guide'); }; };
@@ -297,7 +298,7 @@ const sched = tweak(s => { const g = s.goals, l = s.loans.filter(x => !loanGone(
   { id: 'sx', to: 'snow', src: 'extra', mode: '%', v: 40, how: 'rate', roll: true, loans: [], from: TK, until: '' },
   { id: 'sk', to: 'keep', src: 'extra', mode: '%', v: 100, from: TK, until: '' }]; g.forEach((x, i) => { x.by = addM(TK, i ? 6 : 48); }); });
 addParity({
-  name: 'Budget (Forecast)', fn: 'renderForecast', also: ['fcBody'], el: '#T-budget', cases: () => {
+  name: 'Budget (Forecast)', fn: 'renderForecast', also: ['fcBody'], el: '#T-budget', live: true, cases: () => {
     const c = [];
     for (const r of ['12', '24', '60', 'all']) { c.push({ label: 'range ' + r, set: fr(r) }); c.push({ label: 'range ' + r + ', full schedule', set: () => both(fr(r)(), sched()) }); }
     for (const w of [{ inc: -800, cost: 0, extra: 0 }, { inc: 500, cost: 300, extra: 0 }, { inc: 0, cost: 0, extra: 700 }, { inc: -3000, cost: 3000, extra: 0 }]) c.push({ label: 'what if ' + JSON.stringify(w), set: () => both(wfs(w)(), sched()) });
@@ -316,7 +317,7 @@ addParity({
 const bscope = setVar(() => BSCOPE, v => { BSCOPE = v; });
 const steps = shut => () => { const K = ['b1', 'b2', 'b3', 'b4', 'b5', 'b6', 'bx'], had = K.map(k => [BCL.has(k), BCL.has('!' + k)]); K.forEach(k => { BCL.delete(k); BCL.delete('!' + k); BCL.add(shut ? k : '!' + k); }); return () => K.forEach((k, i) => { BCL.delete(k); BCL.delete('!' + k); if (had[i][0]) BCL.add(k); if (had[i][1]) BCL.add('!' + k); }); };
 addParity({
-  name: 'Budget (Build)', fn: 'renderBuild', el: '#T-budget', cases: () => {
+  name: 'Budget (Build)', fn: 'renderBuild', el: '#T-budget', live: true, cases: () => {
     const c = [];
     for (const k of monthsToTry()) c.push({ label: k, set: () => both(steps(false)(), at(k)) });
     c.push({ label: 'steps shut', set: steps(true) });

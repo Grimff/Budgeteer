@@ -187,6 +187,13 @@ async function selfTest(){const T=[],ok=(c,name,detail='')=>T.push({ok:!!c,name,
   // A loan whose payment never covers its interest: the extra payment plan says Never instead of crashing.
   {const keep=S.loans;S.loans=[...keep,{id:'stk',name:'Stuck',apr:30,bal:100000,min:50,due:0,start:TK,color:'#abc'}];LP={};let txt='',err='';try{renderLoans();txt=$('#T-loans').textContent}catch(e){err=e.message}S.loans=keep;LP={};renderAll();
    ok(!err&&/Never/.test(txt)&&/not paid off at this rate/.test(txt),'A loan that never gets paid off shows Never in the extra payment plan',err)}
+  // Build's ⋮⋮ moves a row on the page by hand, then saves and the screen re-renders in place: the lists must show the
+  // saved order (the .bgrps key ORDN gives React new lists after a hand move; without it React threw here).
+  {const ob=BUDV;BUDV='build';S.tab='budget';renderAll();const G=[...document.querySelectorAll('.bgrps[data-kind=fixed]>.bgrp')];let good=false,why='fewer than 2 groups';
+   if(G.length>1){const r=G[0].querySelector('.brow[data-iid]'),box=G[1].querySelector('.bitems'),id=r.dataset.iid;ORDN++;box.insertBefore(r,box.firstChild);const o=orderRead('fixed');orderApply(false,o.gO,o.iO);
+    const P=plan(S.cur).groups.filter(g=>!g.flex).map(g=>g.items.map(i=>i.id).join(',')).join('|'),D=[...document.querySelectorAll('.bgrps[data-kind=fixed]>.bgrp')].map(g=>[...g.querySelectorAll('.brow[data-iid]')].map(x=>x.dataset.iid).join(',')).join('|');
+    good=P===D&&plan(S.cur).groups.filter(g=>!g.flex)[1].items[0].id===id;why=P+' vs '+D}
+   BUDV=ob;renderAll();ok(good,'A Build row moved to another group by hand redraws in the saved order',why)}
   // The store (app/src/store.js): every redraw moves its version on and the page frame follows; the frame stays mounted,
   // so a focused tab button keeps focus through a redraw.
   if(window.__store){const v0=__store.version(),o=S.cur,tb=$('.tabs [data-t="'+S.tab+'"]');S.cur=addM(TK,-1);renderAll();

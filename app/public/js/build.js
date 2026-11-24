@@ -136,17 +136,19 @@ function orderApply(fx,gO,iO){INB=true;editPlan(p=>{const mine=p.groups.filter(g
 function orderRead(kind){const gO=[...document.querySelectorAll(`.bgrps[data-kind="${kind}"]>.bgrp`)].map(e=>e.dataset.gid),iO={};
  document.querySelectorAll(`.bitems[data-kind="${kind}"]`).forEach(c=>{iO[c.dataset.g]=[...c.querySelectorAll(':scope>.brow[data-iid]')].map(r=>r.dataset.iid)});return{gO,iO}}
 // Dragging ⋮⋮: the row (or group) moves live among its siblings, then the new order is saved. Mouse and touch.
-let DRG=null;
+// ORDN counts rows moved by hand (drag or arrow keys); Build's .bgrps lists use it as their key, so the redraw that
+// follows a move (save or cancel) gets new lists instead of React reconciling over nodes it didn't place.
+let DRG=null,ORDN=0;
 document.addEventListener('pointerdown',e=>{const h=e.target.closest('.grip');if(!h||e.button>0)return;const el=h.dataset.drag==='i'?h.closest('.brow'):h.closest('.bgrp'),box=h.dataset.drag==='i'?el.closest('.bitems'):el.closest('.bgrps');if(!el||!box)return;
  e.preventDefault();DRG={t:h.dataset.drag,el,kind:box.dataset.kind,y0:e.clientY,moved:false,h};h.setPointerCapture(e.pointerId)});
 document.addEventListener('pointermove',e=>{if(!DRG)return;const D=DRG;if(!D.moved){if(Math.abs(e.clientY-D.y0)<4)return;D.moved=true;D.el.classList.add('drg');document.body.classList.add('dragging')}
  if(e.clientY<70)scrollBy(0,-14);else if(e.clientY>innerHeight-70)scrollBy(0,14);
  D.el.style.pointerEvents='none';const u=document.elementFromPoint(e.clientX,e.clientY);D.el.style.pointerEvents='';if(!u)return;
  if(D.t==='i'){const box=u.closest(`.bitems[data-kind="${D.kind}"]`)||(u.closest('.bgrp')&&u.closest('.bgrp').querySelector(`:scope>.bitems[data-kind="${D.kind}"]`));if(!box)return;const r=u.closest('.brow[data-iid]');
-  if(r&&r!==D.el&&box.contains(r)){const m=r.getBoundingClientRect();box.insertBefore(D.el,e.clientY<m.top+m.height/2?r:r.nextSibling)}else if(!r&&D.el.parentNode!==box)box.appendChild(D.el)}
- else{const g=u.closest('.bgrps>.bgrp');if(g&&g!==D.el&&g.parentNode===D.el.parentNode){const m=g.getBoundingClientRect();D.el.parentNode.insertBefore(D.el,e.clientY<m.top+m.height/2?g:g.nextSibling)}}});
+  if(r&&r!==D.el&&box.contains(r)){const m=r.getBoundingClientRect();ORDN++;box.insertBefore(D.el,e.clientY<m.top+m.height/2?r:r.nextSibling)}else if(!r&&D.el.parentNode!==box){ORDN++;box.appendChild(D.el)}}
+ else{const g=u.closest('.bgrps>.bgrp');if(g&&g!==D.el&&g.parentNode===D.el.parentNode){const m=g.getBoundingClientRect();ORDN++;D.el.parentNode.insertBefore(D.el,e.clientY<m.top+m.height/2?g:g.nextSibling)}}});
 function dragEnd(save){const D=DRG;if(!D)return;DRG=null;D.el.classList.remove('drg');document.body.classList.remove('dragging');if(!D.moved)return;if(!save)return renderBuild();const o=orderRead(D.kind);orderApply(D.kind==='flex',o.gO,o.iO)}
 document.addEventListener('pointerup',()=>dragEnd(true));document.addEventListener('pointercancel',()=>dragEnd(false));
 // Keyboard: ↑/↓ on a focused ⋮⋮ moves it one place (an item stays in its group).
 document.addEventListener('keydown',e=>{const h=e.target.closest&&e.target.closest('.grip');if(!h||(e.key!=='ArrowUp'&&e.key!=='ArrowDown'))return;e.preventDefault();const up=e.key==='ArrowUp',el=h.dataset.drag==='i'?h.closest('.brow'):h.closest('.bgrp'),sib=up?el.previousElementSibling:el.nextElementSibling;
- if(!sib||!sib.matches(h.dataset.drag==='i'?'.brow[data-iid]':'.bgrp'))return;el.parentNode.insertBefore(el,up?sib:sib.nextSibling);const kind=(el.closest('.bitems')||el.closest('.bgrps')).dataset.kind,o=orderRead(kind),id=h.dataset.id;orderApply(kind==='flex',o.gO,o.iO);const g=document.querySelector(`.grip[data-id="${id}"]`);if(g)g.focus()});
+ if(!sib||!sib.matches(h.dataset.drag==='i'?'.brow[data-iid]':'.bgrp'))return;ORDN++;el.parentNode.insertBefore(el,up?sib:sib.nextSibling);const kind=(el.closest('.bitems')||el.closest('.bgrps')).dataset.kind,o=orderRead(kind),id=h.dataset.id;orderApply(kind==='flex',o.gO,o.iO);const g=document.querySelector(`.grip[data-id="${id}"]`);if(g)g.focus()});
