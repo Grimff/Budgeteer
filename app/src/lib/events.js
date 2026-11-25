@@ -10,6 +10,7 @@ import { setALC } from './goal-accounts.js';
 import { loanSync } from './linked-loans.js';
 import { OPEN, setGP, setLP, setXS } from './math.js';
 import { SRV } from './server-sync.js';
+import { hcSoon } from './settings.js';
 export let inT; export function setinT(v){return inT=v}
 export let RESTORING=false; export function setRESTORING(v){return RESTORING=v}
 /* ---------- render all ---------- */
@@ -17,7 +18,7 @@ export function renderAll(enter){setLP({});setGP({});setXS(null);setTXI(null);se
  // Only the visible tab is drawn; the others are redrawn when switched to (every tab switch goes through commit → renderAll).
  // Shown before it's drawn, so charts that size themselves to the tab (History) measure its real width.
    drawTab();brandSet();
- if(enter){const t=$('#T-'+S.tab);void t.offsetWidth;t.classList.add('enter')}moveInd();fmtAll()}
+ if(enter){const t=$('#T-'+S.tab);void t.offsetWidth;t.classList.add('enter')}moveInd();fmtAll();hcSoon()}
 export function moveInd(){const b=$(`.tabs [data-t="${S.tab}"]`),i=$('.ind');if(!b)return;i.style.width=b.offsetWidth+'px';i.style.transform=`translateX(${b.offsetLeft-i.offsetLeft}px)`;const T=b.parentElement;if(T.scrollWidth>T.clientWidth+2){const x=b.offsetLeft-(T.clientWidth-b.offsetWidth)/2;T.scrollTo({left:Math.max(0,x),behavior:RM?'auto':'smooth'})}}
 export function commit(enter){if(INB&&SRV){setINB(false);if(autoFile()){setLP({})}}save();rerender(enter)}
 export function rerender(enter){const a=document.activeElement,k=a&&a.dataset?a.dataset.key:null,raw=k?a.value:null,ss=k&&'selectionStart' in a?[a.selectionStart,a.selectionEnd]:null;

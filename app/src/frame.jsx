@@ -16,7 +16,7 @@ import { $$, S, TK, lab, $ } from './lib/core.js';
 import { moveInd } from './lib/events.js';
 import { inbox } from './lib/linked-loans.js';
 import { SRV } from './lib/server-sync.js';
-import { hhName, hhSub, hcDot } from './lib/settings.js';
+import { hhName, hhSub, HCD } from './lib/settings.js';
 
 // The frame elements' own listeners (FRAME_ON), attached natively once per element.
 const REFS = {};
@@ -31,7 +31,7 @@ const on = t => S.tab === t ? 'on' : undefined;
 export function Frame() {
   useBudget(); useFrame();
   // the health check's dot on the gear (hcDot); with it, the gear opens the health check (Settings → Data & math)
-  const hd = hcDot(), hdl = hd.n ? `Settings · the health check has ${hd.n} thing${hd.n === 1 ? '' : 's'} to look at` : 'Settings';
+  const hd = HCD, hdl = hd.n ? `Settings · the health check has ${hd.n} thing${hd.n === 1 ? '' : 's'} to look at` : 'Settings';
   return <>
     <header className="bar" id="bar">
       <div className="brand" data-act="sview" data-v="general" title="Change the name in Settings" onClick={onAct('sview')}><span className="mark" aria-hidden="true">{LOGO}</span><span><b id="hhN">{tx(hhName())}</b><small id="hhS">{tx(hhSub())}</small></span></div>

@@ -114,7 +114,8 @@ server against a real `data/` folder while testing; use `tools/realtest.js`.
   `redraw(t)`, shown or not; `renderBuild`/`renderForecast` ask for that Budget view). After React is done (never
   inside its commit) each screen that drew gets `resync()` and its after-draw step: This month → `sankey()`, Forecast
   → `fcBody()`, Bank → `bankBadge()`. `brandSet`/`bankBadge` redraw the header alone (`frameChanged`).
-- **Re-renders happen in place**, so `resync(el)` puts back what a fresh draw would show and React doesn't control:
+- **Re-renders happen in place**, so `resync(el)` (it reads React's `__reactProps$<id>` keys directly, `PK`/`CK`; a
+  `for…in` over each element was over half of every tab switch) puts back what a fresh draw would show and React doesn't control:
   details `open`, field values/ticks/choices (fields are uncontrolled: `defaultValue`), `hidden`, inner scroll, and a
   select's `selected` attribute. Consequences to keep in mind:
   - a box that code fills by hand gets a new element on every draw with `key={'…' + drawNo()}` (Bank's split box
@@ -340,7 +341,9 @@ server against a real `data/` folder while testing; use `tools/realtest.js`.
 - **Storage is the server only** ("budget on the server" section: `fsInit`/`fsLoad`/`fsQueue`/`fsFlush`/`fsPoll`/`fsUI`;
   the old local-file mode was removed). `FS.state`: `wait` (connecting), `ok`, `err` (unreachable or a save failed;
   the 10-second `fsPoll` reconnects via `fsInit` or retries the save). The browser keeps a copy in localStorage
-  (`KEY`). `REVK` = the server revision that copy matches. On load: if there are unsaved local edits (`PEND`) and the
+  (`KEY`), written 300 ms after `save()` (`saveLocal`; at once on `pagehide`/hidden).
+  `srvPut` sends nothing when the shared data equals `FS.sent` (what the server has), so tab and month switches,
+  which go through `commit()`, don't upload the budget or bump the revision. `REVK` = the server revision that copy matches. On load: if there are unsaved local edits (`PEND`) and the
   server is still at `REVK`, they are pushed; otherwise the server copy replaces them. A save while the server copy
   is still loading (`wait`) doesn't set `PEND`; a save while unreachable (`err`) does. Any 409 adopts the server copy
   and re-files; a toast says so unless the save was auto-only (`FS.autoOnly`). Never asks "which version".
@@ -455,7 +458,8 @@ server against a real `data/` folder while testing; use `tools/realtest.js`.
   step (`change{prev,since,up}`); two identical monthly charges first seen in the last ~70 days show as **new**.
   Rows: cadence, next expected date, budget line (opens its pop-up), yearly cost; stopped ones fold away. The sample's
   Streamflix went from $13.99 to $15.99 last month to show a price change.
-- **Health-check dot** (`hcDot()` in settings.js, drawn in frame.jsx): a dot on the gear (`.tdot`, red if any check is
+- **Health-check dot** (`hcDot()` in settings.js; frame.jsx draws the cached `HCD`, which `hcSoon()` (end of `renderAll`)
+  recomputes ~1 s later when idle and redraws only the header if it changed; `hcNow()` does it at once, for tests): a dot on the gear (`.tdot`, red if any check is
   bad, butter otherwise) when `healthChecks()` finds something other than transactions to sort (the Bank badge shows
   those; that check is marked `inbox`); off until the budget and bank data have loaded. With the dot, the gear
   (`data-hc`) opens Settings → Data & math, where the health check is.
@@ -523,6 +527,14 @@ server against a real `data/` folder while testing; use `tools/realtest.js`.
 - Loading: `SkelCards`/`Skel` (shimmering shapes) instead of "Loading…" on Bank, Wealth and Settings → Connections while
   the bank data loads, and on every tab but Settings on a new browser until the budget arrives (`!HADL && !FS.loaded &&
   FS.state==='wait'`; `HADL` = this browser had its own copy at start; `setFS` redraws when that wait ends).
+
+## Speed
+
+- Measured on a real copy at phone speed (CPU x4): `perf_real`-style runs, load ~1 s, taps 0.15–0.4 s, most of what's
+  left is the browser's style/layout. Hot paths keep pure memos: `normName`/`patternOf`/`merchKey` per transaction
+  object (WeakMaps; a transaction's name never changes), `merchKeys` per `BK.tx` (+length), `acctType` per `BK.accts`,
+  `goalEta` in `GP` (cleared each draw), month labels per month, one `Intl.NumberFormat` for `f0`/`f2`, `addM` by
+  arithmetic. Don't cache anything derived from `S` across draws: some paths change `S` and redraw without saving.
 
 ## Text fields
 

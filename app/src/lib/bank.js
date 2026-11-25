@@ -27,16 +27,20 @@ export function autoSave(){if(!autoFile())return false;if(!FS.dirty)FS.autoOnly=
 /* ---------- filing rules: tie a payment once, the rest file themselves ---------- */
 // Names carry changing reference numbers, so matching uses words only: digits and punctuation are dropped.
 export const normT=s=>String(s||'').toUpperCase().replace(/[^A-Z&' ]+/g,' ').split(/\s+/).filter(w=>w.length>1).join(' ');
-export const normName=t=>(normT(t.merchant)+' '+normT(t.name)).trim();
+// normName/patternOf/merchKey are asked for the same transaction many times per draw (rules, suggestions, recurring
+// charges); a transaction's name never changes, so each is remembered per transaction object.
+const NNM=new WeakMap(),POM=new WeakMap(),MKM=new WeakMap();
+export const normName=t=>{let v=NNM.get(t);if(v===undefined){v=(normT(t.merchant)+' '+normT(t.name)).trim();NNM.set(t,v)}return v};
 export const STOPW=new Set(['POS','ACH','DEBIT','CREDIT','PURCHASE','RECURRING','ONLINE','CHECKCARD','WEB','PMT','TST','SQ','SP','PP','INST','THE','AUTH']);
 // Words that make a different kind of purchase at the same store (Costco vs Costco Gas).
 export const QUAL=new Set(['GAS','FUEL','PHARMACY','PHARM','RX','CAR','WASH','OPTICAL','PHOTO','TIRE','TIRES','BAKERY','LIQUOR','WINE','MKTPLACE','MARKETPLACE','PRIME','MUSIC','KINDLE','DIGITAL','EXPRESS','TRAVEL','AUTO','STATION','SERVICE','INSURANCE']);
-export function patternOf(t){const w=normT(t.merchant||t.name).split(' ').filter(Boolean);while(w.length>1&&STOPW.has(w[0]))w.shift();let n=Math.min(3,w.length);if(w.slice(0,n).join(' ').length<8)n=Math.min(4,w.length);if(/^(TRANSFER|XFER|ZELLE|VENMO|PAYPAL)$/.test(w[0]))n=Math.min(5,w.length);let p=w.slice(0,n).join(' ');
+export function patternOf(t){let v=POM.get(t);if(v===undefined){v=patternOf0(t);POM.set(t,v)}return v}
+function patternOf0(t){const w=normT(t.merchant||t.name).split(' ').filter(Boolean);while(w.length>1&&STOPW.has(w[0]))w.shift();let n=Math.min(3,w.length);if(w.slice(0,n).join(' ').length<8)n=Math.min(4,w.length);if(/^(TRANSFER|XFER|ZELLE|VENMO|PAYPAL)$/.test(w[0]))n=Math.min(5,w.length);let p=w.slice(0,n).join(' ');
  if(t.merchant){const nm=normT(t.name);if(nm.startsWith(p+' ')){const nx=nm.slice(p.length+1).split(' ')[0];if(QUAL.has(nx))p+=' '+nx}}return p}
 export const tdir=t=>t.amount<0?'in':'out';
 // Names that cover many unrelated payments (payment apps, plain transfers). Links to these default to "around this amount".
 export const GENERICP=/^(VENMO|ZELLE|PAYPAL|CASH APP|SQUARE CASH|APPLE CASH|ONLINE TRANSFER|TRANSFER|CHECK|ATM|MOBILE DEPOSIT|DEPOSIT|WITHDRAWAL)\b/;
-export const acctType=id=>{const a=(BK.accts||[]).find(x=>x.id===id);return a?a.type:''};
+let ATA=null,ATM=null;export const acctType=id=>{if(ATA!==BK.accts){ATA=BK.accts;ATM=new Map((ATA||[]).map(a=>[a.id,a.type]))}return ATM.get(id)||''};
 // Month a payment counts in under rule r: the month paid, unless the rule moves payments made in the last 5 days of a
 // month to the next month (shift 'next', rent paid early) or the first 5 days back a month (shift 'prev', paid late).
 export function ruleMonth(t,r){const k=t.date.slice(0,7),d=+t.date.slice(8,10),[y,m]=k.split('-').map(Number),last=new Date(y,m,0).getDate();
@@ -126,8 +130,8 @@ export function autoFile(){if(!SRV||!BK.tx.length||!BK.accts)return 0;S.txd||(S.
 export const titleC=s=>s.split(' ').map(w=>w[0]+w.slice(1).toLowerCase()).join(' ');
 // One row per merchant. A name without Plaid's merchant field joins the merchant it starts with
 // ("KROGER #123 ANYTOWN ST" → Kroger), longest first so Costco Gas stays apart from Costco.
-export function merchKeys(){const M=new Set();BK.tx.forEach(t=>{if(t.merchant)M.add(patternOf(t))});return [...M].sort((a,b)=>b.length-a.length)}
-export function merchKey(t,MK){if(t.merchant)return patternOf(t);const nm=normT(t.name),m=MK.find(x=>nm===x||nm.startsWith(x+' '));return m||patternOf(t)}
+let MKS=null;export function merchKeys(){if(MKS&&MKS[0]===BK.tx&&MKS[1]===BK.tx.length)return MKS[2];const M=new Set();BK.tx.forEach(t=>{if(t.merchant)M.add(patternOf(t))});MKS=[BK.tx,BK.tx.length,[...M].sort((a,b)=>b.length-a.length)];return MKS[2]}
+export function merchKey(t,MK){if(t.merchant)return patternOf(t);const c=MKM.get(t);if(c&&c[0]===MK)return c[1];const nm=normT(t.name),m=MK.find(x=>nm===x||nm.startsWith(x+' ')),v=m||patternOf(t);MKM.set(t,[MK,v]);return v}
 export function lnkOpen(kind,id){if(!SRV||!BK.tx.length){toast('Connect your bank in the Bank tab first');return}
  const k=S.cur,it=kind==='loan'?S.loans.find(x=>x.id===id):kind==='goal'?S.goals.find(x=>x.id===id):kind==='inc'?plan(k).income.find(x=>x.id===id):(allItems(k).find(x=>x.i.id===id)||{}).i;if(!it)return;
  LK={kind,id,v:(kind==='loan'?'l:':kind==='goal'?'g:':kind==='inc'?'inc:':'i:')+id,name:it.name,amt:kind==='goal'?0:kind==='loan'?+it.min||0:+it.amt||0,dir:kind==='inc'?'in':'out',sels:[],pat:'',ref:0,refs:{},wide:{},q:'',amtOn:false,move:false,sibOn:false,MK:merchKeys()};
@@ -193,8 +197,8 @@ export function catMove(id,v){const r=S.txd&&S.txd[id];if(!r||r.v===v)return;con
 export const SPEND_CAT=/^(FOOD_AND_DRINK|TRANSPORTATION|GENERAL_MERCHANDISE|TRAVEL)/;
 // RECF: the parity check's stand-in for recurring() (a case that shows made-up bill suggestions); null otherwise.
 export let RECF=null;export function setRECF(f){return RECF=f}
-export function recurring(){if(RECF)return RECF();if(!SRV||!BK.tx.length)return[];const MK=merchKeys(),G={},no=S.notBill||{},k6=addM(TK,-6);
- BK.tx.forEach(t=>{if(t.amount<=0||t.date.slice(0,7)<k6||isXferish(t))return;const rr=ruleFor(t);if(rr&&txTargets(t.date.slice(0,7)).ok(rr.v))return;const r=S.txd&&S.txd[t.id];if(r){if(!r.v.startsWith('i:'))return;const x=allItems(r.k).find(y=>y.i.id===r.v.slice(2));if(x&&!x.g.flex)return}
+export function recurring(){if(RECF)return RECF();if(!SRV||!BK.tx.length)return[];const MK=merchKeys(),G={},no=S.notBill||{},k6=addM(TK,-6),TT={},AI={};
+ BK.tx.forEach(t=>{if(t.amount<=0||t.date.slice(0,7)<k6||isXferish(t))return;const rr=ruleFor(t),tm=t.date.slice(0,7);if(rr&&(TT[tm]||(TT[tm]=txTargets(tm))).ok(rr.v))return;const r=S.txd&&S.txd[t.id];if(r){if(!r.v.startsWith('i:'))return;const x=(AI[r.k]||(AI[r.k]=allItems(r.k))).find(y=>y.i.id===r.v.slice(2));if(x&&!x.g.flex)return}
   const p=merchKey(t,MK);if(no[p])return;(G[p]||(G[p]=[])).push(t)});
  return Object.entries(G).map(([p,L])=>{const ms=new Set(L.map(t=>t.date.slice(0,7))),A=L.map(t=>t.amount).sort((a,b)=>a-b),med=A[Math.floor(A.length/2)],D=L.map(t=>+t.date.slice(8)).sort((a,b)=>a-b);
   const top=L.find(t=>t.merchant&&normT(t.merchant)===p),pc={};L.forEach(t=>{const c=(t.pfc||[])[0]||'';pc[c]=(pc[c]||0)+1});const cat=Object.entries(pc).sort((a,b)=>b[1]-a[1])[0][0];return{p,cat,label:top?top.merchant:titleC(p),n:L.length,months:ms.size,amt:r2(med),lo:A[0],hi:A[A.length-1],day:D[Math.floor(D.length/2)],last:L.map(t=>t.date).sort().pop(),first:L.map(t=>t.date).sort()[0].slice(0,7)}})

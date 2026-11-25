@@ -1,7 +1,7 @@
 // settings: the code of what was app/public/js/settings.js (unchanged but for imports, `export`, the shared state's setters and
 // startSettings(), which holds what used to run as the file loaded).
 // Shared state (other files change it with the set… functions; it was js/settings.js):
-import { renderSettings, rulesFilter } from '../named.jsx';
+import { brandSet, renderSettings, rulesFilter } from '../named.jsx';
 import { BK, autoSave, bankFrom, billPaid, incGot, pairIssues, titleC } from './bank.js';
 import { budStart } from './build.js';
 import { S, TK, addM, f0, f2, isDue, labS, mon, plan, $, APP_VERSION } from './core.js';
@@ -44,6 +44,11 @@ export function syncWord(rf){if(!rf)return 'Transactions sync every few hours';c
 // The dot on the Settings gear: how many health checks have something to look at, and the worst level ('bad' or
 // 'warn'), leaving out transactions to sort (the Bank tab's count shows those). Nothing until the budget and the
 // bank's accounts have loaded, so checks that need bank data don't light it while it's on its way.
+// The gear draws HCD, not hcDot(): the checks take a few hundred ms on a phone with real data, so they run after a
+// draw, once things are quiet (hcSoon after each renderAll), and redraw only the header when the result changes.
+export let HCD={n:0};export function setHCD(v){return HCD=v}
+let HCT=0;export function hcSoon(){clearTimeout(HCT);HCT=setTimeout(()=>{const ric=window.requestIdleCallback||(f=>f());ric(hcNow,{timeout:3000})},1200)}
+export function hcNow(){clearTimeout(HCT);const d=hcDot();if(d.n!==HCD.n||d.lv!==HCD.lv){setHCD(d);brandSet()}}
 export function hcDot(){if(FS.state!=='ok'||!BK.st||(BK.st.configured&&!BK.accts))return{n:0};const H=healthChecks().filter(h=>h.lv!=='ok'&&!h.inbox);return{n:H.length,lv:H.some(h=>h.lv==='bad')?'bad':'warn'}}
 export function healthChecks(){const H=[],add=(lv,t,d,a)=>H.push(a&&a.length?{lv,t,d,a}:{lv,t,d}),near=(a,b)=>Math.abs(a-b)<0.51,MS=histMonths().filter(k=>k<=TK).slice(-7);
  // 1. Budget, History and the money flow use the same totals

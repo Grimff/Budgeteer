@@ -14,7 +14,7 @@ import { monthSum } from './history.js';
 import { allItems, inbox, linkLoan, BV, setBV, txUndo, txAssign } from './linked-loans.js';
 import { goalEta, goalMon, goalSaved, path, setLP, totals, unplannedA, linkedChange, goalShare, savedWork, invInfo, savedIn, linkedSaved } from './math.js';
 import { FS, sharedData } from './server-sync.js';
-import { BKP, bkList, bkRestore, healthChecks, SV, setSV, hcDot, PAGE_BUILD, abLoad } from './settings.js';
+import { BKP, bkList, bkRestore, healthChecks, SV, setSV, hcDot, hcNow, HCD, PAGE_BUILD, abLoad } from './settings.js';
 import { debtNow } from './wealth.js';
 import { subsList } from './subs.js';
 import { calBills } from './calendar.js';
@@ -158,11 +158,11 @@ export async function selfTest(){const T=[],ok=(c,name,detail='')=>T.push({ok:!!
   ok(!fi||keys.includes(`over:${TK}:${fi.i.id}`),'A category over plan shows',fi?fi.i.name:'(nothing spent yet this month)');
   ntHide('conn:it-bank:ITEM_LOGIN_REQUIRED');ok(!/sign in again/.test((document.querySelector('#T-budget .nt')||{}).textContent||''),'Hide removes an alert');
   // Health-check dot on the gear: the bank error shows it (red), and with it the gear opens Settings → Data & math.
-  { renderAll();const g=$('.tset'),dot=g&&g.querySelector('.tdot.bad'),sv0=SV;setSV('general');g.click();const went=S.tab==='settings'&&SV==='data'&&/health/i.test($('#T-settings').textContent);
+  { renderAll();hcNow();const g=$('.tset'),dot=g&&g.querySelector('.tdot.bad'),sv0=SV;setSV('general');g.click();const went=S.tab==='settings'&&SV==='data'&&/health/i.test($('#T-settings').textContent);
    setSV(sv0);try{localStorage.setItem('pfb_sview',SV)}catch(_){}document.querySelector('.tabs button[data-t="budget"]').click();
    ok(!!dot&&hcDot().lv==='bad'&&/health check/.test(g.getAttribute('aria-label'))&&went,'The gear shows a dot when the health check finds something, and opens it',`dot ${!!dot}, ${JSON.stringify(hcDot())}, opened ${went}`)}
   BK.st.items[0].error=null;delete NTH['conn:it-bank:ITEM_LOGIN_REQUIRED'];if(fi)editPlan(p=>{const it=p.groups.find(g=>g.id===fi.g.id).items.find(i=>i.id===fi.i.id);it.amt=it._was;delete it._was},TK);
-  renderAll();ok(!$('.tset .tdot')&&hcDot().n===0,'No dot on the gear when the health check is all clear',JSON.stringify(hcDot()));
+  renderAll();hcNow();ok(!$('.tset .tdot')&&hcDot().n===0,'No dot on the gear when the health check is all clear',JSON.stringify(hcDot()));
   // Empty states: a new household gets one card per page saying what it will show and the first step (not $0 charts,
   // or "Every loan is paid off"), and no look back at a month with nothing in it.
   { const back=withS(emptyHousehold()),seen={};try{for(const[t,v]of[['budget','month'],['loans'],['goals'],['history']]){S.tab=t;if(v)setBUDV(v);renderAll();const e=$('#T-'+t);seen[t]=[!!e.querySelector('section.empty'),e.textContent]}}finally{back();S.tab='budget';setBUDV('month');renderAll()}
@@ -279,6 +279,11 @@ export async function selfTest(){const T=[],ok=(c,name,detail='')=>T.push({ok:!!
   {const cf=window.confirm;window.confirm=()=>true;try{await bkRestore(BKP[0].id)}finally{window.confirm=cf}}ok(D.restored===1&&FS.state==='ok'&&S.goals.some(g=>g.id==='trip'),'Restoring a daily copy reloads the budget');
   // Saving reaches the (sample) server.
   await new Promise(r=>setTimeout(r,1200));ok((D.saves||0)>0&&FS.state==='ok','Changes save to the server',`${D.saves||0} save(s)`);
+  // Switching tabs and months saves only this browser's view: nothing goes to the server. And the gear's dot, worked out
+  // after a draw rather than in it, catches up with the health check once things are quiet.
+  { const n0=D.saves||0,c0=S.cur;document.querySelector('.tabs button[data-t="loans"]').click();document.querySelector('.tabs button[data-t="budget"]').click();$('[data-act="mprev"]').click();$('[data-act="mnext"]').click();
+   await new Promise(r=>setTimeout(r,2500));const d=hcDot();ok((D.saves||0)===n0&&S.cur===c0,'Switching tabs and months sends nothing to the server',`${(D.saves||0)-n0} save(s)`);
+   ok(HCD.n===d.n&&(!d.n||HCD.lv===d.lv),'The gear’s dot catches up with the health check after a draw',JSON.stringify([HCD,d]))}
   // Draw every tab and every view; nothing may throw.
   const clickAll=sel=>[...document.querySelectorAll(sel)].filter(b=>b.offsetParent).forEach(b=>b.click());
   for(const t of['budget','loans','goals','wealth','history','bank','settings']){document.querySelector(`.tabs button[data-t="${t}"]`).click();const el=document.querySelector('#T-'+t);ok(!el.hidden&&el.innerHTML.length>200,`${t[0].toUpperCase()+t.slice(1)} tab draws`,`${el.innerHTML.length} characters`);

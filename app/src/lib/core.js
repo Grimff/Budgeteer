@@ -16,13 +16,18 @@ export const uid=()=>Math.random().toString(36).slice(2,9);
 export const RM=matchMedia('(prefers-reduced-motion: reduce)').matches;
 export const keyOf=d=>d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');
 export const NOW=new Date(),TK=keyOf(NOW);
-export const addM=(k,n)=>{const[y,m]=k.split('-').map(Number);return keyOf(new Date(y,m-1+n,1))};
+// addM by arithmetic (a Date per call was a hot spot); anything unusual (a fraction, a 2-digit year) still goes through Date
+export const addM=(k,n)=>{const[y,m]=k.split('-').map(Number),t=y*12+m-1+n;if(!(y>=1000&&y<=9999)||!Number.isInteger(t))return keyOf(new Date(y,m-1+n,1));const Y=Math.floor(t/12);return Y+'-'+String(t-Y*12+1).padStart(2,'0')};
 export const mdiff=(a,b)=>{const[ay,am]=a.split('-').map(Number),[by,bm]=b.split('-').map(Number);return (by-ay)*12+(bm-am)};
-export const lab=k=>{const[y,m]=k.split('-').map(Number);return new Date(y,m-1,1).toLocaleDateString('en-US',{month:'long',year:'numeric'})};
-export const labS=k=>{const[y,m]=k.split('-').map(Number);return new Date(y,m-1,1).toLocaleDateString('en-US',{month:'short',year:'numeric'})};
-export const mon=k=>{const[y,m]=k.split('-').map(Number);return new Date(y,m-1,1).toLocaleDateString('en-US',{month:'long'})};
-export const f0=n=>(n<0?'−':'')+'$'+Math.abs(Math.round(n)).toLocaleString('en-US');
-export const f2=n=>(n<0?'−':'')+'$'+Math.abs(n).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});
+// month names: remembered per month (toLocaleDateString sets up a formatter on every call)
+const memo=f=>{const M=new Map();return k=>{let v=M.get(k);if(v===undefined){v=f(k);M.set(k,v)}return v}};
+export const lab=memo(k=>{const[y,m]=k.split('-').map(Number);return new Date(y,m-1,1).toLocaleDateString('en-US',{month:'long',year:'numeric'})});
+export const labS=memo(k=>{const[y,m]=k.split('-').map(Number);return new Date(y,m-1,1).toLocaleDateString('en-US',{month:'short',year:'numeric'})});
+export const mon=memo(k=>{const[y,m]=k.split('-').map(Number);return new Date(y,m-1,1).toLocaleDateString('en-US',{month:'long'})});
+// one formatter each (toLocaleString makes a new one per call); same output
+const N0=new Intl.NumberFormat('en-US'),N2=new Intl.NumberFormat('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});
+export const f0=n=>(n<0?'−':'')+'$'+N0.format(Math.abs(Math.round(n)));
+export const f2=n=>(n<0?'−':'')+'$'+N2.format(Math.abs(n));
 export const fk=n=>n>=1000?'$'+(+(n/1000).toFixed(1))+'k':'$'+Math.round(n);
 export const num=v=>{const x=parseFloat(String(v).replace(/[^0-9.]/g,''));return isFinite(x)?x:0};
 export const r2=v=>Math.round(v*100)/100;
@@ -47,7 +52,10 @@ export const seedLoans=()=>[],seedGoals=()=>[];
 export let HADL=false; export function setHADL(v){return HADL=v}
 export function load(){try{const v=JSON.parse(localStorage.getItem(KEY));if(v&&v.plans&&Object.keys(v.plans).length){v.cur=v.cur||TK;v.tab=v.tab||'budget';v.months=v.months||{};HADL=true;return v}}catch(e){}
  return{plans:{[TK]:seedPlan()},loans:seedLoans(),goals:seedGoals(),months:{},cur:TK,tab:'budget',flow:'plan'}}
-export function save(){if(!AUTOSAVE){try{FS.autoOnly=false}catch(_){}}try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){toast('Could not save in this browser. Download a backup to keep your changes.')}fsQueue()}
+// This browser's copy is written a moment after the tap (saveLocal), not during it: writing ~0.5 MB took 20–40 ms of
+// every tap on a phone. It's only read at start, and leaving or hiding the page writes it at once.
+let LST=0;export function saveLocal(){if(!LST)return;clearTimeout(LST);LST=0;try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){toast('Could not save in this browser. Download a backup to keep your changes.')}}
+export function save(){if(!AUTOSAVE){try{FS.autoOnly=false}catch(_){}}clearTimeout(LST);LST=setTimeout(saveLocal,300);fsQueue()}
 
 export const MO=k=>S.months[k]||{act:{},pay:{},dep:{}};
 export const MOW=k=>{const m=S.months[k]||(S.months[k]={});m.act||(m.act={});m.pay||(m.pay={});m.dep||(m.dep={});return m};
@@ -70,4 +78,5 @@ export const extras=(k=S.cur)=>{const m=MOW(k);return m.extra||(m.extra=[])};
 export function startCore() {
 if(DEMO)try{Object.keys(localStorage).filter(k=>k.startsWith(KEY)).forEach(k=>localStorage.removeItem(k))}catch(_){}
 S=load();
+addEventListener('pagehide',saveLocal);document.addEventListener('visibilitychange',()=>{if(document.hidden)saveLocal()});
 }

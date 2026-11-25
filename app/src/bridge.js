@@ -35,8 +35,13 @@ export function tick() {
   return { use: () => useSyncExternalStore(sub, () => v), bump: () => { v++; flushSync(() => subs.forEach(f => f())); } };
 }
 export function liveReset(el) { const r = el && ROOTS.get(el); if (r) { ROOTS.delete(el); try { r.unmount(); } catch (_) { } el.textContent = ''; } }
-const propsOf = el => { for (const k in el) if (k.startsWith('__reactProps$')) return el[k]; return null; };
-const otherRoot = el => { for (const k in el) if (k.startsWith('__reactContainer$')) return true; return false; };
+// React marks its elements with own properties named __reactProps$<id> / __reactContainer$<id>, one <id> per page:
+// found once from an element's own keys, then read directly (for…in walked hundreds of inherited DOM properties per
+// element, twice, on every draw: over half the time of a tab switch)
+let PK = null, CK = null;
+const rk = el => { for (const k of Object.keys(el)) if (k.startsWith('__reactProps$') || k.startsWith('__reactContainer$')) { const id = k.slice(k.indexOf('$') + 1); PK = '__reactProps$' + id; CK = '__reactContainer$' + id; return; } };
+const propsOf = el => { if (!PK) rk(el); return PK ? el[PK] || null : null; };
+const otherRoot = el => { if (!CK) rk(el); return CK ? CK in el : false; };
 export function resync(root) {
   const walk = el => {
     for (let c = el.firstElementChild; c; c = c.nextElementSibling) {

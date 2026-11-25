@@ -138,7 +138,9 @@ export function goalPlan(g,k){const ov=goalOv(g,k);if(ov!=null)return ov;return 
 export function goalProj(g,k){if(k<TK)return goalSaved(g,k);const key=g.id+'|'+k;if(GP[key]!=null)return GP[key];
  return GP[key]=k===TK?goalSaved(g,TK)+Math.max(0,goalPlan(g,TK)-savedIn(g,TK)):goalProj(g,addM(k,-1))+goalPlan(g,k)}
 // The month the projection reaches the target (TK when already there), or null if it never does at this pace.
-export function goalEta(g){const t=target(g,TK);if(!(t>0))return null;if(goalSaved(g,TK)>=t-0.5)return TK;for(let k=TK,n=0;n<600;n++,k=addM(k,1)){if(goalProj(g,k)>=target(g,k)-0.5)return k}return null}
+// remembered with the projections it reads (GP, cleared on every draw): a goal never reached walks all 600 months
+export function goalEta(g){const ck='eta|'+g.id;if(ck in GP)return GP[ck];return GP[ck]=goalEta0(g)}
+function goalEta0(g){const t=target(g,TK);if(!(t>0))return null;if(goalSaved(g,TK)>=t-0.5)return TK;for(let k=TK,n=0;n<600;n++,k=addM(k,1)){if(goalProj(g,k)>=target(g,k)-0.5)return k}return null}
 // With a target date: what it takes per month from now (this month included) to get there.
 export function goalNeed(g){if(!g.by)return null;const t=target(g,TK),n=Math.max(1,mdiff(TK,g.by)+1);return Math.max(0,(t-goalSaved(g,TK)+savedIn(g,TK))/n)}
 // ---------- Schedule: every planned amount to a goal or loan, with a start and an optional stop ----------
