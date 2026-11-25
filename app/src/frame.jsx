@@ -16,7 +16,7 @@ import { $$, S, TK, lab, $ } from './lib/core.js';
 import { moveInd } from './lib/events.js';
 import { inbox } from './lib/linked-loans.js';
 import { SRV } from './lib/server-sync.js';
-import { hhName, hhSub } from './lib/settings.js';
+import { hhName, hhSub, hcDot } from './lib/settings.js';
 
 // The frame elements' own listeners (FRAME_ON), attached natively once per element.
 const REFS = {};
@@ -30,10 +30,12 @@ const on = t => S.tab === t ? 'on' : undefined;
 
 export function Frame() {
   useBudget(); useFrame();
+  // the health check's dot on the gear (hcDot); with it, the gear opens the health check (Settings → Data & math)
+  const hd = hcDot(), hdl = hd.n ? `Settings · the health check has ${hd.n} thing${hd.n === 1 ? '' : 's'} to look at` : 'Settings';
   return <>
     <header className="bar" id="bar">
       <div className="brand" data-act="sview" data-v="general" title="Change the name in Settings" onClick={onAct('sview')}><span className="mark" aria-hidden="true">{LOGO}</span><span><b id="hhN">{tx(hhName())}</b><small id="hhS">{tx(hhSub())}</small></span></div>
-      <nav className="tabs" aria-label="Sections"><span className="ind" aria-hidden="true"></span>{TABS.map(([t, l]) => <button key={t} data-act="tab" data-t={t} className={on(t)} onClick={onAct('tab')}>{l}</button>)}<button data-act="tab" data-t="bank" id="tbank" className={on('bank')} onClick={onAct('tab')}>Bank{BADGE ? <span className="tbn">{BADGE > 99 ? '99+' : BADGE}</span> : null}</button><button data-act="tab" data-t="settings" className={'tset' + (S.tab === 'settings' ? ' on' : '')} aria-label="Settings" title="Settings" onClick={onAct('tab')}>{GEAR}</button></nav>
+      <nav className="tabs" aria-label="Sections"><span className="ind" aria-hidden="true"></span>{TABS.map(([t, l]) => <button key={t} data-act="tab" data-t={t} className={on(t)} onClick={onAct('tab')}>{l}</button>)}<button data-act="tab" data-t="bank" id="tbank" className={on('bank')} onClick={onAct('tab')}>Bank{BADGE ? <span className="tbn">{BADGE > 99 ? '99+' : BADGE}</span> : null}</button><button data-act="tab" data-t="settings" data-hc={hd.n ? '1' : undefined} className={'tset' + (S.tab === 'settings' ? ' on' : '')} aria-label={hdl} title={hdl} onClick={onAct('tab')}>{GEAR}{hd.n ? <span className={'tdot ' + hd.lv} aria-hidden="true"></span> : null}</button></nav>
       <div className="month"><button className="sp" id="spill" data-act="syncInfo" hidden onClick={onAct('syncInfo')}></button><button className="today" data-act="mtoday" id="tbtn" hidden={S.cur === TK} onClick={onAct('mtoday')}>This month</button><button data-act="mprev" aria-label="Previous month" onClick={onAct('mprev')}>‹</button><button className="ml" data-act="pick" id="mlab" aria-label="Choose month" onClick={onAct('pick')}>{lab(S.cur)}</button><button data-act="mnext" aria-label="Next month" onClick={onAct('mnext')}>›</button><input type="month" id="mp" tabIndex="-1" aria-hidden="true" ref={nat('mp')} /></div>
     </header>
     <main>

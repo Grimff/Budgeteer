@@ -12,7 +12,7 @@ Docker (`docker compose up -d --build`) on port 8095. Bank data comes from Plaid
   and everything it imports. check.js enforces that index.html loads only that.
 - **The code (`app/src/`)** is ES modules with explicit imports; nothing is shared through globals.
   - `lib/<name>.js`: the app's logic, what the old js/<name>.js files held (core, math, budget, loans, goals, history,
-    flow, events, bank, build, goal-accounts, compare, settings, wealth, linked-loans, alerts, csv-import, sample,
+    flow, events, bank, build, goal-accounts, compare, settings, wealth, linked-loans, alerts, csv-import, subs, calendar, sample,
     server-sync). `screens/`, `popups/`, `flow/`, `frame.jsx`, `schedule.jsx`, `ui.jsx`: React. `actions.js`: click and
     field handlers. `bridge.js`, `store.js`, `tabs.jsx`: drawing and the store. `named.jsx`: the functions written in
     React that other code calls by name (renderX, catRender, sankey, fsUI…). `parity.js`: the re-render check.
@@ -316,7 +316,8 @@ server against a real `data/` folder while testing; use `tools/realtest.js`.
 
 - **Needs a look** (`lib/alerts.js`, `AlertsCard` above the setup checklist, current month only): `alertsNow()` = banks
   with errors, linked bills (have a rule) not paid by their due day or due within 3 days (`isDue`, `billPaid`), flex
-  items over plan (`flexAct`), transactions to sort (`inbox`). Keys carry the month; **Hide** (`ntHide`) stores keys
+  items over plan (`flexAct`), price increases from last month on (`priceUps`, key `price:<month of change>:<pattern>`),
+  transactions to sort (`inbox`). Keys carry the month; **Hide** (`ntHide`) stores keys
   in localStorage `pfb_alerts_hidden`. `notifyAlerts()` runs after each `bankLoad` and posts them to `/api/notify`
   (skipped in sample mode). Settings → Connections → Phone alerts (`NtCard`, `ntTest`).
 - **CSV import screen** (`lib/csv-import.js`, `CsvCard` in Settings → Connections, also shown without Plaid keys):
@@ -350,6 +351,11 @@ server against a real `data/` folder while testing; use `tools/realtest.js`.
     - "Same payee, filed somewhere else" (`samePayee`) with Move here
 
     Keep this true for any new kind of line.
+  - **Bill calendar** (`BillCal`, collapsible key `bcal`, after the Budget lines, any month): `calBills(k)`
+    (`lib/calendar.js`) = bills due that month (set-aside bills only in their due month, at the full amount) and loan
+    payments still running, on their due day in a Sunday-first grid; phones (≤760px) get a list of only the days with
+    something due. Chips are coloured by `billState`/`loanState`, which the Budget lines use too (one status logic),
+    and open the line's pop-up. No due day → listed under the grid.
   - **Getting set up** (`GuideCard`, collapsible key `guide`): checklist under the summary in the current
     month (bank, paychecks linked, bills linked, loans, goals, transactions to sort); hidden when all done.
   - **Suggestions:** `recurring()` → "Looks like a bill" (Add as bill / Ignore, restorable).
@@ -409,7 +415,17 @@ server against a real `data/` folder while testing; use `tools/realtest.js`.
   for the chart and the month list; the chart draws at the width shown and labels every `step`-th
   month (short month, year under the first label and January). Delete a month (`delMonth`).
 - **Bank:** header (sync status; Rules, Connections → Settings; Sync now) and sections (`BV`): To
-  review (+ double counts, How filing works), Filed (filters, search, Move / Undo).
+  review (+ double counts, How filing works), Filed (filters, search, Move / Undo), **Recurring** (`BV='subs'`,
+  `Subs`/`SubRow`): `subsList()` (`lib/subs.js`) groups the last 14 months of posted charges by `merchKey` (no transfers,
+  loan payments, or charges filed as anything but a budget line), keeps those at most once a month on a steady gap
+  (1/2/3/6/12 months; monthly needs 3 in a row, others 2), about the same day (±7) and a steady price with at most one
+  step (`change{prev,since,up}`); two identical monthly charges first seen in the last ~70 days show as **new**.
+  Rows: cadence, next expected date, budget line (opens its pop-up), yearly cost; stopped ones fold away. The sample's
+  Streamflix went from $13.99 to $15.99 last month to show a price change.
+- **Health-check dot** (`hcDot()` in settings.js, drawn in frame.jsx): a dot on the gear (`.tdot`, red if any check is
+  bad, butter otherwise) when `healthChecks()` finds something other than transactions to sort (the Bank badge shows
+  those; that check is marked `inbox`); off until the budget and bank data have loaded. With the dot, the gear
+  (`data-hc`) opens Settings → Data & math, where the health check is.
 - **Settings** (gear tab, `renderSettings`, `SV`): General (household name `S.hh{name,sub}` shown
   by `brandSet` in the header and tab title; clicking the brand opens it; start date; catch-all
   `CatchSel`; backups), Rules (`FilingCard` counts per filing step this month; `RulesCard` grouped
@@ -498,4 +514,4 @@ width (375px) with no sideways scrolling.
   first sync after connecting.
 - Liabilities covers student loans, mortgages and cards only; enter APR/minimum for auto and
   personal loans by hand.
-- **Ideas not built yet:** health-check dot on the gear; separate logins per household member.
+- **Ideas not built yet:** separate logins per household member.

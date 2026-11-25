@@ -3,10 +3,11 @@
 // Shared state (other files change it with the set… functions; it was js/alerts.js):
 import { renderBudget } from '../named.jsx';
 import { BK, billPaid, flexAct, rulesFor } from './bank.js';
-import { DEMO, TK, addM, f0, isDue, ord, plan } from './core.js';
+import { DEMO, TK, addM, f0, isDue, ord, plan, f2, mon } from './core.js';
 import { inbox } from './linked-loans.js';
 import { toast } from './math.js';
 import { SRV } from './server-sync.js';
+import { priceUps } from './subs.js';
 export let NTH={}; export function setNTH(v){return NTH=v}
 export let NOTIFY=null; export function setNOTIFY(v){return NOTIFY=v}
 /* ---------- alerts: what needs a look this month ---------- */
@@ -18,6 +19,7 @@ export function alertsNow(){if(!SRV||!BK.st||!BK.st.configured)return[];const k=
   if(due<day)A.push({key:`late:${k}:${i.id}`,lv:'warn',t:`${i.name} hasn’t shown up yet`,d:`It was due on the ${ord(due)} (${f0(amt)} planned). If it was paid another way, open it to file the payment.`,a:ntOpen(i)});
   else if(due-day<=3)A.push({key:`due:${k}:${i.id}`,lv:'info',t:`${i.name} is due ${due===day?'today':due-day===1?'tomorrow':'on the '+ord(due)}`,d:`${f0(amt)} planned`,a:ntOpen(i)})}));
  p.groups.filter(g=>g.flex).forEach(g=>g.items.forEach(i=>{const a=flexAct(k,i.id)||0,pl=+i.amt||0;if(pl>0.5&&a>pl+0.5)A.push({key:`over:${k}:${i.id}`,lv:'warn',t:`${i.name} is ${f0(a-pl)} over plan`,d:`${f0(a)} spent of ${f0(pl)} planned this month`,a:ntOpen(i)})}));
+ priceUps().forEach(x=>A.push({key:`price:${x.change.since}:${x.p}`,lv:'warn',t:`${x.label} went up to ${f2(x.amt)}`,d:`It was ${f2(x.change.prev)} before ${mon(x.change.since)}: ${f0((x.amt-x.change.prev)*12/x.every)} more a year.`,a:{act:'bview',v:'subs',label:'See recurring charges'}}));
  const n=inbox().length;if(n)A.push({key:`review:${k}`,lv:'info',t:`${n} transaction${n===1?'':'s'} to sort`,d:'They aren’t in the budget until they’re filed.',a:{act:'bview',v:'review',label:'Open Bank'}});
  return A}
 export function ntHide(key){NTH[key]=1;const m=TK;Object.keys(NTH).forEach(x=>{const k=x.split(':')[1];if(/^\d{4}-\d\d$/.test(k)&&k<addM(m,-2))delete NTH[x]});try{localStorage.setItem('pfb_alerts_hidden',JSON.stringify(NTH))}catch(_){}renderBudget()}

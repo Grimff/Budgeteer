@@ -71,7 +71,8 @@ export const ACT = {
   'txMore': function (d, b, e) { BK.show=(BK.show||40)+60;return rerender(); },
   'delRc': function (d, b, e) { {const k=d.k,m=MOW(k),r=(m.rc||[]).find(x=>x.id===d.id);if(r&&r.bank){if(!confirm(`Remove ${r.store||'this transaction'} (${f2(r.amt)}) from ${mon(k)}? It goes back to the Bank tab to review.`))return;txUndo(r.txid,true);toast('Moved back to Bank review');return commit()}if(!r||!confirm(`Remove the ${f2(r.amt)} entry from ${r.store||'this store'}? Its amount comes off the actual spending.`))return;m.rc=m.rc.filter(x=>x!==r);if(m.act[r.item]!=null){const v=r2(m.act[r.item]-r.amt);if(v>0.004)m.act[r.item]=v;else delete m.act[r.item]}toast('Removed');return commit()} },
   'origAdd': function (d, b, e) { {OPEN.add('l-'+d.id);rerender();const e=document.querySelector(`[data-key="lo-${d.id}"]`);if(e){e.scrollIntoView({behavior:RM?'auto':'smooth',block:'center'});e.focus()}return} },
-  'tab': function (d, b, e) { if(S.tab!==d.t){S.tab=d.t;scrollTo({top:0,behavior:RM?'auto':'smooth'});commit(true)}return; },
+  // d.hc: the gear with the health check's dot opens Settings → Data & math, where the health check is
+  'tab': function (d, b, e) { if(d.hc&&SV!=='data'){setSV('data');try{localStorage.setItem('pfb_sview',SV)}catch(_){}if(S.tab===d.t)return renderSettings()}if(S.tab!==d.t){S.tab=d.t;scrollTo({top:0,behavior:RM?'auto':'smooth'});commit(true)}return; },
   'openMonth': function (d, b, e) { S.cur=d.k;S.tab='budget';scrollTo({top:0});return commit(true); },
   'hrng': function (d, b, e) { setHR(d.v);try{localStorage.setItem('pfb_hr',HR)}catch(_){}return renderHistory(); },
   'mgo': function (d, b, e) { return go(d.k); },

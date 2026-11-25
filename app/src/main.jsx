@@ -222,7 +222,7 @@ const unfile = n => tweak(s => { Object.keys(s.txd || {}).filter(id => !s.txd[id
 addParity({
   name: 'Bank', fn: 'renderBank', el: '#T-bank', live: true, cases: () => {
     const c = [];
-    for (const k of monthsToTry()) for (const v of ['review', 'filed', null]) c.push({ label: `${k} ${v}`, set: () => both(bv(v)(), at(k)) });
+    for (const k of monthsToTry()) for (const v of ['review', 'filed', 'subs', null]) c.push({ label: `${k} ${v}`, set: () => both(bv(v)(), at(k)) });
     for (const f of FLKIND.map(x => x[0])) c.push({ label: 'filter ' + f, set: () => both(bv('filed')(), flf(f)()) });
     for (const q of ['gro', 'zzz', 'Rent']) c.push({ label: 'search ' + q, set: () => both(bv('filed')(), flq(q)()) });
     c.push({ label: 'first 3 only', set: () => both(bv('filed')(), fln(3)()) });

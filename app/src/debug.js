@@ -18,13 +18,15 @@ import * as wealth from './lib/wealth.js';
 import * as linkedLoans from './lib/linked-loans.js';
 import * as alerts from './lib/alerts.js';
 import * as csvImport from './lib/csv-import.js';
+import * as subs from './lib/subs.js';
+import * as calendar from './lib/calendar.js';
 import * as sample from './lib/sample.js';
 import * as serverSync from './lib/server-sync.js';
 import * as named from './named.jsx';
 
 export function appNamespace() {
   const app = {};
-  for (const M of [core, math, budget, loans, goals, history, flow, events, bank, build, goalAccounts, compare, settings, wealth, linkedLoans, alerts, csvImport, sample, serverSync, named])
+  for (const M of [core, math, budget, loans, goals, history, flow, events, bank, build, goalAccounts, compare, settings, wealth, linkedLoans, alerts, csvImport, subs, calendar, sample, serverSync, named])
     for (const k of Object.keys(M)) {
       // a shared variable: its module exports set<k>, and its value isn't a function
       const set = typeof M['set' + k] === 'function' && typeof M[k] !== 'function' ? M['set' + k] : null;

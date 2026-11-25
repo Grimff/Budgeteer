@@ -32,6 +32,10 @@ export function syncWord(rf){if(!rf)return 'Transactions sync every few hours';c
 // Each check: {lv:'ok'|'warn'|'bad', t:title, d:detail, a:optional button}.
 // Each check: {lv: ok|warn|bad, t: title, d: message, a?: buttons}. d is text or a list of text and {b: bold text}; a
 // is a list of {act, label, ...data-* values} (rtHtml/rtText turn them into markup or plain text).
+// The dot on the Settings gear: how many health checks have something to look at, and the worst level ('bad' or
+// 'warn'), leaving out transactions to sort (the Bank tab's count shows those). Nothing until the budget and the
+// bank's accounts have loaded, so checks that need bank data don't light it while it's on its way.
+export function hcDot(){if(FS.state!=='ok'||!BK.st||(BK.st.configured&&!BK.accts))return{n:0};const H=healthChecks().filter(h=>h.lv!=='ok'&&!h.inbox);return{n:H.length,lv:H.some(h=>h.lv==='bad')?'bad':'warn'}}
 export function healthChecks(){const H=[],add=(lv,t,d,a)=>H.push(a&&a.length?{lv,t,d,a}:{lv,t,d}),near=(a,b)=>Math.abs(a-b)<0.51,MS=histMonths().filter(k=>k<=TK).slice(-7);
  // 1. Budget, History and the money flow use the same totals
  const bad1=MS.filter(k=>{const T=totals(k),M=monthSum(k);return !near(M.ac,T.fixedA+T.flexA+T.loansA+T.saveA)||!near(M.pl,T.fixed+T.flexP+T.loans+T.save)||!near(M.inc,T.incA)});
@@ -60,7 +64,7 @@ export function healthChecks(){const H=[],add=(lv,t,d,a)=>H.push(a&&a.length?{lv
  const MI=Object.values(cmiss);
  add(MI.length?'warn':'ok','Card purchases are all in the budget',MI.length?[...MI.flatMap((o,i)=>[i?' ':'',{b:o.nm},`: ${o.a?(o.f?`its transactions only start ${dshort(o.f)}, so`:'connected, but none of its transactions come through, so'):'not connected, so'} ${o.ids.length} payment${o.ids.length===1?'':'s'} to it (${f0(o.amt)}) ${o.a&&o.f?'before then ':''}${o.ids.length===1?'is':'are'} ignored and what you bought on it is missing.`]),' Count those payments as spending (your catch-all category) to fill the gap.']:'Every card you pay from checking has its purchases counted',MI.length?MI.map(o=>({act:'hcCard',ids:o.ids.join(','),label:`Count ${o.nm} payments as spending`})):null);
  // 7. To review
- const ib=inbox().length;add(ib?'warn':'ok','Transactions sorted',ib?`${ib} transaction${ib===1?'':'s'} waiting in Bank → To review aren’t in the budget yet`:'Everything since '+dshort(bankFrom())+' is filed',ib?[{act:'tab',t:'bank',label:'Open Bank'}]:null);
+ const ib=inbox().length;add(ib?'warn':'ok','Transactions sorted',ib?`${ib} transaction${ib===1?'':'s'} waiting in Bank → To review aren’t in the budget yet`:'Everything since '+dshort(bankFrom())+' is filed',ib?[{act:'tab',t:'bank',label:'Open Bank'}]:null);H[H.length-1].inbox=1;
  // 8. Paychecks and bills seen last month
  const lm=addM(TK,-1),pl=plan(lm),miss=pl.income.filter(i=>!i.once&&+i.amt>0&&!incGot(lm,i.id)).map(i=>i.name),bill=pl.groups.filter(g=>!g.flex).flatMap(g=>g.items).filter(i=>+i.amt>0&&isDue(i,lm)&&!billPaid(lm,i.id)).map(i=>i.name);
  add(miss.length?'warn':'ok',`Paychecks in ${mon(lm)}`,miss.length?`No deposit linked for ${miss.join(', ')}, so ${mon(lm)} counts the planned amount`:'Every planned paycheck arrived and is linked');

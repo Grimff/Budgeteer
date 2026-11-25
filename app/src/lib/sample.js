@@ -3,19 +3,21 @@
 // Shared state (other files change it with the set… functions; it was js/sample.js):
 import { reactParity, renderBudget, renderLoans } from '../named.jsx';
 import { NTH, alertsNow, ntHide } from './alerts.js';
-import { BK, billPaid, flexAct, incGot, normT } from './bank.js';
+import { BK, billPaid, flexAct, incGot, normT, CT } from './bank.js';
 import { BUDV, LOOSE, ORDN, fillAvg, orderApply, orderRead, setBSCOPE, setBUDV, setORDN } from './build.js';
 import { cmpRows } from './compare.js';
-import { C, DEMO, S, SELFTEST, TK, addM, clone, editPlan, esc, f0, f2, lab, labS, plan, r2, rtText, uid, $ } from './core.js';
+import { C, DEMO, S, SELFTEST, TK, addM, clone, editPlan, esc, f0, f2, lab, labS, plan, r2, rtText, uid, $, nextDue } from './core.js';
 import { CV, cvDate, cvDel, cvImport, cvLoadText, cvNum, cvRows } from './csv-import.js';
 import { renderAll } from './events.js';
 import { nodeKey } from './flow.js';
 import { monthSum } from './history.js';
-import { allItems, inbox, linkLoan } from './linked-loans.js';
+import { allItems, inbox, linkLoan, BV, setBV } from './linked-loans.js';
 import { goalEta, goalMon, goalSaved, path, setLP, totals, unplannedA } from './math.js';
 import { FS } from './server-sync.js';
-import { BKP, bkList, bkRestore, healthChecks } from './settings.js';
+import { BKP, bkList, bkRestore, healthChecks, SV, setSV, hcDot } from './settings.js';
 import { debtNow } from './wealth.js';
+import { subsList } from './subs.js';
+import { calBills } from './calendar.js';
 export let DEMOD=null; export function setDEMOD(v){return DEMOD=v}
 /* ---------- sample household (?demo) and self-test (?selftest) ---------- */
 // ?demo opens a made-up household that lives only in this tab: demoFetch answers every api/ call in the page (budget,
@@ -34,7 +36,7 @@ export function sampleData(){const R=demoRand(20261122),amt=(a,b)=>r2(a+R()*(b-a
   add('chk',day(k,12),'CITY POWER & LIGHT',amt(85,140),'City Power',['RENT_AND_UTILITIES','RENT_AND_UTILITIES_GAS_AND_ELECTRICITY']);
   add('chk',day(k,18),'FASTNET INTERNET',70,'Fastnet',['RENT_AND_UTILITIES','RENT_AND_UTILITIES_INTERNET_AND_CABLE']);
   add('card',day(k,20),'MOBILE PHONE CO',85,'Mobile Phone Co',['RENT_AND_UTILITIES','RENT_AND_UTILITIES_TELEPHONE']);
-  add('card',day(k,8),'STREAMFLIX',15.99,'Streamflix',['ENTERTAINMENT','ENTERTAINMENT_TV_AND_MOVIES']);
+  add('card',day(k,8),'STREAMFLIX',k<addM(TK,-1)?13.99:15.99,'Streamflix',['ENTERTAINMENT','ENTERTAINMENT_TV_AND_MOVIES']);
   if(+k.slice(5)===insM||+k.slice(5)===(insM+5)%12+1)add('chk',day(k,22),'SAFEDRIVE INSURANCE',600,'SafeDrive',['GENERAL_SERVICES','GENERAL_SERVICES_INSURANCE']);
   add('chk',day(k,10),'AUTOLEND PAYMENT',380,'',['LOAN_PAYMENTS','LOAN_PAYMENTS_CAR_PAYMENT']);
   add('chk',day(k,5),'SAMPLE LOAN SERVICER PAYMENT',320,'',['LOAN_PAYMENTS','LOAN_PAYMENTS_STUDENT_LOAN_PAYMENT']);add('sloan',day(k,5),'PAYMENT RECEIVED',-320,'',['LOAN_PAYMENTS','LOAN_PAYMENTS_STUDENT_LOAN_PAYMENT']);
@@ -151,7 +153,31 @@ export async function selfTest(){const T=[],ok=(c,name,detail='')=>T.push({ok:!!
   ok(keys.includes('conn:it-bank:ITEM_LOGIN_REQUIRED')&&card&&/sign in again/.test(card.textContent),'A bank that needs signing in shows on the Budget page');
   ok(!fi||keys.includes(`over:${TK}:${fi.i.id}`),'A category over plan shows',fi?fi.i.name:'(nothing spent yet this month)');
   ntHide('conn:it-bank:ITEM_LOGIN_REQUIRED');ok(!/sign in again/.test((document.querySelector('#T-budget .nt')||{}).textContent||''),'Hide removes an alert');
+  // Health-check dot on the gear: the bank error shows it (red), and with it the gear opens Settings → Data & math.
+  { renderAll();const g=$('.tset'),dot=g&&g.querySelector('.tdot.bad'),sv0=SV;setSV('general');g.click();const went=S.tab==='settings'&&SV==='data'&&/health/i.test($('#T-settings').textContent);
+   setSV(sv0);try{localStorage.setItem('pfb_sview',SV)}catch(_){}document.querySelector('.tabs button[data-t="budget"]').click();
+   ok(!!dot&&hcDot().lv==='bad'&&/health check/.test(g.getAttribute('aria-label'))&&went,'The gear shows a dot when the health check finds something, and opens it',`dot ${!!dot}, ${JSON.stringify(hcDot())}, opened ${went}`)}
   BK.st.items[0].error=null;delete NTH['conn:it-bank:ITEM_LOGIN_REQUIRED'];if(fi)editPlan(p=>{const it=p.groups.find(g=>g.id===fi.g.id).items.find(i=>i.id===fi.i.id);it.amt=it._was;delete it._was},TK);
+  renderAll();ok(!$('.tset .tdot')&&hcDot().n===0,'No dot on the gear when the health check is all clear',JSON.stringify(hcDot()));
+  // Recurring charges: the monthly bills and Streamflix (13.99 → 15.99 last month) are found, everyday spending isn't;
+  // the price increase is an alert and shows on Bank → Recurring, whose rows open the budget line.
+  { const QA=(q,r=document)=>[...r.querySelectorAll(q)],L=subsList(),sf=L.find(x=>x.p==='STREAMFLIX'),names=L.map(x=>x.p).join(', ');
+   ok(sf&&sf.active&&sf.every===1&&sf.amt===15.99&&sf.change&&sf.change.prev===13.99&&sf.change.up&&sf.change.since===addM(TK,-1)&&sf.v==='i:stream','A subscription’s price increase is found',JSON.stringify(sf));
+   ok(['FASTNET INTERNET','MOBILE PHONE CO'].every(p=>L.some(x=>x.p.startsWith(p.split(' ')[0])&&x.active&&x.every===1&&!x.change))&&!L.some(x=>/FRESH|QUICKFUEL|GROCER|BISTRO|PAYROLL|TRANSFER|AUTOPAY|PAYMENT/.test(x.p)),'Recurring charges: bills in, everyday spending, pay and transfers out',names);
+   ok(alertsNow().some(a=>a.key===`price:${addM(TK,-1)}:STREAMFLIX`&&/15\.99/.test(a.t)),'A price increase shows in Needs a look',alertsNow().map(a=>a.key).join(', '));
+   const ob=BV;document.querySelector('.tabs button[data-t="bank"]').click();document.querySelector('.bnav [data-v="subs"]').click();const rows=QA('#T-bank .subr'),on=L.filter(x=>x.active).length;
+   const row=rows.find(r=>/Streamflix/.test(r.textContent));ok(rows.length===L.length&&QA('#T-bank .subr:not(.off)').length===on&&row&&/Went up from \$13\.99/.test(row.textContent),'Bank → Recurring lists them with the price change',`${rows.length} rows, ${on} active`);
+   const b=row&&row.querySelector('.subn');if(b)b.click();const dl=$('#tdlg');ok(!!b&&dl&&dl.open&&CT==='i:stream','A recurring charge opens its budget line');if(dl&&dl.open)dl.close();
+   setBV(ob);try{localStorage.setItem('pfb_bview',BV)}catch(_){}document.querySelector('.tabs button[data-t="budget"]').click()}
+  // Bill calendar: every bill and loan due this month on its day, in the same status as its Budget line; a twice-a-year
+  // bill only in its due month, at its full amount; a chip opens the line.
+  { const QA=(q,r=document)=>[...r.querySelectorAll(q)];S.cur=TK;renderAll();const C=calBills(TK),rent=C.find(x=>x.v==='i:rent'),ins=allItems(TK).find(x=>x.i.id==='ins'),dk=ins&&nextDue(ins.i,TK),cd=dk?calBills(dk).find(x=>x.v==='i:ins'):null;
+   const sec=$('#T-budget .calw'),chips=sec?QA('.calg .calc, .caln .calc',sec):[];
+   const same=C.every(x=>{const r=QA('#T-budget .ledger .lr').find(e=>e.querySelector(`[data-v="${x.v}"]`)||e.getAttribute('data-v')===x.v);return !r||!x.st||(r.querySelector('.lst')||{}).textContent===x.st.t});
+   ok(rent&&rent.day===1&&rent.amt===1850&&rent.st&&rent.st.t==='Paid'&&C.some(x=>x.v.startsWith('l:'))&&!C.some(x=>x.v==='i:groc'),'The bill calendar has this month’s bills and loan payments',C.map(x=>x.name+' '+x.day).join(', '));
+   ok(!!cd&&cd.amt===600&&(dk===TK||!C.some(x=>x.v==='i:ins')),'A twice-a-year bill is on the calendar only in its due month, at its full amount',`${dk} ${cd&&cd.amt}`);
+   ok(!!sec&&chips.length===C.length&&same,'The calendar card shows each one, in the same status as its Budget line',`${chips.length} chips for ${C.length}, statuses agree ${same}`);
+   const c0=chips.find(c=>c.dataset.v==='i:rent');if(c0)c0.click();const dl=$('#tdlg');ok(!!c0&&dl&&dl.open&&CT==='i:rent','A calendar chip opens its budget line');if(dl&&dl.open)dl.close()}
   // CSV import: quotes, both signs and a date format are read; a purchase is filed by an existing rule; the same file
   // again adds nothing; removing the account takes its transactions away.
   const csv=`Date,Description,Amount\n${TK}-02,CORNER BISTRO,-23.50\n${TK}-02,"MYSTERY SHOP, INC","(10.00)"\n${TK}-03,REFUND FROM STORE,5.00\n${TK}-03,,1.00\n`;

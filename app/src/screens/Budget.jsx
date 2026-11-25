@@ -14,6 +14,7 @@ import { gLinked } from '../lib/goal-accounts.js';
 import { allItems, dshort, inbox } from '../lib/linked-loans.js';
 import { OPEN, bankSrc, destName, exShare, goalOv, goalPlan, goalSaved, isShut, loanGone, loanPlan, loanXtra, row, savedIn, target, totals, unplannedA, xmOn, xsBuild } from '../lib/math.js';
 import { SRV } from '../lib/server-sync.js';
+import { calBills, billState, loanState } from '../lib/calendar.js';
 
 // A button's data ({act, v, …}) → data-act, data-v, … props.
 const dataAttrs = o => Object.fromEntries(Object.entries(o).map(([k, v]) => ['data-' + k, v]));
@@ -44,6 +45,27 @@ function GuideCard() {
   if (done === st.length) return null;
   const sh = isShut('guide', done >= st.length - 2);
   return <section className={'card cl' + (sh ? ' shut' : '')} style={{ '--i': 0, marginTop: '16px' }}><Clh k="guide" shut={sh} title="Getting set up" sum={`${done} of ${st.length} done`} /><p className="mut" style={{ marginBottom: '8px' }}>Each step makes the budget fill itself in. This card goes away when they’re all done.</p>{st.map((x, i) => <div className={'gst' + (x.ok ? ' ok' : '')} key={i}><i>{x.ok ? '✓' : i + 1}</i><div><b>{x.t}</b><small>{x.d}</small></div>{x.ok ? null : <button type="button" className="btn g sm" {...dataAttrs(x.a)} onClick={onAct(x.a.act)}>{x.b}</button>}</div>)}</section>;
+}
+
+// Bill calendar: the month's bills and loan payments on the day they're due, coloured by status (billState/loanState),
+// each opening its pop-up. Phones get a list of only the days that have something due (CSS switches .calg/.call).
+const WD = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+const paidT = st => st && (st.t === 'Paid' || st.t === 'Pending' || st.t === 'Paid off');
+const CalChip = ({ x }) => <button type="button" className={'calc ' + (x.st ? x.st.c : '')} data-act="catTx" onClick={onAct('catTx')} data-v={x.v} title={`${tx(x.name)} · ${f0(x.amt)}${x.st ? ' · ' + x.st.t : ''}`}><span>{tx(x.name)}</span><b>{f0(x.amt)}</b>{x.st ? <small>{x.st.t}</small> : null}</button>;
+function BillCal() {
+  const k = S.cur, L = calBills(k);
+  if (!L.length) return null;
+  const [y, mo] = k.split('-').map(Number), nd = new Date(y, mo, 0).getDate(), f = new Date(y, mo - 1, 1).getDay(), td = k === TK ? NOW.getDate() : 0, B = {};
+  L.forEach(x => { const d = x.day ? Math.min(x.day, nd) : 0; (B[d] || (B[d] = [])).push(x); });
+  const tot = L.reduce((a, x) => a + x.amt, 0), left = L.filter(x => !paidT(x.st)).reduce((a, x) => a + x.amt, 0), sh = isShut('bcal', false);
+  const cells = []; for (let i = 0; i < f; i++) cells.push(<div className="cald e" key={'e' + i}></div>);
+  for (let d = 1; d <= nd; d++) cells.push(<div className={'cald' + (d === td ? ' td' : '') + (B[d] ? ' has' : '')} key={d}><i>{d}</i>{(B[d] || []).map(x => <CalChip x={x} key={x.v} />)}</div>);
+  const days = Object.keys(B).map(Number).filter(d => d).sort((a, b) => a - b);
+  return <section className={'card cl calw' + (sh ? ' shut' : '')} style={{ '--i': 4, marginTop: '16px' }}><Clh k="bcal" shut={sh} title="Bill calendar" sum={`${L.length} due · ${f0(tot)}${SRV && k >= TK && left > 0.5 && left < tot - 0.5 ? ' · ' + f0(left) + ' still to pay' : ''}`} />{' '}
+    <div className="calg" role="grid" aria-label={'Bills due in ' + mon(k)}>{WD.map(w => <div className="calh" key={w}>{w}</div>)}{cells}</div>{' '}
+    <div className="call">{days.map(d => <div className={'cali' + (d === td ? ' td' : '')} key={d}><i>{MN[mo - 1]} {d}{d === td ? ' · today' : ''}</i>{B[d].map(x => <CalChip x={x} key={x.v} />)}</div>)}</div>{' '}
+    <div className="calk" aria-hidden="true">{[['ok', 'Paid'], ['', 'Due'], ['hot', 'Pending or late'], ['bad', 'Not seen'], ['dim', 'Not linked']].map(([c, t]) => <span className={'calc ' + c} key={t}>{t}</span>)}</div>{' '}
+    {B[0] ? <div className="caln"><i>No due day set</i>{B[0].map(x => <CalChip x={x} key={x.v} />)}</div> : null}</section>;
 }
 
 // Last month in review (current month, until Done).
@@ -114,7 +136,7 @@ export function ThisMonth() {
     if (!gr.items.length) return; let pl = 0, a = 0, ua = 0;
     const rows = gr.items.map(i => {
       const pd = SRV ? billPaid(k, i.id) : null, rl = SRV ? rulesFor('i:' + i.id) : [], due = +i.due || 0, amt = +i.amt || 0, sk = +i.freq > 1, dm = isDue(i, k), aside = sk && !pd && !dm; pl += amt; if (pd) { a += pd.amt; if (amt <= 0.5) ua += pd.amt; } else if (aside) a += amt;
-      let s = ''; if (aside) s = stp('Set aside', 'ok'); else if (SRV) { if (pd) s = pd.list.every(x => PSET.has(x.id)) ? stp('Pending', 'hot') : stp('Paid', 'ok'); else if (!rl.length) s = stp('Not linked', 'dim'); else if (k < TK) s = stp('Not seen', 'bad'); else if (k === TK && due && NOW.getDate() > due + 3) s = stp('Not seen yet', 'hot'); else s = stp(due ? 'Due ' + ord(due) : 'Upcoming'); }
+      const bs = billState(i, k), s = bs ? stp(bs.t, bs.c) : '';
       return { v: 'i:' + i.id, name: i.name, tag: once1(i), meta: [sk ? `${f0(i.base)} ${FQ[i.freq] || 'every ' + i.freq + ' months'} · ${pd ? 'paid ' + f0(pd.real) + ' from the set-aside' : 'due ' + MN[+nextDue(i, k).slice(5) - 1]} · ${f0(sinkFund(i.id, k))} set aside` : '', due ? 'Due the ' + ord(due) : '', pd && !sk ? (pd.list.length > 1 ? pd.list.length + ' payments' : 'Paid ' + dshort(pd.list[0].d)) : ''].filter(Boolean).join(' · '), pl: amt, a: pd ? pd.amt : aside ? amt : null, s };
     });
     LG.push({ kind: gr.loose ? 'Not in a group' : 'Bills', name: gr.name, c: gr.color, pl, a, ua, rows, ah: 'Paid' });
@@ -132,11 +154,7 @@ export function ThisMonth() {
   });
   { let pl = 0, a = 0, un = null; const rows = S.loans.filter(l => !loanGone(l, k)).map(l => {
       const r = k < l.start ? null : row(l, k), mn = loanPlan(l, k), xt = loanXtra(l, k), lk = l.acct && l.link ? l.link.inst : '', pd = r && (r.auto || r.lg) ? r.pay : null; pl += mn; a += pd || 0;
-      const lr = bankSrc(l) && SRV ? rulesFor('l:' + l.id).length + (lk ? 1 : 0) : 0; let s;
-      if (pd != null && xt > 0.5 && pd < mn - 0.5) s = k < TK ? stp('Paid ' + f0(pd), '') : stp(f0(mn - pd) + ' extra to go', '');
-      else if (pd != null) s = stp('Paid', 'ok'); else if (mn <= 0) s = stp('Paid off', 'ok'); else if (lk && !lr && k >= TK) s = stp(k === TK ? 'Waiting' : 'Upcoming');
-      else if (lr) s = k < TK ? stp('Not seen', 'bad') : k === TK && l.due && NOW.getDate() > l.due + 3 ? stp('Not seen yet', 'hot') : stp(l.due ? 'Due ' + ord(l.due) : 'Upcoming');
-      else { s = stp(SRV && !lk ? 'Not linked' : 'Not logged', k < TK ? 'bad' : SRV && !lk ? 'dim' : ''); if (!lk && !un) un = l.id; }
+      const lr = bankSrc(l) && SRV ? rulesFor('l:' + l.id).length + (lk ? 1 : 0) : 0, ls = loanState(l, k), s = stp(ls.t, ls.c); if (ls.unl && !un) un = l.id;
       return { v: 'l:' + l.id, name: l.name, meta: [xt > 0.5 ? `min ${f0(Math.min(l.min, mn))} + ${f0(xt)} extra${exShare('l:' + l.id, k) > 0.5 ? ` (${f0(exShare('l:' + l.id, k))} from extra money)` : ''}` : '', lk ? 'Linked · ' + tx(lk) + (lr ? ' · payments from your bank' : '') : lr ? 'Bank payment linked' : '', l.due ? 'Due the ' + ord(l.due) : ''].filter(Boolean).join(' · '), pl: mn, a: pd, s };
     });
     if (rows.length) LG.push({ kind: 'Loans', name: 'Loan payments', c: 'var(--sky)', pl, a, rows, ah: 'Paid', foot: <div className="lft">{un ? <button className="btn g sm" data-act="logPay" onClick={onAct('logPay')} data-id={un}>Log a payment</button> : null}<button className="lnk" data-act="tab" onClick={onAct('tab')} data-t="loans">Open Loans</button></div> }); }
@@ -153,6 +171,6 @@ export function ThisMonth() {
     <section className="card flowc" style={{ '--i': 1 }}><div className="bh"><div><h2>Where the money goes</h2><p>{S.flow === 'compare' ? 'Each line’s plan against what’s really happened, worst first. Click a line for its transactions.' : 'Income on the left flows into each part of the budget. Point at anything for its share; click a name for its transactions, or a group for its breakdown.'}</p></div><div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}><div className="seg" hidden={S.flow === 'compare'}><button data-act="zout" onClick={onAct('zout')} aria-label="Zoom out">−</button><button data-act="zfit" onClick={onAct('zfit')}>Fit</button><button data-act="zin" onClick={onAct('zin')} aria-label="Zoom in">+</button></div><div className="seg"><button data-act="flow" onClick={onAct('flow')} data-v="plan" className={S.flow !== 'actual' ? 'on' : ''}>Planned</button><button data-act="flow" onClick={onAct('flow')} data-v="actual" className={S.flow === 'actual' ? 'on' : ''}>Actual</button><button data-act="flow" onClick={onAct('flow')} data-v="compare" className={S.flow === 'compare' ? 'on' : ''}>Compare</button></div></div></div>{/* new elements on every draw (drawNo): sankey(), skPos/skPlace, hl/zset and the drag-pan write into these by hand */}<Fragment key={'flow' + drawNo()}><div className="zb" id="zb"></div><div className="skw"><div id="sk"></div><div id="skt" className="skt" hidden></div><div id="skc" className="skc" role="dialog" aria-label="Breakdown" hidden></div></div></Fragment></section>
     <div className="lhead" style={{ '--i': 2 }}><div><h2>Budget lines</h2><p className="mut">Click any line to see its transactions, move one, or link it to your bank.</p></div><button className="btn g sm" data-act="budv" onClick={onAct('budv')} data-v="build">Edit budget</button></div>{' '}
     {nRec ? <div className="tip" style={{ '--i': 2, marginBottom: '16px' }}><i>!</i><p><b>{nRec} charge{nRec === 1 ? ' looks' : 's look'} like a bill</b> but {nRec === 1 ? 'isn’t' : 'aren’t'} tied to one yet. <button className="lnk" data-act="budv" onClick={onAct('budv')} data-v="build" style={{ padding: 0 }}>Review in Build budget</button></p></div> : null}{' '}
-    <div className="ledger" style={{ '--i': 3 }}>{LG.map((o, i) => <Sec key={i} o={o} />)}</div><RcList m={{ rc: (m.rc || []).filter(r => !r.bank) }} />
+    <div className="ledger" style={{ '--i': 3 }}>{LG.map((o, i) => <Sec key={i} o={o} />)}</div><BillCal /><RcList m={{ rc: (m.rc || []).filter(r => !r.bank) }} />
   </>;
 }

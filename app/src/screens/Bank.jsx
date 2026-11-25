@@ -3,7 +3,8 @@
 import { tx, onAct, onInp, onChg, drawNo } from '../bridge.js';
 import { Gear, TxOpts } from '../ui.jsx';
 import { BK, FLQ, PSET, defAlways, flexDefault, pairIssues, tdir, titleC } from '../lib/bank.js';
-import { S, TK, addM, f2, lab, mon } from '../lib/core.js';
+import { S, TK, addM, f0, f2, lab, mon } from '../lib/core.js';
+import { subsList, everyWord } from '../lib/subs.js';
 import { BV, FLF, FLKIND, FLN, dshort, fileKind, inbox, pfcName, suggestTx, txLabel } from '../lib/linked-loans.js';
 import { OPEN } from '../lib/math.js';
 import { SRV } from '../lib/server-sync.js';
@@ -26,6 +27,19 @@ function PairCard() {
   return <section className="card" style={{ marginBottom: '16px' }}><div className="bh"><div><h2>Possible double counts ({I.length})</h2><p>These are payments between your own accounts, like checking to a card or loan, but they’re filed as spending or income. The purchases on the card already count.</p></div><button className="btn sm" data-act="fixPairs" onClick={onAct('fixPairs')}>Make {I.length === 1 ? 'it a transfer' : 'them transfers'}</button></div>{I.slice(0, 30).map(({ r }, i) => <div className="txr dn" key={i}><span className="txd">{dshort(r.d)}</span><div className="nm"><b>{tx(r.n)}</b><small>{tx(txLabel(r))}</small></div><b className="txa">{f2(Math.abs(r.amt))}</b></div>)}</section>;
 }
 
+// Bank → Recurring: charges that repeat on a schedule (subs.js), what they cost a year, and price changes.
+const SubRow = ({ x }) => {
+  const nm = <b>{tx(x.label)}{x.fresh ? <> <span className="fl">new</span></> : null}</b>;
+  const when = x.active ? (x.next ? 'next about ' + dshort(x.next) : '') : 'last ' + dshort(x.last);
+  return <div className={'subr' + (x.active ? '' : ' off')}><div className="nm">{x.open ? <button className="subn" data-act="catTx" onClick={onAct('catTx')} data-v={x.v} title={`Open ${tx(x.item)}`}>{nm}</button> : nm}<small>{everyWord(x.every)}{when ? ' · ' + when : ''} · {x.item ? 'in ' + tx(x.item) : 'not in the budget yet'}</small>{x.change ? <small className={'subc ' + (x.change.up ? 'up' : 'dn')}>{x.change.up ? 'Went up' : 'Went down'} from {f2(x.change.prev)} in {mon(x.change.since)} ({x.change.up ? '+' : '−'}{f0(Math.abs(x.amt - x.change.prev) * 12 / x.every)} a year)</small> : null}</div><div className="suba"><b>{f2(x.amt)}</b><small>{f0(x.yearly)} a year</small></div></div>;
+};
+function Subs() {
+  const L = subsList(), on = L.filter(x => x.active), off = L.filter(x => !x.active), yr = on.reduce((a, x) => a + x.yearly, 0);
+  return <section className="card"><div className="bh"><div><h2>Recurring charges</h2><p>Charges that repeat on a schedule at a steady price, from your last 14 months of bank data. Price changes are flagged, and an increase also shows in Needs a look.</p></div></div>{' '}
+    {on.length ? <><p className="subt"><b>{on.length}</b> active · about <b>{f0(yr / 12)}</b> a month · <b>{f0(yr)}</b> a year</p>{on.map(x => <SubRow x={x} key={x.p} />)}</> : <p className="mut">Nothing repeats on a schedule yet. Charges show up here after they’ve come in a few times.</p>}{' '}
+    {off.length ? <details className="more" data-key="subsoff" open={OPEN.has('subsoff')} style={{ marginTop: '14px' }}><summary>Seem to have stopped ({off.length})</summary>{off.map(x => <SubRow x={x} key={x.p} />)}</details> : null}</section>;
+}
+
 const Head = ({ right = null, line = null }) => <div className="phead"><div><h1>Bank</h1><p className="mut">{line || 'Transactions from your banks and cards, and the rules that file them.'}</p></div>{right}</div>;
 
 export function Bank() {
@@ -37,10 +51,11 @@ export function Bank() {
   const bad = items.filter(it => it.error).length, last = items.map(it => it.lastSync).filter(Boolean).sort().pop();
   const line = <>{st.env === 'sandbox' ? 'Plaid test mode · ' : ''}{BK.busy || st.syncing ? 'Syncing now…' : last ? 'Last synced ' + new Date(last).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }) : 'Not synced yet'} · {items.length} connection{items.length === 1 ? '' : 's'}{bad ? <> · <b style={{ color: '#ff9aa8' }}>{bad} need{bad === 1 ? 's' : ''} attention</b></> : ''}</>;
   const right = <div className="phact"><button className="btn g sm" data-act="sview" onClick={onAct('sview')} data-v="rules">Rules{R.length ? ' (' + R.length + ')' : ''}</button><button className="btn g sm ib" data-act="sview" onClick={onAct('sview')} data-v="connections"><Gear />Connections{bad ? ' (' + bad + ' to fix)' : ''}</button><button className="btn g sm" data-act="bankSync" onClick={onAct('bankSync')} disabled={!!BK.busy}>{BK.busy ? 'Syncing…' : 'Sync now'}</button></div>;
-  let v = BV; if (!['review', 'filed'].includes(v)) v = ib.length || pi.length ? 'review' : 'filed';
+  let v = BV; if (!['review', 'filed', 'subs'].includes(v)) v = ib.length || pi.length ? 'review' : 'filed';
   const nb = (k, l, n, hot) => <button className={v === k ? 'on' : ''} data-act="bview" onClick={onAct('bview')} data-v={k}>{l}{n != null ? <> <span className={hot ? 'bn hot' : 'bn'}>{n}</span></> : null}</button>;
-  const top = <><Head right={right} line={line} /><div className="seg bnav" role="tablist" aria-label="Bank sections">{nb('review', 'To review', ib.length + pi.length, ib.length + pi.length > 0)}{nb('filed', 'Filed in ' + mon(S.cur).slice(0, 3), done.length)}</div></>;
+  const top = <><Head right={right} line={line} /><div className="seg bnav" role="tablist" aria-label="Bank sections">{nb('review', 'To review', ib.length + pi.length, ib.length + pi.length > 0)}{nb('filed', 'Filed in ' + mon(S.cur).slice(0, 3), done.length)}{nb('subs', 'Recurring', null)}</div></>;
   if (!items.length) return <>{top}<section className="card"><h2>No banks connected yet</h2><p className="mut" style={{ margin: '6px 0 14px' }}>Click <b>Connect a bank</b>, then pick your bank and sign in through Plaid. Do this from a computer. Connections and rules live in Settings.</p><button className="btn sm" data-act="bankConnect" onClick={onAct('bankConnect')}>Connect a bank</button></section></>;
+  if (v === 'subs') return <>{top}<Subs /></>;
   if (v === 'review') return <>{top}<PairCard /><section className="card"><div className="bh"><div><h2>To review{ib.length ? ' (' + ib.length + ')' : ''}</h2><p>Pick a category and Add. Tick <b>Always</b> and the next ones like it file themselves.</p></div>{ib.length ? <button className="btn lime" data-act="txAll" onClick={onAct('txAll')}>Add all {show.length < ib.length ? show.length + ' shown' : ib.length}</button> : null}</div>{' '}
     {ib.length ? <>{show.map(t => { const sg = suggestTx(t), et = tx(t.id), mk = t.date.slice(0, 7); return <div className="txr" key={t.id}><span className="txd">{dshort(t.date)}</span><div className="nm"><b>{tx(t.merchant || t.name)}<Pnd id={t.id} /></b><small>{tx(t.accountName || '')}{pfcName(t) ? ' · ' + tx(pfcName(t)) : ''}</small></div><b className={'txa' + (t.amount < 0 ? ' inflow' : '')}>{t.amount < 0 ? '+' : ''}{f2(Math.abs(t.amount))}</b><select className="in txs" data-tx={et} aria-label={`Category for ${tx(t.merchant || t.name)}`} defaultValue={sg} ref={onChg}><TxOpts k={mk} dir={tdir(t)} /></select><label className="alw" title="File future transactions like this one the same way"><input type="checkbox" data-alw={et} defaultChecked={defAlways(sg, mk)} />Always</label><button className="btn sm" data-act="txAdd" onClick={onAct('txAdd')} data-id={et}>Add</button></div>; })}{ib.length > show.length ? <button className="add" data-act="txMore" onClick={onAct('txMore')} style={{ marginTop: '10px' }}>Show more</button> : null}</>
       : <p className="mut">All caught up. New transactions that need you show up here after each sync.</p>}{' '}
