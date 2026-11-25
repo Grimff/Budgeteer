@@ -38,7 +38,7 @@ if (tsv) {
   for (const sf of prog.getSourceFiles().filter(x => files.includes(path.resolve(x.fileName))))
     for (const d of prog.getSemanticDiagnostics(sf)) {
       if (!/^Cannot find name '/.test(tsv.flattenDiagnosticMessageText(d.messageText, ' '))) continue;
-      const name = sf.text.slice(d.start, d.start + d.length); if (name === 'Plaid') continue;
+      const name = sf.text.slice(d.start, d.start + d.length); if (name === 'Plaid' || name === '__BUILD__') continue;   // __BUILD__: the build stamp tools/build.js defines
       bad.push(`${name} is used but not imported or declared: ${path.relative(path.join(SRC, '..', '..'), sf.fileName)}:${sf.getLineAndCharacterOfPosition(d.start).line + 1}`);
     }
 }

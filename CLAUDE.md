@@ -35,12 +35,17 @@ Docker (`docker compose up -d --build`) on port 8095. Bank data comes from Plaid
   real environment variables win. Relative `DATA_DIR` is resolved from the project folder.
 - **Settings and secrets:** `.env` (git-ignored; template `.env.example`) holds `PLAID_CLIENT_ID`, `PLAID_SECRET`,
   `PLAID_ENV`, `BASIC_AUTH` and the rest. `data/` is git-ignored and never committed.
+- **Build stamp:** `tools/build.js` puts `{version, rev, built}` into the bundle as `__BUILD__` (check.js allows that
+  name) and into `dist/build.json`, which the server reads at start. `rev` = `BUILD_REV` (update.sh, Docker build arg)
+  or git. **`./update.sh`** (NAS): `git pull --ff-only`, `BUILD_REV=<commit> docker compose build` + `up -d`, then asks
+  the container's `/api/health` (it returns `rev`) until it answers with the new commit. `docker compose up -d --build`
+  alone rebuilds the code already on disk; it doesn't pull (users have been caught by this).
 - **Docker:** `docker-compose.yml` builds the `Dockerfile` (stage 1 runs `npm ci` + `tools/build.js`; stage 2 is
   node:22-alpine + `app/` without `src/` + the built `dist/`; `.dockerignore` lets in only those files), loads `.env` with `env_file`,
   forces `DATA_DIR=/data`, `PORT=8080`, and mounts `${DATA_PATH:-./data}:/data`. `DATA_REQUIRED=1` makes the server exit at
   start when there's no budget file (a NAS share not mounted yet), so Docker's restart policy retries until it is.
-- **Release:** run `npm test` (must pass), bump the footer "Version N" (`fsUIR` in app/src/chrome.jsx) and the
-  README, commit, push main, then tag `vN` and push the tag. Current: **Version 3** (Version 1 was the string-built front end; 3 is the React one, see "How the front end
+- **Release:** run `npm test` (must pass), bump `APP_VERSION` in app/src/lib/core.js (the footer, Settings and the build
+  stamp read it) and the README, commit, push main, then tag `vN` and push the tag. Current: **Version 3** (Version 1 was the string-built front end; 3 is the React one, see "How the front end
   works"; 2 was skipped). "Version N"/"vN" mentions below are
   from the app's earlier history and use the old numbering.
 
@@ -78,6 +83,10 @@ server against a real `data/` folder while testing; use `tools/realtest.js`.
   `KEY+'_demo'` for localStorage, so real data is never read or written. `?selftest` = demo + `selfTest()` (35+
   checks: totals against the raw sample transactions, transfers, set-asides, loans, goals, health checks, saving, every
   tab and view). Add a check there for any new feature or bug fix. A new `api/` route needs a `demoFetch` answer.
+- **Troubleshooting copy:** Settings → Data & math → Download a copy for troubleshooting (`abCopy` → `GET
+  /api/support-copy`): one JSON `{app:'budgeteer-support-copy', made, build, files:{<each data file>}}` with every key
+  matching token/secret/password/cursor removed. `node tools/realtest.js <copy.json>` runs the test server from it. Ask
+  for this instead of the separate files (people copy the wrong folder: check `savedAt`).
 - **Testing recipe** (`node tools/realtest.js` does all of this; port 18096): copy the 5 JSON files from `data/` to a temp folder, replace every
   `access_token` with `fake-<item_id>`, run a tiny fake Plaid (replays accounts from that copy;
   `/transactions/sync` returns nothing new unless `<temp copy>/fake-sync.json` holds a scripted
@@ -144,7 +153,12 @@ server against a real `data/` folder while testing; use `tools/realtest.js`.
 
 ## Server API (`server.js`)
 
-- `GET /api/health`, `GET /api/rev`, `GET/PUT /api/data` (PUT with `baseRev` → 409 on conflict;
+- `GET /api/about` (Settings → General → **This server**, `AboutCard`, loaded by `abLoad` when Settings opens into
+  `ABT`; `PAGE_BUILD` = this page's `__BUILD__`): build, start time, data folder (`DATA_PATH` from .env when in Docker),
+  writable, last save (`savedAt`), last sync, sync errors, file sizes/times, daily copies. The card warns when the folder
+  isn't writable, no sync for 26 h (unless refresh is Sync now only), connections with errors, and when this page runs
+  an older build than the server (Reload now).
+- `GET /api/health` (`{ok, app, rev}`), `GET /api/rev`, `GET/PUT /api/data` (PUT with `baseRev` → 409 on conflict;
   atomic write; daily backup). Optional `BASIC_AUTH=user:pass`.
 - **Backups:** `dailyBackup` copies the budget before the first save of each local day (`today()`) to
   `backups/budgeteer-YYYY-MM-DD.json`. `GET /api/backups` (`listBackups`: daily + `budgeteer-before-restore-<time>.json`),

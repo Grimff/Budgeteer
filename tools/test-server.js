@@ -89,6 +89,10 @@ const det = () => (calls['/liabilities/get'] || 0) + '/' + (calls['/investments/
   const l = JSON.parse((await req('GET', '/api/bank/loans')).body).accounts[0];
   ok(l && Object.values(l.pays).reduce((x, y) => x + y, 0) === 60 * 300 && l.liab && l.liab.apr === 5, `loan payments grouped correctly (${Object.keys(l.pays).length} month(s), $${Object.values(l.pays).reduce((x, y) => x + y, 0)}) with lender details`);
   const ac = JSON.parse((await req('GET', '/api/bank/accounts')).body).accounts; ok(ac.length === 4 && ac.find(x => x.type === 'investment').holdings, 'accounts include holdings');
+  // About this server, and the troubleshooting copy: everything, with no bank token or sync cursor left in it
+  const ab = JSON.parse((await req('GET', '/api/about')).body); ok(ab.app === 'budgeteer' && ab.writable === true && Array.isArray(ab.files) && ab.files.length === 5 && ab.connections >= 1 && 'rev' in ab && ab.started, `about: ${ab.files && ab.files.length} files, writable ${ab.writable}`);
+  const cp = await req('GET', '/api/support-copy'), cj = JSON.parse(cp.body);
+  ok(cj.app === 'budgeteer-support-copy' && cj.files['bank-transactions.json'] && cj.files['bank-connections.json'].items.length && !/access_token|"cursor"|-tok|secret/i.test(cp.body) && /attachment/.test(cp.h['content-disposition'] || ''), 'the troubleshooting copy has everything but no bank token');
   const ret = ac.find(x => x.id.endsWith('-ret')); ok(ret && ret.type === 'investment' && Array.isArray(ret.flows), `a 401(k) the bank files under another type is an investment account (${ret && ret.type})`);
   const st = JSON.parse((await req('GET', '/api/bank/status')).body); ok(st.items[0].count === 3000 && !JSON.stringify(st).includes('fake-a'), 'status has counts and no tokens');
   // CSV import: new account, two identical rows kept as two, the same file again adds nothing, a sync leaves it alone

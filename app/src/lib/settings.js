@@ -4,7 +4,7 @@
 import { renderSettings, rulesFilter } from '../named.jsx';
 import { BK, autoSave, bankFrom, billPaid, incGot, pairIssues, titleC } from './bank.js';
 import { budStart } from './build.js';
-import { S, TK, addM, f0, f2, isDue, labS, mon, plan, $ } from './core.js';
+import { S, TK, addM, f0, f2, isDue, labS, mon, plan, $, APP_VERSION } from './core.js';
 import { rerender } from './events.js';
 import { histMonths, monthSum } from './history.js';
 import { dshort, inbox } from './linked-loans.js';
@@ -27,6 +27,15 @@ export async function bkRestore(id){const b=(Array.isArray(BKP)?BKP:[]).find(x=>
   clearTimeout(FS.t);const d=await srvGet();if(d){adopt(d);FS.dirty=false;try{localStorage.removeItem(PEND)}catch(_){}autoSave();rerender()}toast('Budget restored from '+bkLabel(b));bkList()}
  catch(e){toast('Couldn’t restore: '+e.message)}}
 export const whenS=d=>new Date(d).toLocaleString('en-US',{month:'short',day:'numeric',hour:'numeric',minute:'2-digit'});
+// About this server (Settings → General): the build it has and the one this page runs, where its data is, when it last
+// saved and synced. Loaded when Settings opens (abLoad, from the tab/sview actions), so drawing stays pure.
+export let ABT=null; export function setABT(v){return ABT=v}
+export const PAGE_BUILD=(typeof __BUILD__!=='undefined'?__BUILD__:null)||{version:APP_VERSION,rev:'',built:''};
+export async function abLoad(){if(!SRV)return;try{const r=await fetch('api/about',{cache:'no-store'});if(!r.ok)throw new Error('HTTP '+r.status);ABT=await r.json()}catch(e){ABT={err:e.message}}renderSettings()}
+// The troubleshooting copy: every data file in one download, bank tokens taken out by the server.
+export async function abCopy(){try{const r=await fetch('api/support-copy',{cache:'no-store'});if(!r.ok)throw new Error('HTTP '+r.status);const b=await r.blob(),a=document.createElement('a');
+ a.href=URL.createObjectURL(b);a.download=`budgeteer-copy-${new Date().toISOString().slice(0,10)}.json`;document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove()},4000);
+ toast('Downloaded. Bank tokens are taken out; it still has your transactions and balances, so share it only with someone helping you.')}catch(e){toast('Couldn’t make the copy: '+e.message)}}
 export function syncWord(rf){if(!rf)return 'Transactions sync every few hours';const o=SYNC_OPTS.find(x=>x[0]===rf.hours);return rf.hours?`Checks ${o?o[1].toLowerCase():'every '+rf.hours+' hours'}${rf.open?' and when the app is opened':''}`:(rf.open?'Checks when the app is opened or you tap Sync now':'Checks only when you tap Sync now')}
 // Health check (Settings → Data & math): proves the tabs agree and points at data that would make the budget wrong.
 // Each check: {lv:'ok'|'warn'|'bad', t:title, d:detail, a:optional button}.

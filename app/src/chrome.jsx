@@ -1,7 +1,7 @@
 // The save status (was fsUI): the banner under the header (#sync), the header pill (#spill) and the footer line (#saved). demo: the sample household's
 // wording (DEMO, a parameter so the parity check can compare both).
 import { draw, tx, onAct } from './bridge.js';
-import { DEMO, $ } from './lib/core.js';
+import { DEMO, $, APP_VERSION } from './lib/core.js';
 import { FS } from './lib/server-sync.js';
 
 
@@ -13,6 +13,6 @@ export function fsUIR(demo = DEMO) {
   const b = $('#sync'), pill = $('#spill'), sv = $('#saved');
   draw(b, <Sync demo={demo} />);
   const st = FS.state === 'wait' ? ['', 'Connecting…'] : FS.state === 'ok' ? ['ok', FS.dirty || FS.busy ? 'Saving to the server…' : `Saved to the server${FS.last ? ' at ' + FS.last.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }) : ''}`] : ['bad', 'Not saved to the server. Saved in this browser only'];
-  draw(sv, <><span className="dim">Version 3</span> · <i className={'sdot ' + st[0]}></i>{demo ? 'Sample data · nothing is saved' : st[1]}</>);
+  draw(sv, <><span className="dim">Version {APP_VERSION}</span> · <i className={'sdot ' + st[0]}></i>{demo ? 'Sample data · nothing is saved' : st[1]}</>);
   pill.hidden = FS.state === 'wait'; pill.className = 'sp ' + st[0]; draw(pill, <><i className={'sdot ' + st[0]}></i>{FS.state === 'ok' ? (FS.dirty || FS.busy ? 'Saving…' : 'Synced') : 'Not synced'}</>);
 }

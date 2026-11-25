@@ -8,7 +8,9 @@ COPY package.json package-lock.json ./
 RUN npm ci --no-audit --no-fund
 COPY tools/build.js tools/
 COPY app/ app/
-RUN node tools/build.js
+# The commit, stamped into the build so Settings can show what's running (update.sh passes it; blank otherwise).
+ARG BUILD_REV=
+RUN BUILD_REV=$BUILD_REV node tools/build.js
 
 # 2. The server: no npm packages, just the app and the built screens.
 FROM node:22-alpine

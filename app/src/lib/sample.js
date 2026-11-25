@@ -13,8 +13,8 @@ import { nodeKey } from './flow.js';
 import { monthSum } from './history.js';
 import { allItems, inbox, linkLoan, BV, setBV, txUndo, txAssign } from './linked-loans.js';
 import { goalEta, goalMon, goalSaved, path, setLP, totals, unplannedA, linkedChange, goalShare, savedWork, invInfo, savedIn, linkedSaved } from './math.js';
-import { FS } from './server-sync.js';
-import { BKP, bkList, bkRestore, healthChecks, SV, setSV, hcDot } from './settings.js';
+import { FS, sharedData } from './server-sync.js';
+import { BKP, bkList, bkRestore, healthChecks, SV, setSV, hcDot, PAGE_BUILD, abLoad } from './settings.js';
 import { debtNow } from './wealth.js';
 import { subsList } from './subs.js';
 import { calBills } from './calendar.js';
@@ -104,6 +104,8 @@ export async function demoFetch(u,o={}){const url=new URL(String(u),location.hre
   if(b.balance!=null){a.bal=b.balance;D.accts.filter(x=>x.id===a.id).forEach(x=>x.bal=b.balance)}it.count=D.tx.filter(t=>t.item==='csv').length;it.lastSync=new Date().toISOString();D.tx.sort((x,y)=>y.date.localeCompare(x.date));return J(200,{ok:true,added,skipped,account:a.id})}
  if(p.startsWith('/api/bank/import/')&&m==='DELETE'){const id=decodeURIComponent(p.split('/').pop()),it=D.items.find(x=>x.kind==='csv');if(!it)return J(404,{error:'unknown account'});it.accounts=it.accounts.filter(x=>x.id!==id);D.tx=D.tx.filter(t=>t.account!==id);D.accts=D.accts.filter(x=>x.id!==id);D.loans=D.loans.filter(x=>x.id!==id);if(!it.accounts.length)D.items=D.items.filter(x=>x!==it);return J(200,{ok:true})}
  if(p.startsWith('/api/notify'))return J(200,{configured:false,sent:0});   // no phone alerts from sample data
+ if(p==='/api/about')return J(200,{app:'budgeteer',...PAGE_BUILD,started:new Date(Date.now()-36e5).toISOString(),node:'sample',docker:true,dataDir:'/data',dataPath:'',writable:true,savedAt:new Date().toISOString(),lastSync:new Date(Date.now()-12e5).toISOString(),connections:3,syncErrors:0,files:['budgeteer-data.json','bank-connections.json','bank-transactions.json','bank-loans.json','bank-investments.json'].map((name,i)=>({name,size:20000*(i+1),at:new Date().toISOString()})),backups:3});
+ if(p==='/api/support-copy')return J(200,{app:'budgeteer-support-copy',made:new Date().toISOString(),build:PAGE_BUILD,files:{'budgeteer-data.json':{data:sharedData()}}});
  if(p==='/api/backups')return J(200,{backups:[1,2,3].map(n=>{const at=new Date(Date.now()-n*864e5).toISOString().slice(0,10);return{id:`budgeteer-${at}.json`,kind:'daily',at,size:20000}})});
  if(p==='/api/backups/restore'&&m==='POST'){D.rev+=2;D.restored=(D.restored||0)+1;return J(200,{ok:true,rev:D.rev})}   // sample: keeps the same budget
  return J(400,{error:'Not available with sample data.'})}
@@ -194,6 +196,11 @@ export async function selfTest(){const T=[],ok=(c,name,detail='')=>T.push({ok:!!
    S.tab='goals';renderAll();const flag=/doesn’t count toward goals/.test($('#T-goals').textContent),pick=[...document.querySelectorAll('#T-goals select[data-gacct] option, #T-goals select[data-alacct] option')].some(o=>o.value===c.id);
    delete S.alloc[c.id];setALC({});setLP({});S.tab='budget';renderAll();
    ok(s1===s0&&p1===p0&&!!w&&flag&&!pick,'A checking account linked to a goal adds nothing to it and is flagged',`saved ${s0}→${s1}, progress ${p0}→${p1}, flagged ${flag}, offered ${pick}`)}
+  // Settings → This server: what's running, that this page runs the same build, save and sync times; and the
+  // troubleshooting download button
+  { const sv0=SV;await abLoad();setSV('general');S.tab='settings';renderAll();const t=($('#T-settings .abt')||{}).textContent||'';setSV('data');renderAll();const btn=!!$('#T-settings [data-act="abCopy"]');
+   setSV(sv0);S.tab='budget';renderAll();
+   ok(/Version 3/.test(t)&&/Same build/.test(t)&&/Budget saved/.test(t)&&/Bank synced/.test(t)&&btn,'Settings shows what the server runs and offers the troubleshooting copy',t.slice(0,120))}
   // Rent for next month paid late this month counts in next month (not twice in this one); a filing made before that
   // rule existed is moved on the next filing pass; a hand filing is never moved.
   { const rt=BK.tx.find(t=>t.date.slice(0,7)===TK&&/OAKWOOD/.test(t.name)),last=new Date(+TK.slice(0,4),+TK.slice(5,7),0).getDate(),id='st-early';

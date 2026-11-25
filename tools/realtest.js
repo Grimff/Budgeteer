@@ -1,12 +1,16 @@
 // Local test on a copy of the real data: copies ../data to a temp folder with every Plaid token replaced, runs a
 // fake Plaid that replays the stored accounts (nothing else), and starts server.js on http://localhost:18096.
 // Never point a server at data/ directly. Run: node tools/realtest.js  (delete the temp copy afterwards if you like).
+// Or from a troubleshooting copy (Settings → Data & math → Download a copy for troubleshooting):
+//   node tools/realtest.js path/to/budgeteer-copy-YYYY-MM-DD.json
 'use strict';
 const fs = require('fs'), path = require('path'), http = require('http');
 const SRC = path.join(__dirname, '..', 'data'), DST = path.join(require('os').tmpdir(), 'budgeteer-realtest');
 fs.rmSync(DST, { recursive: true, force: true }); fs.mkdirSync(DST, { recursive: true });
+const COPY = process.argv[2] ? JSON.parse(fs.readFileSync(process.argv[2], 'utf8')) : null;
+if (COPY && COPY.app !== 'budgeteer-support-copy') { console.error(process.argv[2] + ' isn’t a Budgeteer troubleshooting copy.'); process.exit(1); }
 for (const f of ['budgeteer-data.json', 'bank-connections.json', 'bank-transactions.json', 'bank-loans.json', 'bank-investments.json']) {
-  let s = fs.readFileSync(path.join(SRC, f), 'utf8');
+  let s = COPY ? JSON.stringify(COPY.files[f] || (f === 'bank-transactions.json' ? { tx: {} } : {})) : fs.readFileSync(path.join(SRC, f), 'utf8');
   if (f === 'bank-connections.json') { const c = JSON.parse(s); c.items.forEach(it => { it.access_token = 'fake-' + it.item_id; }); s = JSON.stringify(c); }
   fs.writeFileSync(path.join(DST, f), s);
 }

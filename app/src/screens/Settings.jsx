@@ -15,12 +15,39 @@ import { CV, cvAccts, cvRows } from '../lib/csv-import.js';
 import { dshort, txLabel, txTargets } from '../lib/linked-loans.js';
 import { OPEN, balEnd, bankSrc, extraPaid, goalPlan, goalSaved, linkedSaved, loanGone, manualSaved, row, savedIn, savedL, totals, savedWork } from '../lib/math.js';
 import { FS, SRV } from '../lib/server-sync.js';
-import { BKP, RQ, SV, SYNC_OPTS, bkLabel, healthChecks, hhName, hhSub, syncWord, whenS } from '../lib/settings.js';
+import { BKP, RQ, SV, SYNC_OPTS, bkLabel, healthChecks, hhName, hhSub, syncWord, whenS, ABT, PAGE_BUILD } from '../lib/settings.js';
 import { acctsOf, debtNow, sumBal } from '../lib/wealth.js';
 
 const card16 = { marginBottom: '16px' }, note14 = { fontSize: '14px', margin: '4px 0 12px' };
 
 // Daily copies on the server (Settings → General → Backups).
+// About this server: what it runs, whether this page runs the same, where the data is, last save and sync.
+const ago = t => { if (!t) return 'never'; const m = Math.round((Date.now() - Date.parse(t)) / 6e4); return m < 2 ? 'just now' : m < 60 ? m + ' min ago' : m < 48 * 60 ? Math.round(m / 60) + ' h ago' : Math.round(m / 1440) + ' days ago'; };
+const when = t => t ? new Date(t).toLocaleString([], { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }) : '—';
+const kb = n => n == null ? '—' : n < 1024 * 1024 ? Math.max(1, Math.round(n / 1024)) + ' KB' : (n / 1048576).toFixed(1) + ' MB';
+export function AboutCard() {
+  if (!SRV) return null;
+  const a = ABT, pb = PAGE_BUILD;
+  if (!a) return <section className="card abt"><h2>This server</h2><p className="mut" style={note14}>Version {pb.version}{pb.rev ? ' · ' + pb.rev : ''}</p><div className="adds"><button className="btn g sm" data-act="abLoad" onClick={onAct('abLoad')}>Show details</button></div></section>;
+  if (a.err) return <section className="card abt"><h2>This server</h2><p className="neg" style={note14}>Couldn’t ask the server: {tx(a.err)}</p><div className="adds"><button className="btn g sm" data-act="abLoad" onClick={onAct('abLoad')}>Try again</button></div></section>;
+  const same = !a.rev || !pb.rev ? (a.built || '') === (pb.built || '') || !a.built : a.rev === pb.rev, stale = a.lastSync && Date.now() - Date.parse(a.lastSync) > 26 * 36e5, rf = BK.st && BK.st.refresh;
+  const W = [];
+  if (!a.writable) W.push('The server can’t write to its data folder, so nothing you change is being saved. Check the folder’s owner and permissions on the server.');
+  if (a.connections && stale && !(rf && rf.hours === 0)) W.push(`No bank sync since ${when(a.lastSync)}. Settings → Connections shows any connection that needs attention.`);
+  if (a.syncErrors) W.push(`${a.syncErrors} bank connection${a.syncErrors === 1 ? ' needs' : 's need'} attention (Settings → Connections).`);
+  const row2 = (k, v, sub) => <div className="abr"><span className="mut">{k}</span><span>{v}{sub ? <small className="dim">{sub}</small> : null}</span></div>;
+  return <section className="card abt"><div className="bh"><div><h2>This server</h2><p className="mut" style={note14}>What’s running and where your data is kept.</p></div><button className="btn g sm" data-act="abLoad" onClick={onAct('abLoad')}>Refresh</button></div>
+    {W.map((w, i) => <p key={i} className="abw">{w}</p>)}
+    {row2('Running', `Version ${a.version || '?'}${a.rev ? ' · ' + tx(a.rev) : ''}`, `built ${when(a.built)} · started ${when(a.started)}`)}
+    {row2('This page', same ? 'Same build' : `Older copy${pb.rev ? ' (' + tx(pb.rev) + ')' : ''}`, same ? null : 'Reload to get the new one; on a phone, close the app and open it again.')}
+    {same ? null : <div className="adds" style={{ margin: '4px 0 8px' }}><button className="btn sm" data-act="abReload" onClick={onAct('abReload')}>Reload now</button></div>}
+    {row2('Budget saved', ago(a.savedAt), when(a.savedAt))}
+    {row2('Bank synced', a.connections ? ago(a.lastSync) : 'No banks connected', a.connections ? when(a.lastSync) : null)}
+    {row2('Data folder', a.docker ? (a.dataPath ? tx(a.dataPath) : 'data, next to docker-compose.yml') : tx(a.dataDir), a.docker ? `on the server (${tx(a.dataDir)} inside the container) · ${a.backups} daily cop${a.backups === 1 ? 'y' : 'ies'}` : `${a.backups} daily cop${a.backups === 1 ? 'y' : 'ies'}`)}
+    <details className="more" data-key="abfiles" open={OPEN.has('abfiles')} style={{ marginTop: '10px' }}><summary>Files</summary>{(a.files || []).map(f => <div className="abr" key={f.name}><span className="mut">{tx(f.name)}</span><span>{f.missing ? 'not there yet' : `${kb(f.size)} · ${ago(f.at)}`}</span></div>)}</details>
+  </section>;
+}
+
 export function BkCard() {
   if (!SRV) return null;
   if (BKP === 'wait') return <p className="mut" style={{ marginTop: '12px' }}>Loading the daily copies…</p>;
@@ -142,7 +169,7 @@ function DataView() {
     {tb([tr(['Budget versions', `${pv.length}`, how(pv.map(x => 'from ' + labS(x)).join(' · '))]), tr(['Months with activity', `${ms.length}`, how(ms.length ? labS(ms[0]) + ' – ' + labS(ms[ms.length - 1]) : '')]), tr(['Rules', `${(S.rules || []).length}`, '']), tr(['Filed transactions', `${TV.length}`, how(`${TV.filter(r => r.auto).length} automatically (rules and matched transfers),${TV.filter(r => !r.auto).length} by hand`)]), tr(['Loans · goals', `${L.length} · ${S.goals.length}`, '']),
       ...(SRV ? [tr(['Bank transactions', `${T2.length}`, how(`since ${dshort(bankFrom())} · ${dr}${pend ? ' · ' + pend + ' pending' : ''}`)]), tr(['Bank connections', `${items.length}`, how(items.map(it => tx(it.institution.name) + (it.lastSync ? ' (' + whenS(it.lastSync) + ')' : '')).join(' · '))])] : []),
       ...(FS.last ? [tr(['Last saved', whenS(FS.last), ''])] : [])], 'kv')}{' '}
-    <div className="adds" style={{ marginTop: '14px' }}><button className="btn g sm" data-act="export" onClick={onAct('export')}>Download budget (JSON)</button>{SRV && T2.length ? <button className="btn g sm" data-act="csvTx" onClick={onAct('csvTx')}>Download transactions (CSV)</button> : null}</div>{' '}
+    <div className="adds" style={{ marginTop: '14px' }}><button className="btn g sm" data-act="export" onClick={onAct('export')}>Download budget (JSON)</button>{SRV ? <button className="btn g sm" data-act="abCopy" onClick={onAct('abCopy')} title="Everything in one file, bank tokens taken out">Download a copy for troubleshooting</button> : null}{SRV && T2.length ? <button className="btn g sm" data-act="csvTx" onClick={onAct('csvTx')}>Download transactions (CSV)</button> : null}</div>{' '}
     <details className="more" id="rawd" style={{ marginTop: '14px' }}><summary>Show raw budget data</summary><pre className="raw" id="rawpre"></pre></details></section>);
   return out;
 }
@@ -179,7 +206,7 @@ export function Settings() {
   if (v === 'general') body = <>
     <section className="card" style={card16}><h2>Household</h2><p className="mut" style={note14}>Shown at the top left and in the browser tab, for both of you.</p><div className="fields"><label className="f">Name<input className="in" data-c="hh" data-f="name" data-key="hh-name" defaultValue={tx(hhName())} placeholder="Budgeteer" autoComplete="off" ref={onChg} /></label><label className="f">Subtitle<input className="in" data-c="hh" data-f="sub" data-key="hh-sub" defaultValue={tx(hhSub())} placeholder="Household budget" autoComplete="off" ref={onChg} /></label></div></section>
     <section className="card" style={card16}><h2>Budget</h2><p className="mut" style={note14}>Income, bills and spending categories are set up in <button className="lnk" data-act="budv" onClick={onAct('budv')} data-v="build" style={{ padding: 0, fontSize: 'inherit' }}>Build budget</button>.</p>{SRV ? <><label className="f" style={{ maxWidth: '260px' }}>Budget and bank filing start<input className="in" type="date" data-c="bankfrom" defaultValue={`${bankFrom()}`} ref={onChg} /></label><div style={{ marginTop: '14px' }}><CatchSel /></div></> : null}</section>
-    <section className="card"><h2>Backups</h2><p className="mut" style={note14}>{SRV ? 'The server saves a copy every day. You can also download one to keep yourself.' : 'Download a copy of your budget to keep it safe.'}</p><div className="adds"><button className="btn g sm" data-act="export" onClick={onAct('export')}>Download backup</button><button className="btn g sm" data-act="import" onClick={onAct('import')}>Restore from a file</button>{SRV ? <button className="btn g sm" data-act="bkList" onClick={onAct('bkList')}>{Array.isArray(BKP) ? 'Refresh the list' : 'Restore a daily copy'}</button> : null}</div><BkCard /></section></>;
+    <section className="card"><h2>Backups</h2><p className="mut" style={note14}>{SRV ? 'The server saves a copy every day. You can also download one to keep yourself.' : 'Download a copy of your budget to keep it safe.'}</p><div className="adds"><button className="btn g sm" data-act="export" onClick={onAct('export')}>Download backup</button><button className="btn g sm" data-act="import" onClick={onAct('import')}>Restore from a file</button>{SRV ? <button className="btn g sm" data-act="bkList" onClick={onAct('bkList')}>{Array.isArray(BKP) ? 'Refresh the list' : 'Restore a daily copy'}</button> : null}</div><BkCard /></section><AboutCard /></>;
   else if (v === 'data') body = <DataView />;
   else if (!SRV) body = <section className="card"><p>Bank sync runs on the server, which can’t be reached right now. It reconnects on its own.</p></section>;
   else if (v === 'rules') body = <><FilingCard />{R.length ? <RulesCard /> : <section className="card"><h2>Rules</h2><p className="mut" style={{ marginTop: '6px' }}>No rules yet. Make one with <b>Link payment</b>, <b>Flag a deposit</b> or <b>Link stores</b> in Build budget, or tick <b>Always</b> when you add a transaction in Bank → To review.</p></section>}</>;

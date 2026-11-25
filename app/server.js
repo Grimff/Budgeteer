@@ -24,6 +24,9 @@ const PORT = Number(process.env.PORT) || 8080;
 const DATA_DIR = path.resolve(path.join(__dirname, '..'), process.env.DATA_DIR || '/data');
 const FILE = path.join(DATA_DIR, process.env.DATA_FILE || 'budgeteer-data.json');
 const BACKUP_DIR = path.join(DATA_DIR, 'backups');
+// What this server is running (tools/build.js writes it next to the bundle) and since when.
+const BUILD = (() => { try { return JSON.parse(fs.readFileSync(path.join(__dirname, 'public', 'dist', 'build.json'), 'utf8')); } catch (_) { return {}; } })();
+const STARTED = new Date().toISOString();
 const BACKUPS_KEEP = Number(process.env.BACKUPS_KEEP) || 90;
 const AUTH = process.env.BASIC_AUTH || ''; // optional "user:password"
 const PUBLIC = path.join(__dirname, 'public');   // the app: index.html, css/, js/, fonts/, icons/
@@ -569,7 +572,31 @@ const server = http.createServer(async (req, res) => {
     let url; try { url = new URL(req.url, 'http://x'); } catch (_) { return send(res, 400, 'Bad request'); }
     const p = url.pathname.replace(/\/+$/, '') || '/';
 
-    if (p === '/api/health') return send(res, 200, { ok: true, app: 'budgeteer' });
+    if (p === '/api/health') return send(res, 200, { ok: true, app: 'budgeteer', rev: BUILD.rev || '' });
+
+    // About this server (Settings → General): its build, where its data is, when it last saved and synced.
+    if (p === '/api/about' && req.method === 'GET') {
+      const st = f => { try { const s = fs.statSync(f); return { size: s.size, at: s.mtime.toISOString() }; } catch (_) { return null; } };
+      let writable = true; try { fs.accessSync(DATA_DIR, fs.constants.W_OK); } catch (_) { writable = false; }
+      const items = (loadBank().items || []).filter(it => it.kind !== 'csv'), syncs = items.map(it => Date.parse(it.lastSync || '') || 0);
+      let savedAt = null; try { savedAt = JSON.parse(fs.readFileSync(FILE, 'utf8')).savedAt || null; } catch (_) {}
+      return send(res, 200, { app: 'budgeteer', ...BUILD, started: STARTED, node: process.version, docker: fs.existsSync('/.dockerenv'),
+        dataDir: DATA_DIR, dataPath: process.env.DATA_PATH || '', writable, savedAt,
+        lastSync: syncs.length ? new Date(Math.max(...syncs)).toISOString() : null, connections: items.length, syncErrors: items.filter(it => it.error).length,
+        files: [FILE, BANK_FILE, TX_FILE, LOAN_FILE, INV_FILE].map(f => ({ name: path.basename(f), ...(st(f) || { missing: true }) })),
+        backups: (() => { try { return fs.readdirSync(BACKUP_DIR).filter(f => f.endsWith('.json')).length; } catch (_) { return 0; } })() });
+    }
+
+    // A copy of everything for troubleshooting, in one file, with every bank token and secret taken out (Settings → Data &
+    // math). It still holds real transactions and balances. tools/realtest.js can run a test server from it.
+    if (p === '/api/support-copy' && req.method === 'GET') {
+      const rd = f => { try { return JSON.parse(fs.readFileSync(f, 'utf8')); } catch (_) { return null; } };
+      const clean = o => JSON.parse(JSON.stringify(o, (k, v) => /token|secret|password|cursor/i.test(k) ? undefined : v));
+      const out = { app: 'budgeteer-support-copy', made: new Date().toISOString(), build: BUILD,
+        files: { 'budgeteer-data.json': rd(FILE), 'bank-connections.json': clean(rd(BANK_FILE)), 'bank-transactions.json': rd(TX_FILE),
+          'bank-loans.json': rd(LOAN_FILE), 'bank-investments.json': rd(INV_FILE), 'bank-settings.json': rd(SET_FILE) } };
+      return send(res, 200, out, { 'Content-Disposition': `attachment; filename="budgeteer-copy-${today()}.json"` });
+    }
 
 
     if (p.startsWith('/api/bank/')) {

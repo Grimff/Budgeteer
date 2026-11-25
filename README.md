@@ -57,6 +57,15 @@ Open `http://localhost:8095` (or `http://YOUR-SERVER-IP:8095` from other devices
 in `./data` next to the compose file, or wherever `DATA_PATH` in `.env` points (a NAS share, say; add
 `DATA_REQUIRED=1` so it waits for the share instead of starting empty). Change the port with `HOST_PORT` in `.env`.
 
+**Updating (Docker):** run `./update.sh` in this folder (`sudo ./update.sh` if Docker needs it). It gets the latest
+code, rebuilds, restarts and checks the server is running the new build. `docker compose up -d --build` on its own
+rebuilds whatever code is already here; it doesn't download anything. **Settings → General → This server** shows the
+build that's running, whether your browser has it, where the data is kept and when it last saved and synced.
+
+**Getting help with your numbers:** Settings → Data & math → **Download a copy for troubleshooting** saves everything
+in one file with the bank tokens taken out (it still has your transactions and balances). `node tools/realtest.js
+<that file>` runs a test server from it on port 18096, against a fake bank.
+
 ## 3. Use it
 
 The footer should say **Version 3 · Saved to the server**. The first browser

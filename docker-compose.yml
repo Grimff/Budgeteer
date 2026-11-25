@@ -5,7 +5,11 @@
 # Your budget, bank data and Plaid tokens are saved in ./data (git-ignored), or in DATA_PATH from .env.
 services:
   budgeteer:
-    build: .
+    build:
+      context: .
+      args:
+        # The commit, so Settings → General can show what's running. ./update.sh sets it.
+        - BUILD_REV=${BUILD_REV:-}
     container_name: budgeteer
     env_file: .env
     environment:

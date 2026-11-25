@@ -15,7 +15,7 @@ import { BV, allItems, bankConnect, bankRemove, bankSync, linkLoan, setBV, setFL
 import { LR, PX, pxHow, pxNow, pxSim, setLR, setPS, setPX } from './lib/loans.js';
 import { OPEN, WI, alEnd, alSet, balEnd, bankSrc, bcSet, destName, goalMon, goalNeed, goalPlan, loanGone, loanUsual, loanXo, lp, row, setLP, setUsual, toast, totals, verSet, xStart, xmAt } from './lib/math.js';
 import { FS, SRV, fsFlush, fsInit } from './lib/server-sync.js';
-import { SV, bkList, bkRestore, setSV, syncWord } from './lib/settings.js';
+import { SV, bkList, bkRestore, setSV, syncWord, abCopy, abLoad, ABT } from './lib/settings.js';
 import { setWR } from './lib/wealth.js';
 import { brandSet, catRender, dprev, fcBody, lnkList, lnkRule, pxLive, renderBank, renderBudget, renderForecast, renderGoals, renderHistory, renderLoans, renderSettings, renderWealth, skCard, spAddPart, spForm, wfLive, wiLive } from './named.jsx';
 export const ACT = {
@@ -40,7 +40,10 @@ export const ACT = {
   OPEN.delete('h-'+k);setLP({});setTXI(null);toast(`Deleted ${lab(k)}`);return commit()} },
   'histAll': function (d, b, e) { delete S.histFrom;return commit(); },
   'bcol': function (d, b, e) { {const sec=b.closest('section');if(!sec)return;const shut=!sec.classList.contains('shut');bcSet(d.v,shut);sec.classList.toggle('shut',shut);b.setAttribute('aria-expanded',String(!shut));return} },
-  'sview': function (d, b, e) { {setSV(d.v);try{localStorage.setItem('pfb_sview',SV)}catch(_){}if(S.tab!=='settings'){S.tab='settings';scrollTo({top:0});return commit(true)}return renderSettings()} },
+  'abCopy': function (d, b, e) { return abCopy(); },
+  'abReload': function (d, b, e) { location.reload(); },
+  'abLoad': function (d, b, e) { return abLoad(); },
+  'sview': function (d, b, e) { {if(d.v==='general'&&!ABT)abLoad();setSV(d.v);try{localStorage.setItem('pfb_sview',SV)}catch(_){}if(S.tab!=='settings'){S.tab='settings';scrollTo({top:0});return commit(true)}return renderSettings()} },
   'bview': function (d, b, e) { {if(d.v==='rules'||d.v==='accounts'){setSV(d.v==='rules'?'rules':'connections');S.tab='settings';scrollTo({top:0});return commit(true)}setBV(d.v);try{localStorage.setItem('pfb_bview',BV)}catch(_){}if(S.tab!=='bank'){S.tab='bank';scrollTo({top:0});return commit(true)}return renderBank()} },
   'bfilt': function (d, b, e) { setFLF(d.v);setFLN(50);return renderBank(); },
   'bmore': function (d, b, e) { setFLN(1e9);return renderBank(); },
@@ -72,7 +75,7 @@ export const ACT = {
   'delRc': function (d, b, e) { {const k=d.k,m=MOW(k),r=(m.rc||[]).find(x=>x.id===d.id);if(r&&r.bank){if(!confirm(`Remove ${r.store||'this transaction'} (${f2(r.amt)}) from ${mon(k)}? It goes back to the Bank tab to review.`))return;txUndo(r.txid,true);toast('Moved back to Bank review');return commit()}if(!r||!confirm(`Remove the ${f2(r.amt)} entry from ${r.store||'this store'}? Its amount comes off the actual spending.`))return;m.rc=m.rc.filter(x=>x!==r);if(m.act[r.item]!=null){const v=r2(m.act[r.item]-r.amt);if(v>0.004)m.act[r.item]=v;else delete m.act[r.item]}toast('Removed');return commit()} },
   'origAdd': function (d, b, e) { {OPEN.add('l-'+d.id);rerender();const e=document.querySelector(`[data-key="lo-${d.id}"]`);if(e){e.scrollIntoView({behavior:RM?'auto':'smooth',block:'center'});e.focus()}return} },
   // d.hc: the gear with the health check's dot opens Settings → Data & math, where the health check is
-  'tab': function (d, b, e) { if(d.hc&&SV!=='data'){setSV('data');try{localStorage.setItem('pfb_sview',SV)}catch(_){}if(S.tab===d.t)return renderSettings()}if(S.tab!==d.t){S.tab=d.t;scrollTo({top:0,behavior:RM?'auto':'smooth'});commit(true)}return; },
+  'tab': function (d, b, e) { if(d.t==='settings'&&!ABT)abLoad();if(d.hc&&SV!=='data'){setSV('data');try{localStorage.setItem('pfb_sview',SV)}catch(_){}if(S.tab===d.t)return renderSettings()}if(S.tab!==d.t){S.tab=d.t;scrollTo({top:0,behavior:RM?'auto':'smooth'});commit(true)}return; },
   'openMonth': function (d, b, e) { S.cur=d.k;S.tab='budget';scrollTo({top:0});return commit(true); },
   'hrng': function (d, b, e) { setHR(d.v);try{localStorage.setItem('pfb_hr',HR)}catch(_){}return renderHistory(); },
   'mgo': function (d, b, e) { return go(d.k); },

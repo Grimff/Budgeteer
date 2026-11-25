@@ -7,6 +7,8 @@ import { toast } from './math.js';
 import { FS, fsQueue } from './server-sync.js';
 export let S; export function setS(v){return S=v}
 export let saveT,AUTOSAVE=false; export function setsaveT(v){return saveT=v} export function setAUTOSAVE(v){return AUTOSAVE=v}
+// The app's version: the footer, Settings → This server and the build stamp (tools/build.js reads it). Bump it on release.
+export const APP_VERSION=3;
 export const DEMO=/[?&](demo|selftest)(=|&|$)/.test(location.search),SELFTEST=/[?&]selftest(=|&|$)/.test(location.search);
 export const KEY='budgeteer_v2'+(DEMO?'_demo':'');
 export const $=s=>document.querySelector(s),$$=s=>[...document.querySelectorAll(s)];
