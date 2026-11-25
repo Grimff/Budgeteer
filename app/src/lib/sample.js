@@ -12,13 +12,14 @@ import { renderAll } from './events.js';
 import { nodeKey } from './flow.js';
 import { monthSum } from './history.js';
 import { allItems, inbox, linkLoan, BV, setBV, txUndo, txAssign } from './linked-loans.js';
-import { goalEta, goalMon, goalSaved, path, setLP, totals, unplannedA } from './math.js';
+import { goalEta, goalMon, goalSaved, path, setLP, totals, unplannedA, linkedChange } from './math.js';
 import { FS } from './server-sync.js';
 import { BKP, bkList, bkRestore, healthChecks, SV, setSV, hcDot } from './settings.js';
 import { debtNow } from './wealth.js';
 import { subsList } from './subs.js';
 import { calBills } from './calendar.js';
 import { withS, emptyHousehold } from '../parity.js';
+import { setALC } from './goal-accounts.js';
 export let DEMOD=null; export function setDEMOD(v){return DEMOD=v}
 /* ---------- sample household (?demo) and self-test (?selftest) ---------- */
 // ?demo opens a made-up household that lives only in this tab: demoFetch answers every api/ call in the page (budget,
@@ -171,6 +172,13 @@ export async function selfTest(){const T=[],ok=(c,name,detail='')=>T.push({ok:!!
   // History chart: the month under the pointer (or the last one tapped) gets a readout
   { S.tab='history';renderAll();const hs=[...document.querySelectorAll('#T-history .hchart svg rect[fill="transparent"]')],last=hs[hs.length-1];if(last)last.dispatchEvent(new PointerEvent('pointerover',{bubbles:true,pointerType:'touch'}));await new Promise(r=>setTimeout(r,30));
    const rd=$('#T-history .hrd');ok(!!rd&&rd.textContent.includes(lab(S.cur))&&/Planned out \$/.test(rd.textContent),'The History chart shows a month’s figures when it’s tapped',rd?rd.textContent:'no readout');S.tab='budget';renderAll()}
+  // A retirement account counts only money moved in from checking as saving, never its market change, however the
+  // bank labels its type ('investment', 'brokerage', or 'other' with a 401k subtype or a retirement name).
+  { const a=BK.accts.find(x=>x.id==='brok'),g=S.goals.find(x=>x.id==='trip'),al0=S.alloc.brok,t0=[a.type,a.subtype,a.name];S.alloc.brok={mode:'order',goals:['trip'],pct:{},rest:'last'};
+   const v=(ty,st,nm)=>{a.type=ty;a.subtype=st;a.name=nm;setALC({});setLP({});return linkedChange(g,TK)};
+   const r=[v('investment','401k','Retirement Account'),v('brokerage','','Retirement Account'),v('other','401k','Account'),v('other','','Company Retirement Plan'),v('other','savings','Plain account')];
+   [a.type,a.subtype,a.name]=t0;if(al0)S.alloc.brok=al0;else delete S.alloc.brok;setALC({});setLP({});
+   ok(r[0]===r[1]&&r[0]===r[2]&&r[0]===r[3]&&r[4]!==r[0],'A 401(k)’s market change is never counted as saving, whatever type the bank gives it',r.join(' / '))}
   // Rent for next month paid late this month counts in next month (not twice in this one); a filing made before that
   // rule existed is moved on the next filing pass; a hand filing is never moved.
   { const rt=BK.tx.find(t=>t.date.slice(0,7)===TK&&/OAKWOOD/.test(t.name)),last=new Date(+TK.slice(0,4),+TK.slice(5,7),0).getDate(),id='st-early';

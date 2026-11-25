@@ -170,6 +170,11 @@ const viewLoans = () => readC(LOAN_FILE, { acct: {} });
 const viewInv = () => readC(INV_FILE, { acct: {}, flows: {} });
 const today = () => { const d = new Date(); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); };
 const isDebt = a => a.type === 'loan' || a.type === 'credit';
+// An investment account: Plaid's 'investment' ('brokerage' in older API versions), or a retirement/brokerage account an
+// institution files under another type ('other' with a 401k subtype, say). Without this a 401(k)'s market gains counted
+// as saving in the budget and its contributions were never fetched. The app is handed these as type 'investment'.
+const INV_RE = /401|403|457|\bira\b|roth|pension|retire|brokerage|annuity|stock plan|keogh|profit sharing|mutual fund|tfsa|rrsp/i;
+const isInvA = a => !!a && (a.type === 'investment' || a.type === 'brokerage' || (!['depository', 'credit', 'loan'].includes(a.type) && [a.subtype, a.name, a.official, a.official_name].some(x => INV_RE.test(x || ''))));
 async function plaid(endpoint, body) {
   const r = await fetch(PLAID_BASE + endpoint, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Plaid-Version': '2020-09-14' },
     body: JSON.stringify({ client_id: PLAID_ID, secret: PLAID_SECRET, ...body }) });
@@ -238,7 +243,7 @@ async function refreshLiabilities(it, loans) {
 // Holdings and cash moved in or out of investment accounts (Plaid Investments), for Fidelity, Schwab and others.
 const FLOW_SUB = ['contribution', 'deposit', 'withdrawal', 'transfer', 'distribution', 'rollover'];
 async function refreshInvestments(it, inv) {
-  if (it.inv === 'none' || !(it.accounts || []).some(a => a.type === 'investment')) return;
+  if (it.inv === 'none' || !(it.accounts || []).some(isInvA)) return;
   let h;
   try { h = await plaid('/investments/holdings/get', { access_token: it.access_token }); }
   catch (e) {
@@ -250,7 +255,7 @@ async function refreshInvestments(it, inv) {
   it.inv = 'ok';
   const sec = {}; for (const x of h.securities || []) sec[x.security_id] = x;
   const at = new Date().toISOString();
-  for (const a of h.accounts || []) if (a.type === 'investment') inv.acct[a.account_id] = { item: it.item_id, at, holdings: [] };
+  for (const a of h.accounts || []) if (isInvA(a) || (it.accounts || []).some(x => x.id === a.account_id && isInvA(x))) inv.acct[a.account_id] = { item: it.item_id, at, holdings: [] };
   for (const x of h.holdings || []) {
     const s = sec[x.security_id] || {}, e = inv.acct[x.account_id] || (inv.acct[x.account_id] = { item: it.item_id, at, holdings: [] });
     e.holdings.push({ name: s.name || 'Unknown', ticker: s.ticker_symbol || '', type: s.type || '', cash: !!s.is_cash_equivalent,
@@ -289,9 +294,9 @@ function allAccounts() {
     days.forEach(d => { months[d.slice(0, 7)] = e.days[d]; });
     const cut = new Date(Date.now() - 400 * 864e5).toISOString().slice(0, 10), recent = {};
     days.filter(d => d >= cut).forEach(d => { recent[d] = e.days[d]; });
-    const row = { id: a.id, item: it.item_id, institution: it.institution.name, name: a.name, official: a.official, mask: a.mask, type: a.type, subtype: a.subtype,
+    const row = { id: a.id, item: it.item_id, institution: it.institution.name, name: a.name, official: a.official, mask: a.mask, type: isInvA(a) ? 'investment' : a.type, subtype: a.subtype,
       bal: a.bal, avail: a.avail != null ? a.avail : null, balAt: a.balAt || it.lastSync || null, months, days: recent };
-    if (a.type === 'investment') {
+    if (isInvA(a)) {
       const x = inv.acct[a.id];
       const fl = flows.filter(f => f.account === a.id).map(f => ({ date: f.date, amt: f.amt, name: f.name })).sort((p, q) => p.date.localeCompare(q.date));
       Object.assign(row, { holdings: x ? x.holdings : null, holdAt: x ? x.at : null, flows: fl, invState: it.inv || '' });

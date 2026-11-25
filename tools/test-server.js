@@ -6,14 +6,14 @@ const fs = require('fs'), path = require('path'), http = require('http'), os = r
 const ROOT = require('path').join(__dirname, '..'), STALE = process.env.TEST_MODE === 'stale', DIR = fs.mkdtempSync(path.join(os.tmpdir(), 'bt-'));
 const old = new Date(Date.now() - 3 * 3600e3).toISOString();
 const item = (id, detailAt) => ({ item_id: id, access_token: 'fake-' + id, institution: { id: 'i', name: 'Test Bank' }, cursor: null, lastSync: old, liab: 'ok', inv: 'ok', detailAt,
-  accounts: [{ id: id + '-chk', name: 'Checking', type: 'depository', subtype: 'checking' }, { id: id + '-loan', name: 'Loan', type: 'loan', subtype: 'student' }, { id: id + '-inv', name: 'Brokerage', type: 'investment', subtype: 'brokerage' }] });
+  accounts: [{ id: id + '-chk', name: 'Checking', type: 'depository', subtype: 'checking' }, { id: id + '-loan', name: 'Loan', type: 'loan', subtype: 'student' }, { id: id + '-inv', name: 'Brokerage', type: 'investment', subtype: 'brokerage' }, { id: id + '-ret', name: 'Company 401(k)', type: 'other', subtype: '401k' }] });
 fs.writeFileSync(path.join(DIR, 'bank-connections.json'), JSON.stringify({ items: [item('a', new Date(Date.now() - (STALE ? 25 * 3600e3 : 0)).toISOString())] }));
 const calls = {}, txs = Array.from({ length: 3000 }, (_, i) => ({ transaction_id: 't' + i, account_id: i % 50 ? 'a-chk' : 'a-loan', date: '2026-10-' + String(1 + i % 28).padStart(2, '0'), name: 'STORE ' + (i % 40), merchant_name: 'Store ' + (i % 40), amount: i % 50 ? 12.5 + i % 90 : -300, pending: false }));
 const pushed = [];   // what the fake ntfy server received
 http.createServer((q, r) => { let b = ''; q.on('data', d => b += d); q.on('end', () => {
   if (q.url === '/ntfy') { pushed.push(JSON.parse(b)); r.writeHead(200); return r.end('{}'); }
   calls[q.url] = (calls[q.url] || 0) + 1; const j = JSON.parse(b || '{}'), it = j.access_token && j.access_token.slice(5), send = o => { r.writeHead(200, { 'content-type': 'application/json' }); setTimeout(() => r.end(JSON.stringify(o)), 150); };
-  if (q.url === '/accounts/get') return send({ accounts: [{ account_id: it + '-chk', name: 'Checking', type: 'depository', subtype: 'checking', balances: { current: 1000 } }, { account_id: it + '-loan', name: 'Loan', type: 'loan', subtype: 'student', balances: { current: 9000 } }, { account_id: it + '-inv', name: 'Brokerage', type: 'investment', subtype: 'brokerage', balances: { current: 5000 } }] });
+  if (q.url === '/accounts/get') return send({ accounts: [{ account_id: it + '-chk', name: 'Checking', type: 'depository', subtype: 'checking', balances: { current: 1000 } }, { account_id: it + '-loan', name: 'Loan', type: 'loan', subtype: 'student', balances: { current: 9000 } }, { account_id: it + '-inv', name: 'Brokerage', type: 'investment', subtype: 'brokerage', balances: { current: 5000 } }, { account_id: it + '-ret', name: 'Company 401(k)', type: 'other', subtype: '401k', balances: { current: 20000 } }] });
   if (q.url === '/transactions/sync') return send({ added: j.cursor ? [] : txs, modified: [], removed: [], next_cursor: 'c1', has_more: false });
   if (q.url === '/liabilities/get') return send({ liabilities: { student: [{ account_id: it + '-loan', interest_rate_percentage: 5, minimum_payment_amount: 300 }] } });
   if (q.url === '/investments/holdings/get') return send({ accounts: [{ account_id: it + '-inv', type: 'investment' }], holdings: [], securities: [] });
@@ -88,7 +88,8 @@ const det = () => (calls['/liabilities/get'] || 0) + '/' + (calls['/investments/
   ok(tj.tx.length === 3000 && t.h['content-encoding'] === 'gzip', `transactions: ${tj.tx.length} rows, ${Math.round(t.raw / 1024)} KB sent instead of ${Math.round(t.body.length / 1024)} KB`);
   const l = JSON.parse((await req('GET', '/api/bank/loans')).body).accounts[0];
   ok(l && Object.values(l.pays).reduce((x, y) => x + y, 0) === 60 * 300 && l.liab && l.liab.apr === 5, `loan payments grouped correctly (${Object.keys(l.pays).length} month(s), $${Object.values(l.pays).reduce((x, y) => x + y, 0)}) with lender details`);
-  const ac = JSON.parse((await req('GET', '/api/bank/accounts')).body).accounts; ok(ac.length === 3 && ac.find(x => x.type === 'investment').holdings, 'accounts include holdings');
+  const ac = JSON.parse((await req('GET', '/api/bank/accounts')).body).accounts; ok(ac.length === 4 && ac.find(x => x.type === 'investment').holdings, 'accounts include holdings');
+  const ret = ac.find(x => x.id.endsWith('-ret')); ok(ret && ret.type === 'investment' && Array.isArray(ret.flows), `a 401(k) the bank files under another type is an investment account (${ret && ret.type})`);
   const st = JSON.parse((await req('GET', '/api/bank/status')).body); ok(st.items[0].count === 3000 && !JSON.stringify(st).includes('fake-a'), 'status has counts and no tokens');
   // CSV import: new account, two identical rows kept as two, the same file again adds nothing, a sync leaves it alone
   const rows = [{ date: '2026-10-02', name: 'FARM STAND', amount: 12 }, { date: '2026-10-02', name: 'FARM STAND', amount: 12 }, { date: '2026-10-05', name: 'REFUND', amount: -3.5 }];

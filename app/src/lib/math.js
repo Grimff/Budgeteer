@@ -78,7 +78,10 @@ export function linkedSaved(g,k=S.cur){return allocAt(k).out[g.id]||0}
 // Change in linked balances during month k. The month an account starts being tracked counts from its first balance, not from 0.
 // Investment accounts (brokerage, IRA, 401(k)/403(b)): balances move with the market, so "saved this month" counts
 // contributions, not the balance change. Contributions come from Plaid's investment transactions (a.flows, + = money in).
-export const isInv=a=>!!a&&a.type==='investment';
+// An investment account (the server already hands these over as 'investment'; this also catches 'brokerage' and a
+// retirement account filed under another type). Its market change is never saving: only money moved in from checking.
+const INV_RE=/401|403|457|\bira\b|roth|pension|retire|brokerage|annuity|stock plan|keogh|profit sharing|mutual fund|tfsa|rrsp/i;
+export const isInv=a=>!!a&&(a.type==='investment'||a.type==='brokerage'||(!['depository','credit','loan'].includes(a.type)&&[a.subtype,a.name,a.official].some(x=>INV_RE.test(x||''))));
 // A contribution "from home" matches a checking/savings payment of the same amount within 5 days (a Roth IRA transfer).
 // One with no match came straight from a paycheck (401(k)/403(b)) and never was take-home pay.
 export function fromHome(f){const day=d=>Date.parse(d)/864e5;return BK.tx.some(t=>acctType(t.account)==='depository'&&Math.abs(t.amount-f.amt)<0.01&&Math.abs(day(t.date)-day(f.date))<=5)}

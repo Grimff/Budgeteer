@@ -257,7 +257,9 @@ server against a real `data/` folder while testing; use `tools/realtest.js`.
   balances and a "Planned for <month>" box (one-month override); real deposits only in this or past months.
 - `alloc{acctId:{mode:'order'|'split',goals[],pct{},rest}}` – accounts shared between goals
   (`allocWith`, cached `ALC`). Order fills each goal to its target in turn (last takes leftover
-  unless `rest:'none'`); split uses percents. Investment accounts (`isInv`): progress uses the
+  unless `rest:'none'`); split uses percents. Investment accounts (`isInv`; the server's `isInvA` hands over as type
+  `investment` any `brokerage` account or retirement account filed under another type, e.g. `other`/`401k`, and fetches
+  its holdings and flows; before, such a 401(k) counted its market gains as saving): progress uses the
   balance share, but "saved this month" (`linkedChange`) counts only contributions from take-home
   pay (`fromHome`); payroll contributions and market change show on the goal card (`invInfo`).
 - `txd{txId:{v,k,amt,d,n,auto?,pair?,extra?}}` – filed bank transactions. `v`: `i:item`,
