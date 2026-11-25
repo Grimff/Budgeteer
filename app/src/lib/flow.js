@@ -54,10 +54,6 @@ export function depDialog(id,amt){const g=S.goals.find(x=>x.id===id)||S.goals[0]
   prev:a=>{if(!t)return '';const s=base+a,p=Math.min(100,Math.round(s/t*100));const rem=t-s;return rem<=0?[{b:'That completes the goal!'}]:['That brings you to ',{b:p+'%'},`, ${f0(rem)} to go.${goalMon(g,k)>0?` At ${f0(goalMon(g,k))}/month you’d finish around ${labS(addM(k,Math.ceil(rem/goalMon(g,k))))}.`:''}`]},
   save:a=>{MOW(k).dep[g.id]=r2(a);toast(`Saved ${f0(a)} toward ${g.name}`)}})}
 
-/* ---------- confetti ---------- */
-export function confetti(){if(RM)return;const cv=$('#fx'),x=cv.getContext('2d'),dpr=devicePixelRatio||1;cv.width=innerWidth*dpr;cv.height=innerHeight*dpr;x.scale(dpr,dpr);
- const cols=[C.pink,C.lime,C.butter,C.coral,C.lilac,C.aqua,C.sky],P=Array.from({length:150},()=>({x:innerWidth/2+(Math.random()-.5)*160,y:innerHeight*.35,vx:(Math.random()-.5)*14,vy:-Math.random()*13-4,r:Math.random()*Math.PI,vr:(Math.random()-.5)*.35,w:6+Math.random()*7,h:4+Math.random()*6,c:cols[Math.random()*cols.length|0]}));
- const t0=performance.now();(function f(t){x.clearRect(0,0,innerWidth,innerHeight);const age=t-t0;P.forEach(p=>{p.vy+=.38;p.vx*=.99;p.x+=p.vx;p.y+=p.vy;p.r+=p.vr;x.save();x.globalAlpha=Math.max(0,1-age/2200);x.translate(p.x,p.y);x.rotate(p.r);x.fillStyle=p.c;x.fillRect(-p.w/2,-p.h/2,p.w,p.h);x.restore()});if(age<2200)requestAnimationFrame(f);else x.clearRect(0,0,innerWidth,innerHeight)})(t0)}
 
 // What this file did as it loaded (listeners, settings read from localStorage, …): main.jsx runs it in the old
 // load order, after every module is defined.

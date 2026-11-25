@@ -30,7 +30,7 @@ Docker (`docker compose up -d --build`) on port 8095. Bank data comes from Plaid
     them. The self-test's results are `window.SELFTEST_RESULT`.
   - The parity check's stand-in for `recurring()` (a case with made-up bill suggestions) is bank.js's `RECF`/`setRECF`
     (it used to replace `window.recurring`).
-  See "Moving to React" below.
+  See "How the front end works" below.
 - `app/server.js` – Node 18+, no npm dependencies. Reads `.env` (project folder or cwd) at start;
   real environment variables win. Relative `DATA_DIR` is resolved from the project folder.
 - **Settings and secrets:** `.env` (git-ignored; template `.env.example`) holds `PLAID_CLIENT_ID`, `PLAID_SECRET`,
@@ -39,8 +39,9 @@ Docker (`docker compose up -d --build`) on port 8095. Bank data comes from Plaid
   node:22-alpine + `app/` without `src/` + the built `dist/`; `.dockerignore` lets in only those files), loads `.env` with `env_file`,
   forces `DATA_DIR=/data`, `PORT=8080`, and mounts `${DATA_PATH:-./data}:/data`. `DATA_REQUIRED=1` makes the server exit at
   start when there's no budget file (a NAS share not mounted yet), so Docker's restart policy retries until it is.
-- **Release:** run `node tools/check.js` (must say OK), bump the footer "Version N" in index.html (`fsUI`) and the
-  README, commit, push main, then tag `vN` and push the tag. Current: **Version 1**. "Version N"/"vN" mentions below are
+- **Release:** run `npm test` (must pass), bump the footer "Version N" (`fsUIR` in app/src/chrome.jsx) and the
+  README, commit, push main, then tag `vN` and push the tag. Current: **Version 3** (Version 1 was the string-built front end; 3 is the React one, see "How the front end
+  works"; 2 was skipped). "Version N"/"vN" mentions below are
   from the app's earlier history and use the old numbering.
 
 ## Data on the server (`data/`)
@@ -68,9 +69,8 @@ server against a real `data/` folder while testing; use `tools/realtest.js`.
   shadowed by the Goals accounts card's, so Remove did nothing), buttons with no handler, repeated
   data-k/data-c/data-live keys, and change handlers after `if(!d.c)return;`. Name new actions with a prefix no
   other feature uses (schedule = `sc*`, accounts card = `al*`). check.js parses every file in app/src
-  (with esbuild) and checks index.html loads only dist/app.js. A name used without being imported is an error only when
-  that code runs (in sample mode too: nothing is on window), so add the import with the code; `npm test`'s self-test
-  runs every screen, dialog and view. Use the Write tool for JSON/launch files.
+  (esbuild), checks every name used is imported or declared (TypeScript, from `npm install`; the browser's globals
+  and Plaid's `Plaid` excepted) and that index.html loads only dist/app.js. Use the Write tool for JSON/launch files.
 - **`npm test`** before every push (check its exit code, not a piped tail): check.js, `tools/test-server.js` (server vs a fake Plaid, twice), and the in-app
   self-test in headless Chrome (`--dump-dom` of `/?selftest`; skipped with a note if no Chrome/Chromium/Edge).
 - **Sample household / self-test** (`app/src/lib/sample.js`): `?demo` installs `demoFetch` over `window.fetch`, answering every
@@ -93,140 +93,54 @@ server against a real `data/` folder while testing; use `tools/realtest.js`.
   data attribute (`d.al`, `d.mm`, `d.mv`, rules…) must come before that line, or it silently never runs (v5's
   schedule dropdowns/months/checkboxes did nothing until v6 moved `if(d.al)` up).
 
-## Moving to React
+## How the front end works (React)
 
-Goal: the whole front end in React with no feature added, removed or changed. Done screen by screen so the app
-works (and `npm test` passes) after every step.
-- **Phase 1 (done): the tab screens.** Each `renderX` that built a tab with an HTML string becomes a component
-  in `app/src/screens/`; `main.jsx` puts it in by name (`setGlobal('renderX', …)`, then `replaceScreen`, which kept the old one in
-  `LEGACY`), so every caller, including `renderAll` and click handlers, draws the React one. `draw(el, <X/>)` (bridge.js) renders with a fresh root
-  and `flushSync`, i.e. exactly like `innerHTML=`: rebuilt each time, synchronous, so focus restore by `data-key`,
-  `fmtAll`, open folds and inputs behave as before. Components are pure and read the globals (`S`, `plan`, caches)
-  like the old code; buttons keep their `data-act`/`data-*` attributes, so the delegated click/change/input handlers
-  in events.js run unchanged. `tx()` = `esc()`'s text rules (React escapes the rest).
-  Done: History, Wealth, Goals (+ its accounts card), Loans (+ lenders card, extra payment plan); their charts are
-  components with hover state; Settings (all four views, CSV import, phone alerts). The px/wi live inputs still patch
-  #pxr/#wp-… with the old string helpers, and the rules search still runs rulesFilter while typing, until phase 3.
-  Health-check messages are still HTML strings from healthChecks (inserted by `Html`) until it returns data.
-  Bank (To review, Filed, Move panel `MvPanel`, double counts). Budget → This month (`ThisMonth`: summary bar, Needs a
-  look, Getting set up, monthly review, extra money, budget lines, purchases); the money-flow chart / Compare inside
-  it is still drawn by sankey() (flow.js, compare.js) into #sk after the React draw, and alert buttons come from
-  alertsNow() as HTML. Forecast (`Forecast` frame + `FcBody` into #fcb, both swapped in by name, so the what-if
-  sliders and range/month buttons redraw only the body; the chart's month click keeps its marker on that month, which
-  the old fcChart meant to do but threw on). The schedule editor is `schedule.jsx` (`AlForm`, `AlList`, `AlAdds`;
-  loan names in descriptions are now escaped text). Build budget (`Build`, with `BillLine`, `IncLine`, `RecCard`,
-  `XmStep`); its ⋮⋮ drag/keyboard reordering still moves rows on the page and saves through orderRead/orderApply
-  (build.js), which redraws. Every tab is now drawn by React. (The old draw functions stayed in `LEGACY` for the parity
-  check until all of phases 1–3 were done; they and the string helpers only they used are now deleted.)
-- **Parity check** (`app/src/parity.js`): while the old draw functions existed, every converted screen was drawn by
-  the old function and by React for many cases (every month, each range/view setting, an empty household) and had to
-  match: same elements, attributes (style and class compared parsed), input values, text, and the text the browser
-  shows. The old functions are gone now; what's left, run by the self-test (on the sample as loaded and again at the
-  end): the tab screens (`live: true`) drawn fresh for every case, then one root re-rendered through all the cases in
-  a row must match each fresh draw. The same cases (main.jsx `addParity`; `addPiece` for parts no screen case reaches,
-  e.g. the phone-alerts card hidden in sample mode) are also a record: `__paritySnap()` (sample mode) returns every
-  case drawn by the current code, to compare two builds when changing code under the screens (it caught nothing
-  when the old code was deleted: 1088 cases identical). Add cases to `main.jsx` for every view switch a screen has.
-  JSX notes: a `<table>` needs an explicit `<tbody>` (the HTML parser added one to the old markup), SVG attributes camelCase (`strokeWidth`), keep attribute strings exact (`fillOpacity=".35"`), lengths
-  as strings (`'16px'`), `{' '}` where the old template had a line break between inline elements, `cond ? x : null`
-  (never `cond && x`, which prints 0).
-- **Phase 2 (done): pop-ups, dialogs and the page frame**, the same way (`app/src/popups/`). Their frames stay in index.html;
-  each part a function wrote is drawn as its own root, so inputs outside those parts (the pop-up's search `#tdq`) keep
-  what's typed. Parity screens get `dialog: '#tdlg'` (opened while measured). Done: the line pop-up (`catRenderR`:
-  #tds/#tdr/#tdrg/#tdl; catFilter still hides rows for the search) and the trends dialog (`flowRenderR`: #fds/#fdb,
-  also the pop-up's Trends view), the link dialog (`lnkListR`/`lnkRuleR` in `popups/Link.jsx`: #lpick and #lrule; the
-  rule options keep their own state, so typing the text or ticking a box recounts without redrawing the field; lnkOpen,
-  the #lpick/#lq listeners and Save stay in bank.js), the amount dialog (`openDR` in `popups/Amount.jsx`: #dsel and #dc;
-  the #dp line is still the HTML string `DLG.prev` returns, via dprev). A parity screen or case can give `call` to draw
-  through an opener called by name (payDialog/depDialog → openD). The split form (`spFormR`/`spAddPartR` in
-  `popups/Split.jsx`, swapped in for `spForm`/`spAddPart`, which the spOpen/spAdd clicks call): one root per `.spf` box, so
-  Add a part keeps what's typed; spLeft/spSave still read the boxes. The money-flow card's Compare view (`compareViewR`
-  in `flow/Compare.jsx`; cmpRows stays), and its zoom bar, hover tip and click card (`zbarR`/`skTipR`/`skCardR` in
-  `flow/Card.jsx`: #zb, #skt, #skc; skPos/skPlace still place them), and the chart itself (`sankeyR` in `flow/Sankey.jsx`;
-  the layout code is the old one; hl/zset still set classes and the viewBox on the drawn svg). `fsUI` moved from
-  server-sync.js to linked-loans.js (before the bundle) with a `demo` parameter; it and bankBadge are `chrome.jsx`
-  (#sync, #spill, #saved, #tbank). tools/test.js allows the self-test 240 s.
-- **Phase 3 (in progress).** Step 1 (done): no logic builds HTML any more. Rich text is data (`rtParts`/`rtText`
-  in core.js, `Rich` in ui.jsx): a string or a list of strings and `{b}`; buttons are `{act, label, ...data}`
-  (`ActBtn`). healthChecks (`d`, `a[]`), alertsNow (`a`), DLG.prev (#dp, `dprevR`). The live sentences
-  while typing / dragging are `pxLive` / `wiLive` (loans.js, React `pxLiveR`/`wiLiveR`).
-  Step 2 (done): handlers on elements. Every click action is a function in `app/src/actions.js` (`ACT`, the old
-  click switch's case bodies moved there unchanged by a script, `(d = data-*, b = element, e = click)`); every element
-  with `data-act` has `onClick={onAct('x')}` (bridge.js), which sets INB, closes the flow card on a click outside it
-  first (as the old listener did) and runs the action; an inner element's action wins over its row's (`rx`). Fields:
-  the old input/change listeners' branches are `INP` / `CHG` (unchanged bodies); a field gets `onInput={onInp}` and/or
-  `ref={onChg}` (a native `change` listener, so text/month fields still fire on commit) and runs the first handler
-  that applies, in the old order (`ORDER_INP` / `ORDER_CHG`). Before the old switch and listeners were deleted, an
-  action-parity harness clicked/edited every element in ~50 states both ways and compared S, screen globals, folds,
-  dialogs, toast, page text and focus (all equal; it went with them). check.js now reads actions.js: duplicate ACT
-  keys, data-act / onAct('x') with no handler, a key handled twice, and CHG's order (`c` last, nothing else inside it).
-  events.js keeps only page-wide listeners: folds (OPEN), keyboard, select-on-focus, amount formatting, the flow
-  chart's nodes, outside-click close of the flow card (skipped when `skDone`, the React handler did it first).
-  Step 3 (in progress): one root and a store. Piece 1 (done): the page frame is `frame.jsx`, one persistent root in
-  `#app` (index.html's body is just that and the scripts): header, tabs, month, `#sync` + the tab sections, footer,
-  the four dialogs' shells, toast. Mounted once (`frameMount`); it re-renders instead of being patched: `frameUI`
-  (renderAll's frame part), `brandSet` and `bankBadge` are swapped in by name and tell the store; the Bank count is kept as bankBadge last
-  set it. Containers other roots draw into (tab sections, dialog parts, #sync/#saved/#spill) render without children,
-  and elements old code writes text/attributes into (dialog titles, #ddel.hidden, #lok.disabled, #mp.value, the header's
-  scroll class) get fixed contents and props React sets once. The frame's own element listeners (amount/link dialog,
-  pop-up search, month picker, backup file; were attached at load) are `FRAME_ON` in actions.js, attached natively by
-  refs. Checked: the frame's markup equals the old index.html (one-time comparison), and a browser script driving the
-  frame (tabs, months, keyboard, both dialogs end to end, search, picker, backup restore, rename, scroll, Bank count,
-  375px) gives the same results on the old and new versions. Piece 2 (done): the store, `store.js`, a thin layer over
-  S (which stays global): a version, `subscribe`, `changed()` (bumps it and re-renders subscribers inside flushSync)
-  and `useBudget()` (useSyncExternalStore). renderAll's frame step calls `changed()` first, so every commit() and view
-  switch reaches subscribers before the tab is drawn. The frame is the first subscriber; a self-test check covers it
-  (version moves, frame follows, a focused tab button keeps focus). Piece 3 (in progress): real re-renders screen by
-  screen. `live(el, <X/>)` (bridge.js) keeps one root per container and re-renders it in place (flushSync), then
-  `resync(el)` puts back what a fresh mount would have shown and React doesn't control: details `open`, uncontrolled
-  input values/checks and select choice (from defaultValue/defaultChecked), `hidden`, inner scroll offsets; it skips
-  nested roots. `liveReset(el)` drops the root (parity does before each old draw). A parity screen with `live: true`
-  also gets a re-render pass: one root re-rendered through every case in order must equal a fresh draw of each.
-  Intended differences from the old draw: the clicked button (or the field tabbed to) keeps focus, and the page no longer jumps to the top
-  (the old draw emptied the section first, collapsing the page while charts measured). Component state that a fresh draw reset must reset the same way: a chart that measures its box re-measures after
-  every render, one keyed by its range starts over when the range changes (Wealth's `AreaChart key={from}`), and a
-  chart's hover readout keeps only the hovered point (`hv`, null when not hovering) so its default point is recomputed.
-  Parts that change while typing / dragging inside a live screen follow a small tick of their own instead of drawing a
-  second root into it: Loans' plan text, what-if output (#wo-, no longer written by the wi handler) and sentence
-  (`PxLive`/`WiOut`/`WiLive`; pxLive/wiLive bump it) and the rules search (rulesFilter = `rulesFilterR`, the rules
-  card redraws from RQ). `tick()` in bridge.js makes one ({use, bump}). Never draw() into an element a live root renders.
-  resync also rebuilds selects as a mount would: only the option matching defaultValue keeps the `selected` attribute.
-  A container another root draws into keeps its own element state reset by resync (hidden, scroll) but not what's
-  inside; a box filled by hand that a fresh draw emptied gets `key={'…' + drawNo()}` (Bank's split box `.spf`), so each
-  draw of the screen gives it a new element. Hand-toggled `hidden` (Move panel `mvShow`, `spOpen`) goes back to the
-  prop on every draw, as before. This month's money-flow card keeps its hand-managed part (#zb, .skw with #sk/#skt/#skc)
-  in a Fragment keyed by drawNo(), so sankey(), skPos/skPlace, hl/zset and drag-pan start from new elements each draw;
-  Forecast's #fcb (FcBody, still its own root redrawn alone by the what-if sliders) is keyed the same way, and the
-  what-if outputs (#wfo-) follow a tick (`wfLive`, no longer written by the wf handler). Build's ⋮⋮ moves rows by hand:
-  build.js counts them (`ORDN`) and the `.bgrps` lists use it as their key, so the redraw after a move (save or cancel)
-  gets new lists (without it, moving an item to another group made React throw; a self-test check covers it).
-  `CountUp` calls cu after every render, as each old draw did; cu stops an older animation on the same element (`el._cu`).
-  Done: every tab (History, Wealth, Goals, Loans, Settings, Bank, Budget's three views).
-  The tabs are on the store (`tabs.jsx`): each section holds one root, a `TabScreen` subscribed to the store and to its
-  own tick. It draws its screen when the store changes and its tab is showing (renderAll → frameUIR → `changed()`, so
-  every commit/view switch; a hidden tab keeps what it showed), or when its renderX is called by name (`redraw(t)`,
-  shown or not, as before; renderBuild/renderForecast ask for that Budget view, renderBudget follows BUDV). `Body` is
-  memo'd on a draw count (`drawStep`/`drawNo`). After React is done (end of changed() via `afterFlush`, or of redraw;
-  never inside React's commit) each screen that drew gets resync() and its old after-draw step: This month → sankey(),
-  Forecast → fcBody(), Bank → bankBadge(). renderAll's tab step is `drawTab` (= drawTabR: only mounts a tab with no
-  root yet, the store drew the rest). brandSet/bankBadge update the header alone (`frameChanged`/`useFrame`), so
-  Bank's bankBadge doesn't redraw Bank. frameUIR sets the body's tab class before changed(), as frameUI ran before the
-  tab was drawn. Self-test: one draw per change (the visible tab), a hidden tab keeps its content, renderX draws a
-  hidden tab (`__drawNo` in sample mode). Fields stay uncontrolled (defaultValue + resync): the amount formatter,
-  select-on-focus and rerender's restore of typed text and caret work on them as before; controlled fields would mean
-  a draft per field rebuilding all of that, for no visible change, so that step was dropped.
-- **Step 4 (done): the js/ files into ES modules, one bundle** (see Deploy). Checked with a
-  snapshot of the sample household before and after (every tab and view's text for every month, totals, loan paths,
-  goal projections, the schedule simulation, health checks: identical; a planted $1 slip changes 30 entries).
-  The old draw functions (the 31 names main.jsx used to swap, `replaceScreen`/`LEGACY`) and the 52 string helpers only
-  they used are deleted (old dead code kept: `confetti`, never called since the first version); the React versions
-  are defined by name with `setGlobal`. That came first because a module can't hold a function that's swapped by name.
-  Then every js/ file moved the same way (19 modules, each still putting its names on the global object), and then
-  to explicit imports and one bundle: each js/ file's let/var became its module's `export let` with a setter, the 184
-  assignments from other files became setter calls (scope-aware: a local of the same name is left alone), what ran at
-  load became start<Name>(), main.jsx's setGlobal definitions became named.jsx, and an import was added for every
-  name a file used without declaring (found by TypeScript's "cannot find name", browser globals known). Each step:
-  the record of all 1088 parity cases, the snapshot and the click-through of every tab identical.
+- **Screens** are components (`app/src/screens/`, pop-ups in `popups/`, the money-flow card in `flow/`, the schedule
+  editor `schedule.jsx`, shared bits in `ui.jsx`). They read the app's state straight from the modules (`S`, `plan()`,
+  the caches) and must stay pure: no saves or data changes while drawing.
+- **Drawing follows the store** (`store.js`, `tabs.jsx`). `S` is plain module state; `renderAll` (after every
+  `commit()` and view switch) runs `frameUIR` → `changed()`, which re-renders the page frame (`frame.jsx`, one root in
+  `#app`) and the visible tab. Each tab section holds one root (`TabScreen`): it draws when the store changes and its
+  tab is showing (a hidden tab keeps what it showed), or when its `renderX` is called by name (`named.jsx` →
+  `redraw(t)`, shown or not; `renderBuild`/`renderForecast` ask for that Budget view). After React is done (never
+  inside its commit) each screen that drew gets `resync()` and its after-draw step: This month → `sankey()`, Forecast
+  → `fcBody()`, Bank → `bankBadge()`. `brandSet`/`bankBadge` redraw the header alone (`frameChanged`).
+- **Re-renders happen in place**, so `resync(el)` puts back what a fresh draw would show and React doesn't control:
+  details `open`, field values/ticks/choices (fields are uncontrolled: `defaultValue`), `hidden`, inner scroll, and a
+  select's `selected` attribute. Consequences to keep in mind:
+  - a box that code fills by hand gets a new element on every draw with `key={'…' + drawNo()}` (Bank's split box
+    `.spf`, This month's money-flow part `#zb`/`.skw`, Forecast's `#fcb`); Build's ⋮⋮ drag moves rows by hand, so
+    `ORDN` (counted in build.js) keys the `.bgrps` lists (without it React throws; a self-test check covers it);
+  - parts that change while typing or dragging follow a small tick of their own (`tick()` in bridge.js):
+    Loans' plan text and what-if (`pxLive`/`wiLive`), Forecast's what-if outputs (`wfLive`), the rules search
+    (`rulesFilter`). Never `draw()` into an element a live root renders;
+  - charts re-measure after every render, start over when their range changes (`key`), and keep only the hovered
+    point in state (`hv`, null when not hovering); `CountUp` runs `cu` after every render (`el._cu` stops an older
+    animation);
+  - the clicked button keeps focus and the page doesn't jump to the top (the old string-built pages did both).
+- **Pop-ups and dialogs**: their shells are in `frame.jsx`; each part is drawn into its box by its function
+  (`catRender`, `flowRender`, `lnkList`/`lnkRule`, `openD`, `spForm`, `compareView`, `skCard`/`skTip`/`zbar`) with
+  `draw()`, a fresh root each time, like `innerHTML=`. The money-flow chart (`sankeyR`) is drawn the same way into
+  `#sk`; `hl`/`zset` set its classes and viewBox and `skPos`/`skPlace` place the tip and card by hand.
+- **Handlers**: every click action is a function in `actions.js` (`ACT`, `(d = data-*, b = element, e = click)`);
+  an element with `data-act` gets `onClick={onAct('x')}` (sets INB, closes the flow card on a click outside it; an
+  inner element's action wins over its row's). Fields: `onInput={onInp}` and/or `ref={onChg}` (a native `change`
+  listener, so text fields fire on commit), running the first handler in `ORDER_INP`/`ORDER_CHG` that applies. The
+  frame's own listeners are `FRAME_ON`. `events.js` keeps the page-wide ones: folds (`OPEN`), keyboard,
+  select-on-focus, amount formatting, the flow chart's nodes and its outside-click close.
+- **Checks**: `check.js` (also every name imported, via TypeScript). The self-test runs `parity.js`: each tab drawn
+  fresh for every case in `main.jsx` (`addParity`: every month, each range/view, an empty household), then one root
+  re-rendered through all of them must match each fresh draw. `__paritySnap()` (sample mode) records every case,
+  pop-ups and `addPiece` parts included, to compare two builds when changing code under the screens. Add cases for
+  every view switch a screen has.
+- **JSX notes**: a `<table>` needs an explicit `<tbody>`; SVG attributes camelCase (`strokeWidth`); keep attribute
+  strings exact (`fillOpacity=".35"`); lengths as strings (`'16px'`); `{' '}` where inline elements need a space;
+  `cond ? x : null`, never `cond && x` (prints 0).
+- **History**: Version 1 built every screen as HTML strings in classic scripts sharing globals. The move to React
+  (Version 3) replaced them screen by screen with no feature added or removed: each React screen was compared with
+  the old one for every case until the old code was deleted, then the code became ES modules with explicit imports in
+  one bundle, checked with a snapshot of every tab, view and month of the sample (text and the core math) and a
+  click-through of every tab against the previous build at each step.
 
 ## Server API (`server.js`)
 

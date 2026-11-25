@@ -59,7 +59,7 @@ in `./data` next to the compose file, or wherever `DATA_PATH` in `.env` points (
 
 ## 3. Use it
 
-The footer should say **Version 1 · Saved to the server**. The first browser
+The footer should say **Version 3 · Saved to the server**. The first browser
 to open an empty server saves its budget there; after that everyone loads the same copy.
 If two people edit at the same moment, the app keeps the server's copy and re-applies.
 

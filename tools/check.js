@@ -27,6 +27,22 @@ for (const [f, t] of [['index.html', html], ['css/app.css', fs.readFileSync(path
   if (ctl) bad.push(`${ctl} control character(s) in ${f}`);
 }
 
+// Every name used is declared or imported (TypeScript's "cannot find name", the browser's own globals known): a
+// missing import would otherwise only show when that code runs. Plaid Link's `Plaid` is the one global the app uses.
+let tsv = null; try { tsv = require('typescript'); } catch (_) { }
+if (tsv) {
+  const files = Object.keys(jsx).map(f => path.join(SRC, '..', f));
+  const prog = tsv.createProgram(files, { allowJs: true, checkJs: true, noEmit: true, jsx: tsv.JsxEmit.Preserve, module: tsv.ModuleKind.ESNext,
+    moduleResolution: tsv.ModuleResolutionKind.Bundler, target: tsv.ScriptTarget.ES2022, lib: ['lib.es2022.d.ts', 'lib.dom.d.ts', 'lib.dom.iterable.d.ts'],
+    types: [], skipLibCheck: true, moduleDetection: tsv.ModuleDetectionKind.Force });
+  for (const sf of prog.getSourceFiles().filter(x => files.includes(path.resolve(x.fileName))))
+    for (const d of prog.getSemanticDiagnostics(sf)) {
+      if (!/^Cannot find name '/.test(tsv.flattenDiagnosticMessageText(d.messageText, ' '))) continue;
+      const name = sf.text.slice(d.start, d.start + d.length); if (name === 'Plaid') continue;
+      bad.push(`${name} is used but not imported or declared: ${path.relative(path.join(SRC, '..', '..'), sf.fileName)}:${sf.getLineAndCharacterOfPosition(d.start).line + 1}`);
+    }
+}
+
 // Click actions: ACT's keys in actions.js (plus the aliases set after it, `ACT.x = ACT.y`).
 const A = jsx['src/actions.js'] || '', actBody = A.slice(A.indexOf('export const ACT = {'), A.indexOf('\n};', A.indexOf('export const ACT = {')));
 const cases = [...actBody.matchAll(/^  '([A-Za-z0-9_]+)': function \(d, b, e\) \{/gm), ...A.matchAll(/^ACT\.([A-Za-z0-9_]+) = ACT\./gm)].map(m => m[1]), count = {};
@@ -59,4 +75,4 @@ for (const [re, name] of [[/d\.k==='([A-Za-z0-9_]+)'/g, 'data-k'], [/d\.c==='([A
 }
 
 if (bad.length) { console.log('FAIL\n - ' + bad.join('\n - ')); process.exit(1); }
-console.log(`OK · ${cases.length} actions, ${used.size} buttons, no duplicates, change handlers in order` + (esb ? '' : ' (syntax not checked: run npm install)'));
+console.log(`OK · ${cases.length} actions, ${used.size} buttons, no duplicates, change handlers in order` + (esb ? '' : ' (syntax not checked: run npm install)') + (tsv ? ', every name imported' : ' (imports not checked: run npm install)'));

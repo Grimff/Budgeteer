@@ -46,7 +46,6 @@ export function Frame() {
     <dialog id="tdlg"><form method="dialog"><h3 id="tdt"></h3><p className="sub" id="tds"></p><div className="clinks" id="tdr"></div><div className="seg" id="tdrg" style={{ marginBottom: '8px' }}></div><input className="in" id="tdq" placeholder="Search store, name or account" autoComplete="off" aria-label="Search these transactions" style={{ marginBottom: '8px' }} ref={nat('tdq')} /><p className="dim" id="tdf" hidden style={{ fontSize: '13px', margin: '0 0 8px' }}></p><div className="tlist" id="tdl"></div><div className="dact"><button type="button" className="btn g" data-act="tclose" onClick={onAct('tclose')}>Close</button></div></form></dialog>
     <dialog id="fdlg"><form method="dialog"><h3 id="fdt"></h3><p className="sub" id="fds"></p><div id="fdb"></div></form></dialog>
     <div id="toast" role="status" aria-live="polite"></div>
-    <canvas id="fx" aria-hidden="true"></canvas>
   </>;
 }
 

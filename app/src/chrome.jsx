@@ -13,6 +13,6 @@ export function fsUIR(demo = DEMO) {
   const b = $('#sync'), pill = $('#spill'), sv = $('#saved');
   draw(b, <Sync demo={demo} />);
   const st = FS.state === 'wait' ? ['', 'Connecting…'] : FS.state === 'ok' ? ['ok', FS.dirty || FS.busy ? 'Saving to the server…' : `Saved to the server${FS.last ? ' at ' + FS.last.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }) : ''}`] : ['bad', 'Not saved to the server. Saved in this browser only'];
-  draw(sv, <><span className="dim">Version 1</span> · <i className={'sdot ' + st[0]}></i>{demo ? 'Sample data · nothing is saved' : st[1]}</>);
+  draw(sv, <><span className="dim">Version 3</span> · <i className={'sdot ' + st[0]}></i>{demo ? 'Sample data · nothing is saved' : st[1]}</>);
   pill.hidden = FS.state === 'wait'; pill.className = 'sp ' + st[0]; draw(pill, <><i className={'sdot ' + st[0]}></i>{FS.state === 'ok' ? (FS.dirty || FS.busy ? 'Saving…' : 'Synced') : 'Not synced'}</>);
 }
