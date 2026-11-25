@@ -41,6 +41,18 @@ export const acctType=id=>{const a=(BK.accts||[]).find(x=>x.id===id);return a?a.
 // month to the next month (shift 'next', rent paid early) or the first 5 days back a month (shift 'prev', paid late).
 export function ruleMonth(t,r){const k=t.date.slice(0,7),d=+t.date.slice(8,10),[y,m]=k.split('-').map(Number),last=new Date(y,m,0).getDate();
  if(r&&r.shift==='next'&&d>last-5)return addM(k,1);if(r&&r.shift==='prev'&&d<=5)return addM(k,-1);return k}
+// A bill payment late in a month whose bill is already paid is next month's paid early (rent for the 1st paid on the
+// 25th): it counts in the next month if that one has no payment yet. Monthly bills only, a payment about the bill's
+// size, and only filings made by rules (by hand always wins). Without this the month showed the bill paid twice.
+export function earlyMonth(v,k,d,amt,self){if(!v||!v.startsWith('i:')||!d)return k;const id=v.slice(2),x=allItems(k).find(x=>x.i.id===id);if(!x||x.g.flex||+x.i.freq>1)return k;
+ const pl=+(x.i.base??x.i.amt)||0,day=+d.slice(8,10),last=new Date(+k.slice(0,4),+k.slice(5,7),0).getDate(),due=+x.i.due||0;
+ if(pl<=0||Math.abs(amt-pl)>pl*.25||day<(due?Math.max(due+14,last-12):last-9))return k;
+ const k1=addM(k,1),R=Object.entries(S.txd||{}).filter(([i2,r])=>i2!==self&&r&&r.v===v);
+ const here=R.filter(([,r])=>r.k===k&&r.d<d).reduce((a,[,r])=>a+(+r.amt||0),0);
+ return here>=pl*.9&&!R.some(([,r])=>r.k===k1)?k1:k}
+// The same for filings already made (they were filed before this existed): rule filings of a bill in their own month.
+export function earlyFix(){let n=0;Object.entries(S.txd||{}).sort((a,b)=>(a[1].d||'').localeCompare(b[1].d||'')).forEach(([id,r])=>{if(!r||!r.auto||r.auto==='pair'||r.auto==='rest'||!r.v||!r.v.startsWith('i:')||r.flex||!r.d||r.k!==r.d.slice(0,7))return;
+ const k2=earlyMonth(r.v,r.k,r.d,+r.amt||0,id);if(k2!==r.k){r.k=k2;n++}});if(n){TXI=null;setLP({})}return n}
 export function ruleFor(t){let best=null;const nm=normName(t),a=Math.abs(t.amount);(S.rules||[]).forEach(r=>{if(r.dir!==tdir(t)||!r.p||!nm.includes(r.p))return;if(r.x&&r.x.some(x=>nm.includes(x)))return;if(r.min!=null&&a<r.min-0.005)return;if(r.max!=null&&a>r.max+0.005)return;if(!best||r.p.length>best.p.length)best=r});return best}
 export function addRule(p,dir,v,min,max,x){S.rules||(S.rules=[]);p=normT(p);let r=S.rules.find(y=>y.p===p&&y.dir===dir);if(!r){r={id:uid(),p,dir};S.rules.push(r)}r.v=v;if(x&&x.length)r.x=x;else delete r.x;if(min!=null){r.min=min;r.max=max}else{delete r.min;delete r.max}return r}
 export const rulesFor=v=>(S.rules||[]).filter(r=>r.v===v);
@@ -88,14 +100,23 @@ export function incGot(k,id){const e=txIdx()[k]?.['inc:'+id];return e&&e.list.le
 // an automatic one is just redone by autoFile. A pending charge that vanished without posting (a released
 // hold) is unfiled. If the bank kept the same id, the filing is refreshed with the posted amount.
 export function pendCarry(){const byId=new Map(BK.tx.map(t=>[t.id,t]));let n=0;
- BK.tx.forEach(t=>{if(!t.ppid||t.pending)return;if(S.noAuto&&S.noAuto[t.ppid]){S.noAuto[t.id]=1;delete S.noAuto[t.ppid]}const o=S.txd[t.ppid];if(!o)return;txUndo(t.ppid);if(!o.auto&&!S.txd[t.id])txAssign(t,o.v,undefined,o.k);n++});
- Object.entries(S.txd).forEach(([id,r])=>{if(!r.pend)return;const t=byId.get(id);if(!t){if(r.d>=bankFrom()){txUndo(id);n++}return}if(t.pending)return;const o={...r};txUndo(id);txAssign(t,o.v,o.auto,o.k);n++});
+ // A posted charge takes over its pending one's filing. A rule filing is redone by the rules, unless no rule matches the
+ // posted description (banks often word the two differently): then it keeps the pending one's filing.
+ BK.tx.forEach(t=>{if(!t.ppid||t.pending)return;if(S.noAuto&&S.noAuto[t.ppid]){S.noAuto[t.id]=1;delete S.noAuto[t.ppid]}const o=S.txd[t.ppid];if(!o)return;txUndo(t.ppid);if(!S.txd[t.id]&&(!o.auto||!ruleFor(t)))txAssign(t,o.v,o.auto,o.k);n++});
+ // A pending charge that's gone: if a posted one of the same amount came in on or after its date (within 10 days) and
+ // isn't filed, it's that charge posted without a link back (common for ACH payments like rent), so it takes the filing.
+ // Otherwise it was a released hold and is unfiled.
+ const day=d=>Date.parse(d)/864e5,taken=new Set(BK.tx.filter(x=>x.ppid).map(x=>x.ppid));
+ Object.entries(S.txd).forEach(([id,r])=>{if(!r.pend)return;const t=byId.get(id);
+  if(!t){if(r.d<bankFrom())return;const p=BK.tx.find(x=>!x.pending&&!S.txd[x.id]&&!(S.noAuto||{})[x.id]&&!(x.ppid&&x.ppid!==id)&&Math.abs(r2(x.amount)-(+r.amt||0))<0.005&&day(x.date)-day(r.d)>=-1&&day(x.date)-day(r.d)<=10);
+   const o={...r};txUndo(id);if(p&&!taken.has(id)&&(!o.auto||!ruleFor(p)))txAssign(p,o.v,o.auto,o.k);n++;return}
+  if(t.pending)return;const o={...r};txUndo(id);txAssign(t,o.v,o.auto,o.k);n++});
  if(n){TXI=null;setLP({})}return n}
-export function autoFile(){if(!SRV||!BK.tx.length||!BK.accts)return 0;S.txd||(S.txd={});let n=pendCarry();const f=bankFrom(),P=txPairs(),no=S.noAuto||{};
+export function autoFile(){if(!SRV||!BK.tx.length||!BK.accts)return 0;S.txd||(S.txd={});let n=pendCarry()+earlyFix();const f=bankFrom(),P=txPairs(),no=S.noAuto||{};
  const gone=S.txGone||{};BK.tx.forEach(t=>{if(t.date<f||S.txd[t.id]||no[t.id]||gone[t.id])return;
   if(P.has(t.id)){const o=P.get(t.id);if(S.txd[o]&&!['xfer','skip'].includes(S.txd[o].v)&&S.txd[o].auto!=='pair')return;
    const ot=t.amount>0&&BK.tx.find(x=>x.id===o),ln=ot&&S.loans.find(l=>l.acct&&l.paySrc==='bank'&&l.acct===ot.account);if(ln){txAssign(t,'l:'+ln.id,'pair');S.txd[t.id].pair=o;n++;return}S.txd[t.id]={v:'xfer',k:t.date.slice(0,7),amt:r2(t.amount),d:t.date,n:t.merchant||t.name,auto:'pair',pair:o};n++;return}
-  const r=ruleFor(t),km=r?ruleMonth(t,r):null;if(r&&txTargets(km).ok(r.v)&&!((r.v.startsWith('inc:')||r.v==='once')&&acctType(t.account)!=='depository')){txAssign(t,r.v,r.id,km);n++;return}
+  const r=ruleFor(t);let km=r?ruleMonth(t,r):null;if(r&&km===t.date.slice(0,7))km=earlyMonth(r.v,km,t.date,r2(t.amount),t.id);if(r&&txTargets(km).ok(r.v)&&!((r.v.startsWith('inc:')||r.v==='once')&&acctType(t.account)!=='depository')){txAssign(t,r.v,r.id,km);n++;return}
   // Anything else that's a plain purchase rolls into Flex spending. Transfers, loan and card payments and
   // payment apps (Plaid's TRANSFER_* / LOAN_PAYMENTS) stay in review, since they're often rent or money between accounts.
   if(!r&&flexable(t)){const fx=flexDefault(t.date.slice(0,7));if(fx){txAssign(t,'i:'+fx,'rest');n++}}});

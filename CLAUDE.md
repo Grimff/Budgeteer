@@ -286,6 +286,15 @@ server against a real `data/` folder while testing; use `tools/realtest.js`.
   posted id (same category and month, posted amount) and an automatic one is redone; a pending charge that
   vanished without posting (released hold) is unfiled; same-id posting refreshes the amount. A bill paid
   only by pending charges shows **Pending** on This month.
+- **Bill paid early for next month** (`earlyMonth`, in the rules step; `earlyFix()` at the start of `autoFile` applies
+  it to rule filings made before it existed): a payment of a monthly bill late in a month (day ≥ due+14 and ≥ last−12,
+  or the last 10 days with no due day), about the bill's size (±25%), when that month already has the bill paid
+  (≥90%, by an earlier payment) and the next month has none, counts in the next month. Rent for the 1st paid on the
+  25th used to show twice in that month (bills up by a rent) and unpaid in the next. Hand filings are never moved.
+- **Pending → posted keeps the filing** (`pendCarry`): a rule filing is redone by the rules unless no rule matches the
+  posted description, in which case it keeps the pending filing; a vanished pending charge hands its filing to an
+  unfiled posted one of the same amount 0–10 days later (ACH posts often carry no `pending_transaction_id`), else it
+  was a released hold and is unfiled. Before, such a payment fell back to To review and its bill showed unpaid.
 - **Manual always wins:** automation only files unfiled transactions; `ruleReapply` only redoes
   what that rule filed; Move / Undo / Add are manual.
 - Fixed bills and income get actuals from `txd` (`txIdx` → `billPaid`, `incGot`); groceries/flex

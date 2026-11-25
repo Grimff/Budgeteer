@@ -3,7 +3,7 @@
 // Shared state (other files change it with the set… functions; it was js/sample.js):
 import { reactParity, renderBudget, renderLoans } from '../named.jsx';
 import { NTH, alertsNow, ntHide } from './alerts.js';
-import { BK, billPaid, flexAct, incGot, normT, CT } from './bank.js';
+import { BK, billPaid, flexAct, incGot, normT, CT, autoFile, setTXI, setPSET, PSET } from './bank.js';
 import { BUDV, LOOSE, ORDN, fillAvg, orderApply, orderRead, setBSCOPE, setBUDV, setORDN } from './build.js';
 import { cmpRows } from './compare.js';
 import { C, DEMO, S, SELFTEST, TK, addM, clone, editPlan, esc, f0, f2, lab, labS, plan, r2, rtText, uid, $, nextDue, HADL, setHADL } from './core.js';
@@ -11,7 +11,7 @@ import { CV, cvDate, cvDel, cvImport, cvLoadText, cvNum, cvRows } from './csv-im
 import { renderAll } from './events.js';
 import { nodeKey } from './flow.js';
 import { monthSum } from './history.js';
-import { allItems, inbox, linkLoan, BV, setBV } from './linked-loans.js';
+import { allItems, inbox, linkLoan, BV, setBV, txUndo, txAssign } from './linked-loans.js';
 import { goalEta, goalMon, goalSaved, path, setLP, totals, unplannedA } from './math.js';
 import { FS } from './server-sync.js';
 import { BKP, bkList, bkRestore, healthChecks, SV, setSV, hcDot } from './settings.js';
@@ -171,6 +171,20 @@ export async function selfTest(){const T=[],ok=(c,name,detail='')=>T.push({ok:!!
   // History chart: the month under the pointer (or the last one tapped) gets a readout
   { S.tab='history';renderAll();const hs=[...document.querySelectorAll('#T-history .hchart svg rect[fill="transparent"]')],last=hs[hs.length-1];if(last)last.dispatchEvent(new PointerEvent('pointerover',{bubbles:true,pointerType:'touch'}));await new Promise(r=>setTimeout(r,30));
    const rd=$('#T-history .hrd');ok(!!rd&&rd.textContent.includes(lab(S.cur))&&/Planned out \$/.test(rd.textContent),'The History chart shows a month’s figures when it’s tapped',rd?rd.textContent:'no readout');S.tab='budget';renderAll()}
+  // Rent for next month paid late this month counts in next month (not twice in this one); a filing made before that
+  // rule existed is moved on the next filing pass; a hand filing is never moved.
+  { const rt=BK.tx.find(t=>t.date.slice(0,7)===TK&&/OAKWOOD/.test(t.name)),last=new Date(+TK.slice(0,4),+TK.slice(5,7),0).getDate(),id='st-early';
+   if(rt){const t={...rt,id,date:TK+'-'+String(last-2).padStart(2,'0'),pending:false};delete t.ppid;BK.tx.push(t);autoFile();const a=S.txd[id]&&S.txd[id].k;
+    S.txd[id].k=TK;autoFile();const b=S.txd[id].k;delete S.txd[id].auto;S.txd[id].k=TK;autoFile();const c=S.txd[id].k;
+    txUndo(id);BK.tx.splice(BK.tx.indexOf(t),1);setTXI(null);
+    ok(a===addM(TK,1)&&b===addM(TK,1)&&c===TK&&billPaid(TK,'rent')&&billPaid(TK,'rent').amt===1850,'Next month’s rent paid early counts in next month, not twice in this one',`new ${a}, old filing ${b}, by hand ${c}`)}
+   else ok(false,'Next month’s rent paid early counts in next month','no rent in the sample this month')}
+  // A pending charge filed by hand keeps its filing when it posts without a link back and under another description
+  { const rt=BK.tx.find(t=>t.date.slice(0,7)===TK&&/STREAMFLIX/.test(t.name))||BK.tx.find(t=>t.date.slice(0,7)===TK&&t.amount>0);
+   const p={...rt,id:'st-pnd',name:'POS HOLD 4471',merchant:'',amount:43.21,pending:true},q={...rt,id:'st-post',name:'CORNER HARDWARE 88213',merchant:'',amount:43.21,pending:false,date:rt.date};delete p.ppid;delete q.ppid;
+   BK.tx.push(p);setPSET(new Set([...PSET,p.id]));txAssign(p,'i:stream');BK.tx.splice(BK.tx.indexOf(p),1);BK.tx.push(q);PSET.delete(p.id);autoFile();const r=S.txd['st-post'];
+   ok(!S.txd['st-pnd']&&r&&r.v==='i:stream'&&!r.pend,'A pending charge’s filing moves to the posted charge, even without a link back',JSON.stringify(r));
+   txUndo('st-post');BK.tx.splice(BK.tx.indexOf(q),1);setTXI(null)}
   // Recurring charges: the monthly bills and Streamflix (13.99 → 15.99 last month) are found, everyday spending isn't;
   // the price increase is an alert and shows on Bank → Recurring, whose rows open the budget line.
   { const QA=(q,r=document)=>[...r.querySelectorAll(q)],L=subsList(),sf=L.find(x=>x.p==='STREAMFLIX'),names=L.map(x=>x.p).join(', ');
