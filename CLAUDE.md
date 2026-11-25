@@ -451,7 +451,9 @@ server against a real `data/` folder while testing; use `tools/realtest.js`.
   for the chart and the month list; the chart draws at the width shown and labels every `step`-th
   month (short month, year under the first label and January). Delete a month (`delMonth`).
 - **Bank:** header (sync status; Rules, Connections → Settings; Sync now) and sections (`BV`): To
-  review (+ double counts, How filing works), Filed (filters, search, Move / Undo), **Recurring** (`BV='subs'`,
+  review (+ double counts: `PairCard`, each row names the card/loan payment it matched and has **Transfer** (`fixPairs`
+  with `data-id`) and **Keep as filed** (`pairKeep` sets `pok` on the filing, which `pairIssues` and the health check skip),
+  How filing works), Filed (filters, search, Move / Undo), **Recurring** (`BV='subs'`,
   `Subs`/`SubRow`): `subsList()` (`lib/subs.js`) groups the last 14 months of posted charges by `merchKey` (no transfers,
   loan payments, or charges filed as anything but a budget line), keeps those at most once a month on a steady gap
   (1/2/3/6/12 months; monthly needs 3 in a row, others 2), about the same day (±7) and a steady price with at most one

@@ -3,7 +3,7 @@
 // Shared state (other files change it with the set… functions; it was js/sample.js):
 import { reactParity, renderBudget, renderLoans } from '../named.jsx';
 import { NTH, alertsNow, ntHide } from './alerts.js';
-import { BK, billPaid, flexAct, incGot, normT, CT, autoFile, setTXI, setPSET, PSET, acctType } from './bank.js';
+import { BK, billPaid, flexAct, incGot, normT, CT, autoFile, setTXI, setPSET, PSET, acctType, txPairs, pairIssues } from './bank.js';
 import { BUDV, LOOSE, ORDN, fillAvg, orderApply, orderRead, setBSCOPE, setBUDV, setORDN } from './build.js';
 import { cmpRows } from './compare.js';
 import { C, DEMO, S, SELFTEST, TK, addM, clone, editPlan, esc, f0, f2, lab, labS, plan, r2, rtText, uid, $, nextDue, HADL, setHADL } from './core.js';
@@ -225,6 +225,14 @@ export async function selfTest(){const T=[],ok=(c,name,detail='')=>T.push({ok:!!
    const row=rows.find(r=>/Streamflix/.test(r.textContent));ok(rows.length===L.length&&QA('#T-bank .subr:not(.off)').length===on&&row&&/Went up from \$13\.99/.test(row.textContent),'Bank → Recurring lists them with the price change',`${rows.length} rows, ${on} active`);
    const b=row&&row.querySelector('.subn');if(b)b.click();const dl=$('#tdlg');ok(!!b&&dl&&dl.open&&CT==='i:stream','A recurring charge opens its budget line');if(dl&&dl.open)dl.close();
    setBV(ob);try{localStorage.setItem('pfb_bview',BV)}catch(_){}document.querySelector('.tabs button[data-t="budget"]').click()}
+  // Possible double counts: each row can be kept as filed (no longer flagged) or made a transfer on its own, and names
+  // the card payment it matched.
+  { const P=txPairs(),ids=[...P.keys()].filter(id=>{const t=BK.tx.find(x=>x.id===id);return t&&t.amount>0&&acctType(t.account)==='depository'&&t.date.slice(0,7)===S.cur}).slice(0,2),old=ids.map(id=>S.txd[id]),it=allItems(S.cur).find(x=>!x.flex)||allItems(S.cur)[0];
+   ids.forEach(id=>{const t=BK.tx.find(x=>x.id===id);S.txd[id]={v:'i:'+it.i.id,k:S.cur,amt:t.amount,d:t.date,n:t.name}});setTXI(null);const ob=BV;setBV('review');document.querySelector('.tabs button[data-t="bank"]').click();
+   const rows=()=>[...document.querySelectorAll('#T-bank .txr.dn')].filter(r=>r.querySelector('[data-act="pairKeep"]'));const n0=rows().length,r0=rows()[0],named=r0&&/Matches a \$[\d,.]+ payment on /.test(r0.textContent);
+   const k=r0&&r0.querySelector('[data-act="pairKeep"]'),kid=k&&k.dataset.id;if(k)k.click();const t1=rows()[0],f=t1&&t1.querySelector('[data-act="fixPairs"]'),fid=f&&f.dataset.id;if(f)f.click();
+   ok(ids.length===2&&n0===2&&named&&S.txd[kid]&&S.txd[kid].pok&&S.txd[kid].v.startsWith('i:')&&S.txd[fid]&&S.txd[fid].v==='xfer'&&!pairIssues().length&&!rows().length,'A possible double count can be kept as filed or made a transfer, one at a time',JSON.stringify({ids,n0,named,kid,fid}));
+   ids.forEach((id,i)=>{if(old[i])S.txd[id]=old[i];else delete S.txd[id]});setTXI(null);setBV(ob);document.querySelector('.tabs button[data-t="budget"]').click()}
   // Bill calendar: every bill and loan due this month on its day, in the same status as its Budget line; a twice-a-year
   // bill only in its due month, at its full amount; a chip opens the line.
   { const QA=(q,r=document)=>[...r.querySelectorAll(q)];S.cur=TK;renderAll();const C=calBills(TK),rent=C.find(x=>x.v==='i:rent'),ins=allItems(TK).find(x=>x.i.id==='ins'),dk=ins&&nextDue(ins.i,TK),cd=dk?calBills(dk).find(x=>x.v==='i:ins'):null;

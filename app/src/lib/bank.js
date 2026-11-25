@@ -166,8 +166,9 @@ export function lnkMatches(){const P=lnkPats().map(p=>({p,x:lnkExclFor(p)})),one
  return BK.tx.filter(t=>{if(tdir(t)!==LK.dir)return false;if(LK.kind==='goal'&&!goalTx(t))return false;if(LK.dir==='in'&&acctType(t.account)!=='depository')return false;if(S.txd&&S.txd[t.id]&&S.txd[t.id].auto==='pair')return false;
   const nm=normName(t);if(!P.some(({p,x})=>nm.includes(p)&&!x.some(y=>nm.includes(y))))return false;return !(one&&LK.amtOn&&ref)||Math.abs(Math.abs(t.amount)-ref)<=ref*.25})}
 // Payments between your own accounts that were filed as spending or income before pairing existed.
-// Loan filings are left alone: a linked loan's balance wins, so they never double count.
-export function pairIssues(){if(!BK.accts)return[];const P=txPairs(),out=[];P.forEach((o,id)=>{const r=S.txd&&S.txd[id];if(r&&(r.v.startsWith('i:')||r.v.startsWith('inc:')||r.v==='once'))out.push({id,o,r})});return out}
+// Loan filings are left alone: a linked loan's balance wins, so they never double count. `pok` on a filing = the person
+// said it isn't a double count (e.g. paying yourself back for a bill paid from an account outside the budget).
+export function pairIssues(){if(!BK.accts)return[];const P=txPairs(),out=[];P.forEach((o,id)=>{const r=S.txd&&S.txd[id];if(r&&!r.pok&&(r.v.startsWith('i:')||r.v.startsWith('inc:')||r.v==='once'))out.push({id,o,r})});return out}
 // Details: every transaction filed to one category this month, with a picker to move any of them.
 
 export function catOpen(v){CT=v;CR='month';$('#tdq').value='';catRender();$('#tdlg').showModal()}
