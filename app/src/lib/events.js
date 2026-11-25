@@ -40,6 +40,9 @@ export function startEvents() {
 // Clicks, typing and changes are handled by each element's own React handler (app/src/actions.js); what's left here is
 // page-wide: folds, keyboard, amount formatting, and the money-flow chart's nodes and card.
    // the typing debounce (INP.k in actions.js)
+// Phones: pop-ups are bottom sheets (app.css); pulling one down from the top of its content closes it. It closes through
+// its own close button (tclose/lclose/fclose/dclose clear the pop-up's state too), or plain close() if it has none.
+sheetSwipe();
 document.addEventListener('toggle',e=>{const d=e.target;if(d.matches&&d.matches('details[data-key]')){d.open?OPEN.add(d.dataset.key):OPEN.delete(d.dataset.key)}},true);
 document.addEventListener('keydown',e=>{if((e.key==='Enter'||e.key===' ')&&e.target.matches('.clh')){e.preventDefault();e.target.click();return}if(e.key==='Enter'&&e.target.matches('.in')&&!e.target.closest('dialog')){e.preventDefault();const all=$$('.tab:not([hidden]) .in:not([disabled])'),i=all.indexOf(e.target);(all[i+1]||e.target).focus();all[i+1]?.select?.()}});
 document.addEventListener('focusin',e=>{if(RESTORING)return;const el=e.target;if(el.matches('.in.a')&&!el.closest('dialog')){el._sel=true;setTimeout(()=>{if(el._sel)el.select?.();el._sel=false},0)}});
@@ -52,4 +55,14 @@ document.addEventListener('click',e=>{const nd=e.target.closest('#sk .nd'),lk=nd
 addEventListener('scroll',()=>$('#bar').classList.toggle('sc',scrollY>6),{passive:true});
 addEventListener('resize',moveInd);
 document.fonts&&document.fonts.ready.then(moveInd);
+}
+let SW=null;
+export function sheetSwipe(){
+ const end=()=>{if(!SW)return;const{d,dy,t}=SW;SW=null;const v=dy/Math.max(1,Date.now()-t);d.style.transition='transform .2s ease-out';
+  if(dy>110||(dy>40&&v>.6)){d.style.transform='translateY(100%)';setTimeout(()=>{d.style.transition=d.style.transform='';const c=d.querySelector('[data-act$="close"]');if(d.open)c?c.click():d.close()},190)}
+  else{d.style.transform='';setTimeout(()=>{d.style.transition=''},210)}};
+ document.addEventListener('touchstart',e=>{const d=e.target.closest&&e.target.closest('dialog[open]');if(!d||innerWidth>760||e.touches.length>1||d.scrollTop>0||e.target.closest('input,select,textarea,.skw,[data-drag]'))return;SW={d,y0:e.touches[0].clientY,dy:0,t:Date.now(),on:false}},{passive:true});
+ document.addEventListener('touchmove',e=>{if(!SW)return;const dy=e.touches[0].clientY-SW.y0;if(!SW.on){if(dy<-4||SW.d.scrollTop>0){SW=null;return}if(dy<8)return;SW.on=true;SW.y0+=8;SW.t=Date.now()}
+  e.preventDefault();SW.dy=Math.max(0,dy-8);SW.d.style.transition='none';SW.d.style.transform=`translateY(${SW.dy}px)`},{passive:false});
+ document.addEventListener('touchend',end,{passive:true});document.addEventListener('touchcancel',end,{passive:true});
 }

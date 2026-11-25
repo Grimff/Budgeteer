@@ -6,7 +6,7 @@ import { NTH, alertsNow, ntHide } from './alerts.js';
 import { BK, billPaid, flexAct, incGot, normT, CT } from './bank.js';
 import { BUDV, LOOSE, ORDN, fillAvg, orderApply, orderRead, setBSCOPE, setBUDV, setORDN } from './build.js';
 import { cmpRows } from './compare.js';
-import { C, DEMO, S, SELFTEST, TK, addM, clone, editPlan, esc, f0, f2, lab, labS, plan, r2, rtText, uid, $, nextDue } from './core.js';
+import { C, DEMO, S, SELFTEST, TK, addM, clone, editPlan, esc, f0, f2, lab, labS, plan, r2, rtText, uid, $, nextDue, HADL, setHADL } from './core.js';
 import { CV, cvDate, cvDel, cvImport, cvLoadText, cvNum, cvRows } from './csv-import.js';
 import { renderAll } from './events.js';
 import { nodeKey } from './flow.js';
@@ -18,6 +18,7 @@ import { BKP, bkList, bkRestore, healthChecks, SV, setSV, hcDot } from './settin
 import { debtNow } from './wealth.js';
 import { subsList } from './subs.js';
 import { calBills } from './calendar.js';
+import { withS, emptyHousehold } from '../parity.js';
 export let DEMOD=null; export function setDEMOD(v){return DEMOD=v}
 /* ---------- sample household (?demo) and self-test (?selftest) ---------- */
 // ?demo opens a made-up household that lives only in this tab: demoFetch answers every api/ call in the page (budget,
@@ -159,6 +160,17 @@ export async function selfTest(){const T=[],ok=(c,name,detail='')=>T.push({ok:!!
    ok(!!dot&&hcDot().lv==='bad'&&/health check/.test(g.getAttribute('aria-label'))&&went,'The gear shows a dot when the health check finds something, and opens it',`dot ${!!dot}, ${JSON.stringify(hcDot())}, opened ${went}`)}
   BK.st.items[0].error=null;delete NTH['conn:it-bank:ITEM_LOGIN_REQUIRED'];if(fi)editPlan(p=>{const it=p.groups.find(g=>g.id===fi.g.id).items.find(i=>i.id===fi.i.id);it.amt=it._was;delete it._was},TK);
   renderAll();ok(!$('.tset .tdot')&&hcDot().n===0,'No dot on the gear when the health check is all clear',JSON.stringify(hcDot()));
+  // Empty states: a new household gets one card per page saying what it will show and the first step (not $0 charts,
+  // or "Every loan is paid off"), and no look back at a month with nothing in it.
+  { const back=withS(emptyHousehold()),seen={};try{for(const[t,v]of[['budget','month'],['loans'],['goals'],['history']]){S.tab=t;if(v)setBUDV(v);renderAll();const e=$('#T-'+t);seen[t]=[!!e.querySelector('section.empty'),e.textContent]}}finally{back();S.tab='budget';setBUDV('month');renderAll()}
+   ok(Object.values(seen).every(x=>x[0])&&!/paid off\. Nice/.test(seen.loans[1])&&/No loans yet/.test(seen.loans[1])&&/No goals yet/.test(seen.goals[1])&&/No history yet/.test(seen.history[1])&&!/in review/.test(seen.budget[1]),'A new household sees an empty state on each page, not zeros',JSON.stringify(Object.fromEntries(Object.entries(seen).map(([k,v])=>[k,v[0]]))))}
+  // Loading: placeholders while the bank data is on its way, and on a new browser until the budget arrives
+  { const st=BK.st,ac=BK.accts;BK.st=null;BK.accts=null;S.tab='bank';renderAll();const a=!!$('#T-bank .skl');S.tab='wealth';renderAll();const b=!!$('#T-wealth .skl');BK.st=st;BK.accts=ac;
+   const h0=HADL,l0=FS.loaded,s0=FS.state;setHADL(false);FS.loaded=false;FS.state='wait';S.tab='budget';renderAll();const c=!!$('#T-budget .skl')&&!$('#T-budget .sbar');setHADL(h0);FS.loaded=l0;FS.state=s0;renderAll();
+   ok(a&&b&&c&&!$('#T-budget .skl'),'Loading shows placeholders, then the page',`bank ${a}, wealth ${b}, first load ${c}`)}
+  // History chart: the month under the pointer (or the last one tapped) gets a readout
+  { S.tab='history';renderAll();const hs=[...document.querySelectorAll('#T-history .hchart svg rect[fill="transparent"]')],last=hs[hs.length-1];if(last)last.dispatchEvent(new PointerEvent('pointerover',{bubbles:true,pointerType:'touch'}));await new Promise(r=>setTimeout(r,30));
+   const rd=$('#T-history .hrd');ok(!!rd&&rd.textContent.includes(lab(S.cur))&&/Planned out \$/.test(rd.textContent),'The History chart shows a month’s figures when it’s tapped',rd?rd.textContent:'no readout');S.tab='budget';renderAll()}
   // Recurring charges: the monthly bills and Streamflix (13.99 → 15.99 last month) are found, everyday spending isn't;
   // the price increase is an alert and shows on Bank → Recurring, whose rows open the budget line.
   { const QA=(q,r=document)=>[...r.querySelectorAll(q)],L=subsList(),sf=L.find(x=>x.p==='STREAMFLIX'),names=L.map(x=>x.p).join(', ');

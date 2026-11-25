@@ -20,9 +20,10 @@ import { Forecast } from './screens/Forecast.jsx';
 import { Build } from './screens/Build.jsx';
 import { BK } from './lib/bank.js';
 import { BUDV } from './lib/build.js';
-import { S } from './lib/core.js';
-import { SRV } from './lib/server-sync.js';
+import { S, HADL } from './lib/core.js';
+import { SRV, FS } from './lib/server-sync.js';
 import { bankBadge, fcBody, sankey } from './named.jsx';
+import { SkelCards } from './ui.jsx';
 
 const TABS = ['budget', 'loans', 'goals', 'wealth', 'history', 'bank', 'settings'];
 const TT = Object.fromEntries(TABS.map(t => [t, tick()]));   // per tab: redraw asked by name
@@ -47,6 +48,7 @@ const Body = memo(function Body({ t, n, view, el }) {
   useLayoutEffect(() => { if (n) PEND.push({ t, view, el }); });
   if (!n) return null;   // mounted, not drawn yet
   drawStep();
+  if (!HADL && !FS.loaded && FS.state === 'wait' && t !== 'settings') return <SkelCards n={3} />;   // a new browser, the budget still on its way
   const C = t === 'budget' ? BUDGET[budView(view)] : SCREEN[t];
   return <C />;
 });

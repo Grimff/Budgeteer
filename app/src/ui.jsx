@@ -53,3 +53,22 @@ export function CatchSel() {
   const auto = (allItems(TK).find(x => x.i.id === (S.catchAll && S.catchAll !== 'review' ? '' : flexDefaultAuto(TK))) || { i: { name: 'Flex' } }).i.name;
   return <div className="catchr"><b>Purchases with no store link go to</b><select className="in" data-catchall="1" aria-label="Where purchases with no store link go" defaultValue={S.catchAll || ''} ref={onChg}><option value="">{'Automatic: ' + tx(auto)}</option>{plan().groups.map(g => <optgroup key={g.id} label={tx(g.name)}>{g.items.filter(i => !i.once).map(i => <option key={i.id} value={i.id}>{tx(i.name)}</option>)}</optgroup>)}<option value="review">Leave them in To review</option></select></div>;
 }
+
+// Empty states: one card that says what this page will show and the first step to get there.
+const Ic = ({ d }) => <svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">{d}</svg>;
+export const IC = {
+  loan: <Ic d={<><path d="M4 6l5 5 4-3 7 8" /><path d="M15 16h5v-5" /></>} />,
+  goal: <Ic d={<><circle cx="12" cy="12" r="8" /><circle cx="12" cy="12" r="4" /><circle cx="12" cy="12" r=".6" fill="currentColor" /></>} />,
+  hist: <Ic d={<><path d="M5 19V11" /><path d="M10 19V6" /><path d="M15 19v-9" /><path d="M20 19V4" /></>} />,
+  flow: <Ic d={<><path d="M3 7c6 0 7 10 18 10" /><path d="M3 7c6 0 8-2 18-2" /><path d="M3 7c5 0 9 5 18 6" /></>} />,
+  fc: <Ic d={<><path d="M4 18c4-1 6-9 10-9s4 4 6 4" /><path d="M4 6c4 1 6 7 10 7" strokeDasharray="2 3" /></>} />,
+};
+export function Empty({ icon, title, children, acts = null, i = 1, style = null }) {
+  return <section className="card empty" style={{ '--i': i, ...(style || {}) }}><div className="emi">{icon}</div><div className="emt"><h2>{title}</h2><p className="mut">{children}</p>{acts ? <div className="acts">{acts}</div> : null}</div></section>;
+}
+// Loading: grey shapes in the layout that's coming, instead of a bare "Loading…".
+export const Skel = ({ w = '100%', h = 14, r = 8, mt = 0 }) => <span className="skl" style={{ width: w, height: h + 'px', borderRadius: r + 'px', marginTop: mt + 'px' }}></span>;
+export function SkelCards({ n = 2, hero = true }) {
+  return <div className="skw0" aria-busy="true" aria-label="Loading">{hero ? <section className="card"><Skel w="38%" h={13} /><Skel w="52%" h={38} r={12} mt={12} /><div className="skg">{[0, 1, 2, 3].map(i => <div key={i}><Skel w="60%" h={11} /><Skel w="45%" h={22} mt={8} /></div>)}</div></section> : null}
+    {Array.from({ length: n }).map((_, i) => <section className="card" key={i}><Skel w="44%" h={20} /><Skel w="90%" mt={14} /><Skel w="76%" mt={10} /><Skel w="58%" mt={10} /></section>)}</div>;
+}

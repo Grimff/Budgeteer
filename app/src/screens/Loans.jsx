@@ -4,7 +4,7 @@
 // sentence: those follow a small tick of their own (pxLiveR / wiLiveR bump it), not the whole tab.
 import { Fragment, useLayoutEffect, useRef, useState } from 'react';
 import { tx, onAct, onInp, onChg, tick } from '../bridge.js';
-import { Gear, CountUp, Clh } from '../ui.jsx';
+import { Gear, CountUp, Clh, Empty, IC } from '../ui.jsx';
 import { BK, rulesFor, titleC } from '../lib/bank.js';
 import { NOW, S, TK, addM, f0, f2, fk, lab, labS, mdiff, mo, mon, ord, r2 } from '../lib/core.js';
 import { acctOf, subLab } from '../lib/linked-loans.js';
@@ -43,7 +43,7 @@ function DebtChart() {
   const mStep = Math.ceil(N / Math.max(1, Math.floor((W - pl - pr) / 46))), short = N <= 16, mlab = k => new Date(+k.slice(0, 4), +k.slice(5) - 1, 1).toLocaleDateString('en-US', { month: 'short' }) + (k.endsWith('-01') || k === ks[0] ? ' ' + k.slice(2, 4).replace(/^/, '’') : '');
   const ti = Math.min(N - 1, mdiff(ks[0], ts)), i = Math.max(0, Math.min(N - 1, at)), x = X(i), nearEnd = X(ci) > W - pr - 40;
   const move = e => { const r = e.currentTarget.getBoundingClientRect(), vx = (e.clientX - r.left) / r.width * W; setAt(Math.round((vx - pl) / (W - pl - pr) * (N - 1))); };
-  return <><div id="dch" ref={ref}><svg viewBox={`0 0 ${W} ${H}`} id="dsv" role="img" aria-label="Total debt over time" onPointerMove={move} onPointerLeave={() => setAt(null)}>
+  return <><div id="dch" ref={ref}><svg viewBox={`0 0 ${W} ${H}`} id="dsv" role="img" aria-label="Total debt over time" onPointerDown={move} onPointerMove={move} onPointerLeave={e => { if (e.pointerType !== 'touch') setAt(null); }}>
     <defs><linearGradient id="ga" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor="#ffb6d9" stopOpacity=".35" /><stop offset="1" stopColor="#ffb6d9" stopOpacity="0" /></linearGradient></defs>
     {ti > 0 ? <><rect x={X(0)} y={pt} width={X(ti) - X(0)} height={H - pt - pb} fill="rgba(255,255,255,.035)" /><text x={X(0) + 8} y={H - pb - 10} fill="var(--dim)" fontSize="13">Before tracking (estimated)</text></> : null}
     {[0, .5, 1].map(f => [
@@ -162,7 +162,7 @@ export function Loans() {
   const LA = L.filter(l => !loanGone(l)), LG0 = L.filter(l => loanGone(l)), psh = isShut('lpaid', true);
   return <>
     <div className="phead" style={{ '--i': 0 }}><div><h1>Loans</h1><p className="mut">Balances, payments, and how much paying early saves you.</p></div><div className="phact"><button className="btn g sm ib" data-act="lenders" onClick={onAct('lenders')} title="Connect lenders and link loan accounts"><Gear />Lenders</button></div></div>{' '}
-    <section className="card" style={{ '--i': 0 }}><div className="bh"><div><h2>Total debt over time</h2><p>Your path compared with paying only the minimums. The green gap is debt you got rid of early. Move across the chart.</p></div><div className="seg" role="group" aria-label="Time range">{RANGES.map(([k, l]) => <button key={k} className={LR === k ? 'on' : ''} data-act="lr" onClick={onAct('lr')} data-r={k}>{l}</button>)}</div></div><DebtChart key={LR + '|' + S.cur} /></section>{' '}
+    {L.length ? <><section className="card" style={{ '--i': 0 }}><div className="bh"><div><h2>Total debt over time</h2><p>Your path compared with paying only the minimums. The green gap is debt you got rid of early. Move across the chart.</p></div><div className="seg" role="group" aria-label="Time range">{RANGES.map(([k, l]) => <button key={k} className={LR === k ? 'on' : ''} data-act="lr" onClick={onAct('lr')} data-r={k}>{l}</button>)}</div></div><DebtChart key={LR + '|' + S.cur} /></section>{' '}
     <div className="hero hl" style={{ '--i': 1 }}><div><p className="lbl">Interest saved by paying early{S.cur > TK ? ' (by ' + lm + ', with planned extras)' : ''}</p><CountUp className="big" id="lSaved" k="lSaved" to={Math.max(0, saved)} fmt={f2} />{' '}
       <p className="note">{extra > 0.5 ? <>From {f0(extra)} paid above the minimums. Every extra dollar has saved about <b style={{ color: 'var(--lime)' }}>{Math.round(saved / extra * 100)}¢</b> in interest so far.</> : 'Log a payment above the minimum and watch this number grow. Every extra dollar goes straight to principal.'}</p>{' '}
       <div className="acts"><button className="btn lime" data-act="logPay" onClick={onAct('logPay')} data-id={best ? best.id : ''} disabled={!best}>Log a payment</button></div></div>{' '}
@@ -171,7 +171,8 @@ export function Loans() {
         <div className="kpi"><small>Paid in {lm}</small><b>{f0(paidM)}</b><span>{logged} of {L.filter(l => row(l, S.cur)).length} logged · min {f0(minM)}</span></div>{' '}
         <div className="kpi"><small>Extra-payment streak</small><b>{mo(st)}</b><span>{st ? 'Keep it going' : 'Pay extra this month to start one'}</span></div></div></div>
     <PxCard />
-    {LA.length ? <div className="lgrid" style={{ '--i': 4 }}>{LA.map(l => <LoanCard key={l.id} l={l} />)}</div> : <section className="card" style={{ '--i': 4 }}><p className="mut">Every loan is paid off. Nice work.</p></section>}<button className="add" data-act="addLoan" onClick={onAct('addLoan')} style={{ marginTop: '16px' }}>{SRV ? 'Add a loan by hand' : 'Add a loan'}</button>
+    {LA.length ? <div className="lgrid" style={{ '--i': 4 }}>{LA.map(l => <LoanCard key={l.id} l={l} />)}</div> : <section className="card" style={{ '--i': 4 }}><p className="mut">Every loan is paid off. Nice work.</p></section>}<button className="add" data-act="addLoan" onClick={onAct('addLoan')} style={{ marginTop: '16px' }}>{SRV ? 'Add a loan by hand' : 'Add a loan'}</button></>
+    : <Empty icon={IC.loan} title="No loans yet" i={0} acts={<>{SRV ? <button className="btn sm" data-act="lenders" onClick={onAct('lenders')}>Connect a lender</button> : null}<button className="btn g sm" data-act="addLoan" onClick={onAct('addLoan')}>{SRV ? 'Add a loan by hand' : 'Add a loan'}</button></>}>A car loan, student loan, mortgage or card: see each balance come down, when you’ll be debt free, and how much paying a little extra saves in interest.</Empty>}
     {LG0.length ? <section className={'card cl' + (psh ? ' shut' : '')} style={{ '--i': 4, marginTop: '24px' }}><Clh k="lpaid" shut={psh} title="Paid off" sum={`${LG0.length} loan${LG0.length === 1 ? '' : 's'}`} /><p className="mut" style={{ marginBottom: '12px' }}>{LG0.map((l, j) => { const a = lp(l).a, last = a[a.length - 1]; return <Fragment key={l.id}>{j ? ' · ' : ''}<b style={{ color: 'var(--text)' }}>{tx(l.name)}</b> in {labS(last ? last.k : l.start)}</Fragment>; })}. They no longer count toward the budget; earlier months keep their payments.</p><div className="lgrid">{LG0.map(l => <LoanCard key={l.id} l={l} />)}</div></section> : null}
     <BankLoansPanel />
   </>;

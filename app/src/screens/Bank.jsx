@@ -1,7 +1,7 @@
 // Bank tab (was renderBank in js/linked-loans.js, pairCard and mvPanel in js/bank.js). Filing logic (inbox,
 // suggestTx, pairIssues, …) stays in bank.js. The Move panel's buttons and selects keep their data-* hooks.
 import { tx, onAct, onInp, onChg, drawNo } from '../bridge.js';
-import { Gear, TxOpts } from '../ui.jsx';
+import { Gear, TxOpts, SkelCards } from '../ui.jsx';
 import { BK, FLQ, PSET, defAlways, flexDefault, pairIssues, tdir, titleC } from '../lib/bank.js';
 import { S, TK, addM, f0, f2, lab, mon } from '../lib/core.js';
 import { subsList, everyWord } from '../lib/subs.js';
@@ -45,7 +45,7 @@ const Head = ({ right = null, line = null }) => <div className="phead"><div><h1>
 export function Bank() {
   if (!SRV) return <><Head /><section className="card"><p>Bank sync runs on the server, which can’t be reached right now. It reconnects on its own.</p></section></>;
   const st = BK.st;
-  if (!st) return <><Head /><section className="card"><p className="mut">{BK.err || 'Loading…'}</p></section></>;
+  if (!st) return <><Head />{BK.err ? <section className="card"><p className="mut">{BK.err}</p></section> : <SkelCards n={2} hero={false} />}</>;
   if (!st.configured) return <><Head /><section className="card"><h2>Add your Plaid keys</h2><p className="mut" style={{ margin: '8px 0 14px' }}>The server needs your Plaid keys before it can connect to your bank. Add these lines under <b>environment</b> in your Docker compose file, then redeploy the stack:</p><pre className="code">{'- PLAID_CLIENT_ID=your-client-id\n- PLAID_SECRET=your-secret\n- PLAID_ENV=production'}</pre><p className="dim" style={{ fontSize: '14px', marginTop: '10px' }}>Use PLAID_ENV=sandbox with sandbox keys to try it with Plaid’s test bank first.</p></section></>;
   const items = st.items || [], ib = inbox(), show = ib.slice(0, BK.show || 40), done = Object.entries(S.txd || {}).filter(([, r]) => r.k === S.cur && !r.sp).sort((a, b) => (b[1].d || '').localeCompare(a[1].d || '')), pi = pairIssues(), R = S.rules || [];
   const bad = items.filter(it => it.error).length, last = items.map(it => it.lastSync).filter(Boolean).sort().pop();

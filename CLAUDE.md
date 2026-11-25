@@ -468,10 +468,28 @@ server against a real `data/` folder while testing; use `tools/realtest.js`.
   `display:contents` on wider screens) and frequency; Forecast lanes put the name above the track and show only
   years on the axis; History's month tables and Data & math's tables stack. The money-flow chart keeps its min width
   and scrolls sideways (`.skhint` says so); `sankeyR` starts it scrolled to the Budget and group columns when it
-  overflows. Check with a 375px screenshot of every tab, view and pop-up; wider screens must stay pixel-identical. Charts (`DebtChart`, `AreaChart`) draw at the width shown
+  overflows. Check with a 375px screenshot of every tab, view and pop-up; wider screens must stay pixel-identical.
+  **Touch** (same section of app.css, ≤760px): pop-ups are bottom sheets (full width from the bottom edge, a handle;
+  `sheetSwipe()` in events.js closes one pulled down from the top of its content, through its own close button so
+  `CT`/`LK`/`FD` clear); tap targets are 44px where cheap (`.btn.sm`, `.add`, selects, tabs, month arrows; Build's
+  frequency select 40) and small controls (`.x`, `.lnk`, `.pill`, `.grip`, `.fcp`, chips, `.clh`) get an invisible
+  `::after` hit area instead (don't give those an `::after` of their own). Charts: `onPointerDown` sets the point and
+  a touch pointerleave doesn't clear it, so a tap shows the readout and it stays; History's chart has a readout too
+  (`hv`, `.hrd`, only while a month is pointed at or tapped). Charts (`DebtChart`, `AreaChart`) draw at the width shown
   (min 340) so labels stay readable.
 - The same transaction can be on the page twice (Bank Filed list + pop-up), so look up its parts relative to the clicked button, not with a page-wide `querySelector` (`mvShow`).
 - Class names: don't reuse `.fl` (Bank tag style) for layout; Build spending rows are `.brow.bfl`.
+
+## Empty and loading states
+
+- `Empty` (ui.jsx, `section.card.empty` with an `IC` icon, what the page will show and the first step) replaces a
+  page's charts and $0 cards when there's nothing yet: Loans (no loans: Connect a lender / Add a loan by hand; "Every
+  loan is paid off" now only when there are paid-off loans), Goals (no goals), History (every month $0), This month's
+  money flow (no income, bills, loans or goals: `noPlan`), Forecast's Debt and savings chart (no loans or goals). The
+  monthly review hides for a month with nothing in it.
+- Loading: `SkelCards`/`Skel` (shimmering shapes) instead of "Loading…" on Bank, Wealth and Settings → Connections while
+  the bank data loads, and on every tab but Settings on a new browser until the budget arrives (`!HADL && !FS.loaded &&
+  FS.state==='wait'`; `HADL` = this browser had its own copy at start; `setFS` redraws when that wait ends).
 
 ## Text fields
 

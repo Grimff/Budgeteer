@@ -6,7 +6,7 @@ import { Fragment } from 'react';
 import { tx, onAct, onChg, tick } from '../bridge.js';
 const RT = tick();
 export const rulesFilterR = RT.bump;
-import { TxOpts, CatchSel, ActBtn, Rich } from '../ui.jsx';
+import { TxOpts, CatchSel, ActBtn, Rich, SkelCards } from '../ui.jsx';
 import { NOTIFY } from '../lib/alerts.js';
 import { BK, bankFrom, flexDefault, ruleFor, titleC } from '../lib/bank.js';
 import { soFarOf } from '../lib/budget.js';
@@ -179,7 +179,8 @@ export function Settings() {
   else if (v === 'data') body = <DataView />;
   else if (!SRV) body = <section className="card"><p>Bank sync runs on the server, which can’t be reached right now. It reconnects on its own.</p></section>;
   else if (v === 'rules') body = <><FilingCard />{R.length ? <RulesCard /> : <section className="card"><h2>Rules</h2><p className="mut" style={{ marginTop: '6px' }}>No rules yet. Make one with <b>Link payment</b>, <b>Flag a deposit</b> or <b>Link stores</b> in Build budget, or tick <b>Always</b> when you add a transaction in Bank → To review.</p></section>}</>;
-  else if (!st || !st.configured) body = <><section className="card"><p className="mut">{BK.err || (st ? 'To connect banks, add your Plaid keys to the server’s .env and restart it. Or import a CSV file below.' : 'Loading…')}</p></section><CsvCard /></>;
+  else if (!st && !BK.err) body = <SkelCards n={2} hero={false} />;   // still loading
+  else if (!st || !st.configured) body = <><section className="card"><p className="mut">{BK.err || 'To connect banks, add your Plaid keys to the server’s .env and restart it. Or import a CSV file below.'}</p></section><CsvCard /></>;
   else body = <><ConnCard items={items} /><CsvCard /><NtCard /></>;
   return <>
     <div className="phead" style={{ '--i': 0 }}><div><h1>Settings</h1><p className="mut">Your household, how bank transactions are filed, your bank connections, and how every number is worked out.</p></div></div><div className="seg bnav" role="tablist" aria-label="Settings sections">{nb('general', 'General')}{nb('rules', 'Rules', SRV ? R.length : null)}{nb('connections', 'Connections', bad || null, bad > 0)}{nb('data', 'Data & math', null)}</div>

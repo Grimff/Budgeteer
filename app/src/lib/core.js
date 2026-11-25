@@ -41,7 +41,9 @@ export const it=(name,amt,due=0)=>({id:uid(),name,amt,due});
 export function seedPlan(){return{income:[],groups:[]}}
 export const seedLoans=()=>[],seedGoals=()=>[];
 
-export function load(){try{const v=JSON.parse(localStorage.getItem(KEY));if(v&&v.plans&&Object.keys(v.plans).length){v.cur=v.cur||TK;v.tab=v.tab||'budget';v.months=v.months||{};return v}}catch(e){}
+// HADL: this browser had its own copy of the budget at start (if not, the tabs show placeholders until the server's arrives)
+export let HADL=false; export function setHADL(v){return HADL=v}
+export function load(){try{const v=JSON.parse(localStorage.getItem(KEY));if(v&&v.plans&&Object.keys(v.plans).length){v.cur=v.cur||TK;v.tab=v.tab||'budget';v.months=v.months||{};HADL=true;return v}}catch(e){}
  return{plans:{[TK]:seedPlan()},loans:seedLoans(),goals:seedGoals(),months:{},cur:TK,tab:'budget',flow:'plan'}}
 export function save(){if(!AUTOSAVE){try{FS.autoOnly=false}catch(_){}}try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){toast('Could not save in this browser. Download a backup to keep your changes.')}fsQueue()}
 

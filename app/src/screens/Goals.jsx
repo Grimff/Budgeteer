@@ -2,7 +2,7 @@
 // The math (goalSaved, goalProj, goalEta, allocAt, …) stays in those files.
 import { useLayoutEffect, useRef, useState } from 'react';
 import { tx, onAct, onInp, onChg } from '../bridge.js';
-import { Gear, CountUp, Ring, Clh, NmA } from '../ui.jsx';
+import { Gear, CountUp, Ring, Clh, NmA, Empty, IC } from '../ui.jsx';
 import { BK, rulesFor, titleC } from '../lib/bank.js';
 import { MO, S, TK, addM, f0, f2, lab, labS, mdiff, mo, mon, r2 } from '../lib/core.js';
 import { allocAt, gLinked } from '../lib/goal-accounts.js';
@@ -30,7 +30,7 @@ function GoalChart({ G }) {
   const ln = (arr, a, b) => arr.slice(a, b + 1).map((o, j) => (j ? 'L' : 'M') + X(a + j).toFixed(1) + ',' + Y(o.p).toFixed(1)).join('');
   const i = Math.max(0, Math.min(N - 1, at));
   const move = e => { const r = e.currentTarget.getBoundingClientRect(), vx = (e.clientX - r.left) / r.width * W; setAt(Math.round((vx - pl) / (W - pl - pr) * (N - 1))); };
-  return <><div id="gch" ref={ref}><svg viewBox={`0 0 ${W} ${H}`} id="gsv" role="img" aria-label="Goal progress over time" onPointerMove={move} onPointerLeave={() => setAt(null)}>
+  return <><div id="gch" ref={ref}><svg viewBox={`0 0 ${W} ${H}`} id="gsv" role="img" aria-label="Goal progress over time" onPointerDown={move} onPointerMove={move} onPointerLeave={e => { if (e.pointerType !== 'touch') setAt(null); }}>
     {[0, .5, 1].map(f => [
       <line key={'l' + f} x1={pl} x2={W - pr} y1={Y(f)} y2={Y(f)} stroke="var(--line)" strokeDasharray={f === 1 ? '4 4' : undefined} />,
       <text key={'t' + f} x={pl - 8} y={Y(f) + 5} textAnchor="end" fill="var(--dim)" fontSize="13">{f * 100}%</text>])}
@@ -114,12 +114,13 @@ export function Goals() {
   const n = tg.map(g => [g, goalEta(g)]).filter(([g, e]) => e && goalSaved(g, TK) < target(g, TK) - 0.5).sort((a, b) => a[1].localeCompare(b[1]))[0];
   return <>
     <div className="phead" style={{ '--i': 0 }}><div><h1>Goals</h1><p className="mut">What you’re saving for, when you’ll get there, and whether you’re on track.</p></div><div className="phact"><button className="btn g sm ib" data-act="alGo" onClick={onAct('alGo')} title="Choose which accounts count toward goals"><Gear />Accounts</button></div></div>
-    <div className="hero hg" style={{ '--i': 0 }}><div><p className="lbl">{fut ? 'Projected toward your goals by ' + lab(S.cur) : 'Saved toward your goals'}</p><CountUp className="big" id="gTot" k="gTot" to={tot} /><p className="note">{f0(mon$)} planned in {lm} across {G.length} goal{G.length === 1 ? '' : 's'}.{fut ? ' Future months add each goal’s plan; nothing is counted as saved until it happens.' : ' Linked accounts and deposits you log count toward each goal.'}</p></div>{' '}
+    {G.length ? <div className="hero hg" style={{ '--i': 0 }}><div><p className="lbl">{fut ? 'Projected toward your goals by ' + lab(S.cur) : 'Saved toward your goals'}</p><CountUp className="big" id="gTot" k="gTot" to={tot} /><p className="note">{f0(mon$)} planned in {lm} across {G.length} goal{G.length === 1 ? '' : 's'}.{fut ? ' Future months add each goal’s plan; nothing is counted as saved until it happens.' : ' Linked accounts and deposits you log count toward each goal.'}</p></div>{' '}
       <div className="kpis"><div className="kpi"><small>{fut ? 'Planned in' : 'Saved in'} {lm}</small><b>{f0(fut ? mon$ : thisM)}</b><span>{fut ? 'goes in the budget' : 'of ' + f0(mon$) + ' planned'}</span></div>{' '}
         <div className="kpi"><small>Emergency fund covers</small><b>{em ? ((bal(em) / (ess || 1)).toFixed(1) + ' months') : '—'}</b><span>of your {f0(ess)}/mo budget{fut ? ' (projected)' : ''}</span></div>{' '}
         <div className="kpi"><small>On track</small><b>{dated.length ? `${dated.length - late.length} of ${dated.length}` : '—'}</b><span>{late.length ? tx(late.map(g => g.name).join(', ')) + ' behind its date' : dated.length ? 'every dated goal on time' : 'add target dates to check'}</span></div>{' '}
         <div className="kpi"><small>Next goal reached</small>{n ? <><b>{labS(n[1])}</b><span>{tx(n[0].name)}</span></> : <><b>—</b><span>set monthly amounts</span></>}</div></div></div>
+    : <Empty icon={IC.goal} title="No goals yet" i={0} acts={<><button className="btn sm" data-act="addGoal" onClick={onAct('addGoal')}>Add a goal</button>{SRV ? <button className="btn g sm" data-act="alGo" onClick={onAct('alGo')}>Use a savings account</button> : null}</>}>An emergency fund, a trip, a down payment: give each goal a target and a monthly amount and this page shows when you’ll get there. A savings account can count toward one or several goals.</Empty>}
     {tg.length ? <section className="card" style={{ '--i': 1, marginBottom: '16px' }}><div className="bh"><div><h2>Goal timeline</h2><p>Each goal’s progress toward its target, projected with its monthly plan. Dots mark when it’s reached; diamonds mark target dates.</p></div><div className="seg" role="group" aria-label="Time range">{[['1y', '1Y'], ['2y', '2Y'], ['5y', '5Y'], ['all', 'All']].map(([k, l]) => <button key={k} className={GR === k ? 'on' : ''} data-act="grng" onClick={onAct('grng')} data-r={k}>{l}</button>)}</div></div><GoalChart key={GR} G={tg} /></section> : null}
-    <div className="ggrid" style={{ '--i': 2 }}>{G.map(g => <GoalCard key={g.id} g={g} />)}</div><button className="add" data-act="addGoal" onClick={onAct('addGoal')} style={{ marginTop: '16px' }}>Add a goal</button><AllocCard />
+    {G.length ? <><div className="ggrid" style={{ '--i': 2 }}>{G.map(g => <GoalCard key={g.id} g={g} />)}</div><button className="add" data-act="addGoal" onClick={onAct('addGoal')} style={{ marginTop: '16px' }}>Add a goal</button></> : null}<AllocCard />
   </>;
 }

@@ -458,6 +458,19 @@ button.pill:not(.x){box-shadow:inset 0 0 0 1px var(--line2)}button.pill.ok{box-s
  /* the month as "Nov 2026" so it fits on one line (the full name stays in the text for everything else) */
  .month .ml{min-width:0;white-space:nowrap}.month .ml>span{display:none}.month .ml::after{content:attr(data-s)}
  dialog{padding:20px 18px}
+ /* pop-ups are bottom sheets: full width, from the bottom edge, a handle on top; pull down to close (events.js) */
+ dialog,#ldlg,#tdlg,#fdlg{width:100%;max-width:100%;margin:auto auto 0;border-radius:24px 24px 0 0;border-bottom:0;max-height:calc(100% - 28px);padding-bottom:calc(20px + env(safe-area-inset-bottom));overscroll-behavior:contain}
+ dialog[open]{animation:sheet .32s var(--ease)}
+ /* touch targets: 44px where the size is cheap to change; small controls (×, ⋮⋮, +, links, pills, chips) get an
+    invisible ::after around them instead, so their look and the layout don't move */
+ .btn.sm,.add,.calc,.rvm,select.in,.month button,details.more>summary{min-height:44px}.month button{width:44px}.month .ml{width:auto}
+ select.in.fq{min-height:40px}.seg button{padding-top:10px;padding-bottom:10px}.tabs button{min-height:44px}.alb{min-height:44px}
+ .chk{min-height:44px;margin-top:0}input[type=checkbox]{width:22px;height:22px;flex:none}
+ .x,.lnk,button.pill,.subn,.fcp,.chipr button,.clh{position:relative}
+ .x::after,.lnk::after,button.pill::after,.subn::after,.fcp::after,.chipr button::after,.grip::after,.clh::after{content:'';position:absolute;inset:-7px -3px}
+ .x::after{inset:-7px}.x[data-act="ruleDel"]::after,.x[data-act="catRuleDel"]::after{inset:-14px -10px}.grip::after{inset:-10px -14px}.fcp::after{inset:-9px}
+ button.pill::after,.subn::after{inset:-10px -3px}.clh::after{inset:-8px 0}
+ dialog::before{content:'';display:block;width:42px;height:5px;border-radius:3px;background:var(--line2);margin:-8px auto 14px}
  /* Bank → Filed and the pop-up's transaction list: buttons go under the amount so names get the room */
  .txr.dn{grid-template-columns:48px minmax(0,1fr) auto;row-gap:4px}.txr.dn>span:not(.txd){grid-column:2/-1;justify-self:end}
  .trow{grid-template-columns:46px minmax(0,1fr) auto!important;row-gap:2px}.trow>button[data-act="mvShow"]{grid-column:3;justify-self:end}
@@ -492,3 +505,12 @@ button.pill:not(.x){box-shadow:inset 0 0 0 1px var(--line2)}button.pill.ok{box-s
  .alr .n{grid-column:2;text-align:left;min-width:0}.alr>.x{grid-column:3;justify-self:end}
 }
 @media (max-width:360px){.month{gap:2px}.month button{width:34px;height:34px}.month .ml{padding:0 6px;font-size:16px}.brand{gap:8px;font-size:17px}}
+@keyframes sheet{from{transform:translateY(100%)}to{transform:none}}
+/* empty states and loading placeholders */
+.empty{display:flex;gap:18px;align-items:flex-start}.empty .emi{flex:none;width:52px;height:52px;border-radius:16px;display:grid;place-items:center;background:color-mix(in srgb,var(--pink) 14%,transparent);color:var(--pink)}
+.empty h2{margin:0 0 6px}.empty p{margin:0;max-width:60ch}.empty .acts{display:flex;flex-wrap:wrap;gap:10px;margin-top:16px}
+.empty.in{padding:6px 0}.empty.in p .lnk{margin-left:4px}
+.skw0{display:flex;flex-direction:column;gap:16px}.skg{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;margin-top:20px}.skg>div{background:var(--s2);border-radius:16px;padding:14px}
+.skl{display:block;background:linear-gradient(90deg,var(--s2) 0,var(--s3) 40%,var(--s2) 80%) 0 0/300% 100%;animation:skl 1.4s ease-in-out infinite}
+@keyframes skl{from{background-position:100% 0}to{background-position:0 0}}
+@media (max-width:640px){.empty{flex-direction:column;gap:12px}}

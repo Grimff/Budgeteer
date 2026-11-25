@@ -2,7 +2,7 @@
 // stays in wealth.js.
 import { useLayoutEffect, useRef, useState } from 'react';
 import { tx, onAct } from '../bridge.js';
-import { Gear, CountUp, NmA } from '../ui.jsx';
+import { Gear, CountUp, NmA, SkelCards } from '../ui.jsx';
 import { BK } from '../lib/bank.js';
 import { C, NOW, S, f0, f2, fk } from '../lib/core.js';
 import { dshort } from '../lib/linked-loans.js';
@@ -24,7 +24,7 @@ function AreaChart({ pts, col }) {
   const line = pts.map((q, i) => (i ? 'L' : 'M') + X(i).toFixed(1) + ',' + Y(q.v).toFixed(1)).join('');
   const i = Math.max(0, Math.min(N - 1, at)), x = X(i);
   const move = e => { const r = e.currentTarget.getBoundingClientRect(); setAt(Math.round(((e.clientX - r.left) / r.width * W - pl) / (W - pl - pr) * (N - 1))); };
-  return <div id="wch" ref={ref}><svg viewBox={`0 0 ${W} ${H}`} className="wsv" role="img" aria-label="Investment value over time" onPointerMove={move} onPointerLeave={() => setAt(null)}>
+  return <div id="wch" ref={ref}><svg viewBox={`0 0 ${W} ${H}`} className="wsv" role="img" aria-label="Investment value over time" onPointerDown={move} onPointerMove={move} onPointerLeave={e => { if (e.pointerType !== 'touch') setAt(null); }}>
     <defs><linearGradient id="wgr" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor={col} stopOpacity=".32" /><stop offset="1" stopColor={col} stopOpacity="0" /></linearGradient></defs>
     {[0, .5, 1].map(f => { const v = mn + (mx - mn) * f; return [
       <line key={'l' + f} x1={pl} x2={W - pr} y1={Y(v)} y2={Y(v)} stroke="var(--line)" />,
@@ -49,7 +49,7 @@ function InvCard({ a }) {
 export function Wealth() {
   const head = <div className="phead"><div><h1>Wealth</h1><p className="mut">Bank balances, investments and debts in one place. Updates after each bank sync.</p></div>{SRV ? <div className="phact"><button className="btn g sm ib" data-act="sview" onClick={onAct('sview')} data-v="connections" title="Connect banks and brokerages"><Gear />Connections</button></div> : null}</div>;
   if (!SRV) return <>{head}<section className="card"><p>Balances come from bank sync on the server, which can’t be reached right now. It reconnects on its own.</p></section></>;
-  if (!BK.st || !BK.accts) return <>{head}<section className="card"><p className="mut">{BK.err || 'Loading…'}</p></section></>;
+  if (!BK.st || !BK.accts) return <>{head}{BK.err ? <section className="card"><p className="mut">{BK.err}</p></section> : <SkelCards n={2} />}</>;
   if (!BK.st.configured) return <>{head}<section className="card"><p>Add your Plaid keys first. The Bank tab shows how.</p></section></>;
   const cash = acctsOf('depository'), inv = acctsOf('investment'), cards = acctsOf('credit'), cashT = sumBal(cash), invT = sumBal(inv), cardT = sumBal(cards), loanT = S.loans.reduce((x, l) => x + debtNow(l), 0), net = cashT + invT - cardT - loanT, pm = perf(inv, monthEnd0(), ymd(NOW));
   const need = (BK.st.items || []).filter(it => it.inv === 'consent'), first = inv.flatMap(a => Object.keys(a.days || {})).sort()[0] || ymd(NOW), from = rangeFrom(WR, first), rp = perf(inv, from, ymd(NOW));

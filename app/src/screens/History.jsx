@@ -1,8 +1,10 @@
 // History tab (was renderHistory in js/history.js). monthSum/histMonths/HR stay in history.js.
+import { useState } from 'react';
 import { tx, onAct } from '../bridge.js';
 import { S, TK, f0, f2, fk, lab, mon, $ } from '../lib/core.js';
 import { HR, histMonths, monthSum } from '../lib/history.js';
 import { OPEN } from '../lib/math.js';
+import { Empty, IC } from '../ui.jsx';
 
 const mshort = k => new Date(+k.slice(0, 4), +k.slice(5) - 1, 1).toLocaleDateString('en-US', { month: 'short' });
 const dash = (v, plus, minus) => Math.abs(v) < 0.5 ? '—' : (v > 0 ? plus : minus) + f0(Math.abs(v));
@@ -10,7 +12,8 @@ const good = v => Math.abs(v) < 0.5 ? 'var(--mut)' : v > 0 ? 'var(--lime)' : '#f
 
 function Chart({ D }) {
   const cw = ($('#T-history') && $('#T-history').clientWidth) || (($('main') || document.body).clientWidth - 40) || 1000, W = Math.max(320, cw - (cw < 640 ? 36 : 56)), narrow = W < 600, H = narrow ? 240 : 300, pl = narrow ? 48 : 64, pr = 12, pt = 26, pb = 48, M = Math.max(1, ...D.flatMap(d => [d.inc, d.pl, d.ac])) * 1.08, n = D.length, slot = (W - pl - pr) / Math.max(n, 1), bw = Math.min(46, slot * .32), Y = v => pt + (1 - v / M) * (H - pt - pb), step = Math.ceil(46 / slot);
-  return <svg viewBox={`0 0 ${W} ${H}`} role="img" aria-label="Planned vs actual spending by month">
+  const [hv, setHv] = useState(null), h = hv != null && hv < n ? D[hv] : null;
+  return <svg viewBox={`0 0 ${W} ${H}`} role="img" aria-label="Planned vs actual spending by month" onPointerLeave={e => { if (e.pointerType !== 'touch') setHv(null); }}>
     {[0, .5, 1].map(f => { const v = M / 1.08 * f; return [
       <line key={'l' + f} x1={pl} x2={W - pr} y1={Y(v)} y2={Y(v)} stroke="var(--line)" />,
       <text key={'t' + f} x={pl - 10} y={Y(v) + 5} textAnchor="end" fill="var(--dim)" fontSize="13">{fk(v)}</text>]; })}
@@ -24,6 +27,15 @@ function Chart({ D }) {
         {i === (n - 1) % step || d.k.endsWith('-01') ? <text x={cx} y={H - 9} textAnchor="middle" fill="var(--dim)" fontSize="12">{d.k.slice(0, 4)}</text> : null}
       </> : null}
     </g>; })}
+    {D.map((d, i) => <rect key={'h' + d.k} x={pl + slot * i} y={pt} width={slot} height={H - pt - pb} fill="transparent" onPointerEnter={() => setHv(i)} onPointerDown={() => setHv(i)} />)}
+    {h ? (() => { const cx = pl + slot * (hv + .5), tw = 160, tx0 = Math.max(pl, Math.min(W - pr - tw, cx - tw / 2)), over = h.spX > h.spP + 0.5; return <g className="hrd" pointerEvents="none">
+      <line x1={cx} x2={cx} y1={pt} y2={H - pb} stroke="var(--line2)" strokeDasharray="3 4" />
+      <rect x={tx0} y={2} width={tw} height={86} rx="10" fill="var(--s3)" stroke="var(--line2)" />
+      <text x={tx0 + 12} y={21} fill="var(--text)" fontSize="13" fontWeight="700">{lab(h.k)}</text>
+      <text x={tx0 + 12} y={40} fill="var(--butter)" fontSize="12.5">{'Planned out ' + f0(h.pl)}</text>
+      <text x={tx0 + 12} y={58} fill={over ? '#ff9aa8' : 'var(--pink)'} fontSize="12.5">{'Actual out ' + f0(h.ac)}</text>
+      <text x={tx0 + 12} y={76} fill="var(--lime)" fontSize="12.5">{'Income ' + f0(h.inc)}</text>
+    </g>; })() : null}
   </svg>;
 }
 
@@ -43,11 +55,12 @@ export function History() {
   const all = histMonths(), end = Math.max(0, all.includes(S.cur) ? all.indexOf(S.cur) : all.length - 1), ks = HR === 'all' ? all : all.slice(Math.max(0, end + 1 - +HR), end + 1), D = ks.map(monthSum);
   return <>
     <div className="phead" style={{ '--i': 0 }}><div><h1>History</h1><p className="mut">Plan vs. actual for every month. Months fill in as you log groceries, flex, loan payments and goal deposits.</p></div><div className="phact"><div className="seg" role="group" aria-label="Months shown">{[['6', '6 months'], ['12', '12 months'], ['all', 'All']].map(([v, l]) => <button key={v} type="button" data-act="hrng" onClick={onAct('hrng')} data-v={v} className={HR === v ? 'on' : ''}>{l}</button>)}</div></div></div>{' '}
+    {D.every(d => !d.pl && !d.ac && !d.inc) ? <Empty icon={IC.hist} title="No history yet" acts={<button className="btn sm" data-act="budv" onClick={onAct('budv')} data-v="build">Build your budget</button>}>Each month’s plan and what really happened show here side by side, once your budget has income and bills.</Empty> : <>
     <section className="card hchart" style={{ '--i': 1 }}><Chart D={D} />{' '}
       <div className="hleg"><span><i style={{ background: 'var(--butter)' }}></i>Planned out</span><span><i style={{ background: 'var(--pink)' }}></i>Actual out</span><span><i style={{ background: 'var(--lime)', height: '4px', verticalAlign: '3px' }}></i>Income</span><span><i style={{ background: 'transparent', border: '1.5px dashed var(--pink)' }}></i>Nothing logged yet</span></div></section>{' '}
     <section className="card" style={{ '--i': 2, marginTop: '16px', paddingBottom: '10px' }}>
       {[...D].reverse().map(d => <Month key={d.k} d={d} />)}
       {S.histFrom ? <p className="dim" style={{ fontSize: '13.5px', padding: '12px 4px 4px' }}>History starts in {lab(S.histFrom)}. <button className="lnk" data-act="histAll" onClick={onAct('histAll')} style={{ fontSize: '13.5px', padding: 0 }}>Show earlier months</button></p> : null}
-    </section>
+    </section></>}
   </>;
 }

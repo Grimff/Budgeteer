@@ -3,7 +3,7 @@
 // Shared state (other files change it with the set… functions; it was js/server-sync.js):
 import { fsUI } from '../named.jsx';
 import { autoSave, bankLoad } from './bank.js';
-import { KEY, S, setS } from './core.js';
+import { KEY, S, setS, HADL } from './core.js';
 import { renderAll, rerender } from './events.js';
 import { openSync } from './linked-loans.js';
 import { setLP, toast } from './math.js';
@@ -20,7 +20,7 @@ export async function srvPut(){const body=JSON.stringify({baseRev:FS.mod||null,d
 export let PEND,REVK;   // set by startServerSync (they use core's KEY)
 export const sharedData=()=>{const{cur,tab,flow,storeMap,...d}=S;d.loans=(d.loans||[]).map(({real,rp,live,link,auto,...l})=>l);return d};
 export function adopt(d){setS({...d,months:d.months||{},cur:S.cur,tab:S.tab,flow:S.flow});setLP({});try{localStorage.setItem(KEY,JSON.stringify(S));if(SRV)localStorage.setItem(REVK,String(FS.mod||0))}catch(_){}}
-export function setFS(st,err){FS.state=st;if(err!==undefined)FS.err=err;if(st==='ok')FS.detail='';fsUI()}
+export function setFS(st,err){const w=FS.state==='wait';FS.state=st;if(err!==undefined)FS.err=err;if(st==='ok')FS.detail='';fsUI();if(w&&st!=='wait'&&!HADL)rerender()}   // the placeholders give way
 export function fsErrMsg(e){FS.detail=e?`${e.name||'Error'}: ${e.message||e}`:'';try{console.error('[Budgeteer sync]',e)}catch(_){}return e&&e.message==='notbudget'?'The server sent something that isn’t budget data.':'Couldn’t reach the budget server.'}
 export async function fsLoad(){let pend=false,base=0;try{pend=localStorage.getItem(PEND)==='1';base=+localStorage.getItem(REVK)||0}catch(_){}
  const d=await srvGet();FS.loaded=true;if(!d){await srvPut();setFS('ok','');return}
