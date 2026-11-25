@@ -393,7 +393,9 @@ server against a real `data/` folder while testing; use `tools/realtest.js`.
     something due. Chips are coloured by `billState`/`loanState`, which the Budget lines use too (one status logic),
     and open the line's pop-up. No due day → listed under the grid.
   - **Getting set up** (`GuideCard`, collapsible key `guide`): checklist under the summary in the current
-    month (bank, paychecks linked, bills linked, loans, goals, transactions to sort); hidden when all done.
+    month (bank, paychecks linked, bills linked, loans, goals, transactions to sort); hidden when all done. **Hide** in
+    its header (`gdHide`, `.gdh`, lifted above the `.clh` phone hit area) sets `S.noGuide` (saved, both people); Settings →
+    General → Getting set up shows it again.
   - **Suggestions:** `recurring()` → "Looks like a bill" (Add as bill / Ignore, restorable).
 - **Budget → Forecast** (`BUDV='fc'`, v5): KPIs (debt free, next goal, kept per month, months over budget);
   **Your plan over time** (`FcLanes`: one lane per loan/goal + Snowball/Kept, bars = schedule items from/until,

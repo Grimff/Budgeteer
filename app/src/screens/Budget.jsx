@@ -32,7 +32,7 @@ function AlertsCard() {
 
 // Getting set up checklist (current month, until every step is done).
 function GuideCard() {
-  if (!SRV || !BK.st || !BK.st.configured || S.cur !== TK) return null;
+  if (S.noGuide || !SRV || !BK.st || !BK.st.configured || S.cur !== TK) return null;
   const p = plan(TK), items = (BK.st.items || []).length, inc = p.income.filter(i => !i.once && +i.amt > 0), incL = inc.filter(i => rulesFor('inc:' + i.id).length).length, bills = p.groups.filter(g => !g.flex).flatMap(g => g.items).filter(i => +i.amt > 0), billL = bills.filter(i => rulesFor('i:' + i.id).length).length;
   const lo = S.loans.filter(l => !loanGone(l, TK)), loL = lo.filter(l => l.acct || rulesFor('l:' + l.id).length).length, gs = S.goals, gp = gs.filter(g => goalPlan(g, TK) > 0 || gLinked(g)).length, rev = items && BK.tx.length ? inbox().length : 0, bb = { act: 'budv', v: 'build' };
   const st = [{ ok: items > 0, t: 'Connect your bank', d: items ? `${items} connection${items === 1 ? '' : 's'} bring in spending and paychecks` : 'Spending and paychecks then come in on their own.', b: 'Connections', a: { act: 'sview', v: 'connections' } },
@@ -44,7 +44,7 @@ function GuideCard() {
   const done = st.filter(x => x.ok).length;
   if (done === st.length) return null;
   const sh = isShut('guide', done >= st.length - 2);
-  return <section className={'card cl' + (sh ? ' shut' : '')} style={{ '--i': 0, marginTop: '16px' }}><Clh k="guide" shut={sh} title="Getting set up" sum={`${done} of ${st.length} done`} /><p className="mut" style={{ marginBottom: '8px' }}>Each step makes the budget fill itself in. This card goes away when they’re all done.</p>{st.map((x, i) => <div className={'gst' + (x.ok ? ' ok' : '')} key={i}><i>{x.ok ? '✓' : i + 1}</i><div><b>{x.t}</b><small>{x.d}</small></div>{x.ok ? null : <button type="button" className="btn g sm" {...dataAttrs(x.a)} onClick={onAct(x.a.act)}>{x.b}</button>}</div>)}</section>;
+  return <section className={'card cl' + (sh ? ' shut' : '')} style={{ '--i': 0, marginTop: '16px' }}><Clh k="guide" shut={sh} title="Getting set up" sum={`${done} of ${st.length} done`} extra={<button type="button" className="lnk gdh" data-act="gdHide" data-v="1" onClick={onAct('gdHide')} title="Hide this checklist (Settings → General brings it back)">Hide</button>} /><p className="mut" style={{ marginBottom: '8px' }}>Each step makes the budget fill itself in. This card goes away when they’re all done.</p>{st.map((x, i) => <div className={'gst' + (x.ok ? ' ok' : '')} key={i}><i>{x.ok ? '✓' : i + 1}</i><div><b>{x.t}</b><small>{x.d}</small></div>{x.ok ? null : <button type="button" className="btn g sm" {...dataAttrs(x.a)} onClick={onAct(x.a.act)}>{x.b}</button>}</div>)}</section>;
 }
 
 // Bill calendar: the month's bills and loan payments on the day they're due, coloured by status (billState/loanState),

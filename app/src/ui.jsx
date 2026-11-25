@@ -25,8 +25,8 @@ export function Ring({ pct, c, sz = 118 }) {
 }
 
 // Header of a collapsible card (was clh() in math.js); click/Enter handled by the bcol action.
-export function Clh({ k, shut, title, sum, tag: T = 'h2' }) {
-  return <T className="clh" data-act="bcol" onClick={onAct('bcol')} data-v={k} role="button" tabIndex="0" aria-expanded={`${!shut}`}>{title}<small className="bsm">{sum || ''}</small><i className="chev" aria-hidden="true"></i></T>;
+export function Clh({ k, shut, title, sum, tag: T = 'h2', extra = null }) {
+  return <T className="clh" data-act="bcol" onClick={onAct('bcol')} data-v={k} role="button" tabIndex="0" aria-expanded={`${!shut}`}>{title}<small className="bsm">{sum || ''}</small>{extra}<i className="chev" aria-hidden="true"></i></T>;
 }
 
 // "Bank · Account ••1234" (was nmA() in wealth.js).

@@ -233,6 +233,11 @@ export async function selfTest(){const T=[],ok=(c,name,detail='')=>T.push({ok:!!
    const k=r0&&r0.querySelector('[data-act="pairKeep"]'),kid=k&&k.dataset.id;if(k)k.click();const t1=rows()[0],f=t1&&t1.querySelector('[data-act="fixPairs"]'),fid=f&&f.dataset.id;if(f)f.click();
    ok(ids.length===2&&n0===2&&named&&S.txd[kid]&&S.txd[kid].pok&&S.txd[kid].v.startsWith('i:')&&S.txd[fid]&&S.txd[fid].v==='xfer'&&!pairIssues().length&&!rows().length,'A possible double count can be kept as filed or made a transfer, one at a time',JSON.stringify({ids,n0,named,kid,fid}));
    ids.forEach((id,i)=>{if(old[i])S.txd[id]=old[i];else delete S.txd[id]});setTXI(null);setBV(ob);document.querySelector('.tabs button[data-t="budget"]').click()}
+  // The Getting set up checklist can be hidden from its header for good (saved, for both people) and brought back in Settings.
+  { S.goals.push({id:'gdx',name:'Test goal',target:500,saved:0});renderAll();const had=!!$('#T-budget .gst'),h=$('#T-budget .gdh');if(h)h.click();const gone=!$('#T-budget .gst')&&S.noGuide===1;
+   const os=SV;setSV('general');document.querySelector('button.tset').click();const sb=document.querySelector('#T-settings [data-act="gdHide"][data-v="0"]');if(sb)sb.click();
+   setSV(os);document.querySelector('.tabs button[data-t="budget"]').click();const back=!!$('#T-budget .gst')&&!S.noGuide;
+   ok(had&&gone&&back,'The set-up checklist can be hidden and brought back',JSON.stringify({had,gone,sb:!!sb,back}));S.goals=S.goals.filter(g=>g.id!=='gdx');renderAll()}
   // Bill calendar: every bill and loan due this month on its day, in the same status as its Budget line; a twice-a-year
   // bill only in its due month, at its full amount; a chip opens the line.
   { const QA=(q,r=document)=>[...r.querySelectorAll(q)];S.cur=TK;renderAll();const C=calBills(TK),rent=C.find(x=>x.v==='i:rent'),ins=allItems(TK).find(x=>x.i.id==='ins'),dk=ins&&nextDue(ins.i,TK),cd=dk?calBills(dk).find(x=>x.v==='i:ins'):null;
