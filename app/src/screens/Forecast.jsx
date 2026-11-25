@@ -70,7 +70,7 @@ function FcChart({ R, M }) {
   if (W == null) return <><div id="fch" ref={ref}></div>{' '}{detail}</>;
   const H = W < 640 ? 230 : 280, pl = 58, pr = 14, pt = 14, pb = 32, top = Math.max(...R.map(r => Math.max(r.debt, r.saved)), 1) * 1.08, X = i => pl + i / Math.max(1, N - 1) * (W - pl - pr), Y = v => pt + (1 - v / top) * (H - pt - pb);
   const ln = f => R.map((r, i) => (i ? 'L' : 'M') + X(i).toFixed(1) + ',' + Y(r[f]).toFixed(1)).join('');
-  const step = Math.ceil(N / Math.max(1, Math.floor((W - pl - pr) / 52)));
+  const step = Math.ceil(N / Math.max(1, Math.floor((W - pl - pr) / (W < 500 ? 66 : 52))));
   const at = e => { const b = e.currentTarget.getBoundingClientRect(); return Math.max(0, Math.min(N - 1, Math.round(((e.clientX - b.left) / b.width * W - pl) / (W - pl - pr) * (N - 1)))); };
   const x = X(hov ?? si);
   return <><div id="fch" ref={ref}><div className="fleg"><span><i style={{ background: 'var(--sky)' }}></i>Total owed</span><span><i style={{ background: 'var(--lilac)' }}></i>Saved toward goals</span></div><svg viewBox={`0 0 ${W} ${H}`} id="fsv" role="img" aria-label="Debt and savings by month" style={{ cursor: 'pointer' }} onPointerMove={e => setHov(at(e))} onPointerLeave={() => setHov(null)} onClick={e => { const i = at(e); setFDK(R[i].k); setSi(i); }}>

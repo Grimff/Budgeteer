@@ -460,7 +460,14 @@ server against a real `data/` folder while testing; use `tools/realtest.js`.
   from your bank" (`lsetup`, open by default only when something needs action) and Goals →
   "Accounts for goals" (`galloc`, closed by default; `alGo` opens it).
 - Phones (≤760px): the tab row scrolls sideways (`moveInd` keeps the current tab in view); `.phead`
-  wraps its buttons under the title. Charts (`DebtChart`, `AreaChart`) draw at the width shown
+  wraps its buttons under the title.
+  The phone rules from the layout pass are together at the end of app.css ("phone layout pass"): Bank → Filed and
+  the pop-up's transaction rows put Move/Undo under the amount; `.bki` rows (Loans from your bank, Connections) give
+  the name its own line; Build bill rows are name/amount/× then **Due** day (`.bdue`, a label that is
+  `display:contents` on wider screens) and frequency; Forecast lanes put the name above the track and show only
+  years on the axis; History's month tables and Data & math's tables stack. The money-flow chart keeps its min width
+  and scrolls sideways (`.skhint` says so); `sankeyR` starts it scrolled to the Budget and group columns when it
+  overflows. Check with a 375px screenshot of every tab, view and pop-up; wider screens must stay pixel-identical. Charts (`DebtChart`, `AreaChart`) draw at the width shown
   (min 340) so labels stay readable.
 - The same transaction can be on the page twice (Bank Filed list + pop-up), so look up its parts relative to the clicked button, not with a page-wide `querySelector` (`mvShow`).
 - Class names: don't reuse `.fl` (Bank tag style) for layout; Build spending rows are `.brow.bfl`.

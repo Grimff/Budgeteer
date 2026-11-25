@@ -59,4 +59,8 @@ export function sankeyR() {
   setK({ L: Ls, all, W, H, I, O, left, act }); skClose();
   draw(el, <svg viewBox={`${Z.x} ${Z.y} ${Z.w} ${Z.h}`} role="img" aria-label="Money flow from income to groups to bills">{Ls.map((l, i) => <path key={'l' + i} className="lk" data-l={i} fill={l.c} d={ds[i]}></path>)}{all.map((n, i) => <Node key={'n' + i} n={n} i={i} />)}</svg>);
   zbar(SEL ? all.find(n => n.id === SEL) : null);
+  // On a phone the chart is wider than its card and scrolls sideways; start at the Budget column, where the money
+  // splits up, rather than on the income ribbon alone (only when it scrolls, so wide screens are unchanged).
+  const w = el.closest('.skw'), b = all.find(n => n.ci === 1), g = all.find(n => n.ci === 2);
+  if (w && b && w.scrollWidth > w.clientWidth + 20 && Z.w === W) { const u = w.scrollWidth / W, x0 = g ? Math.min(b.x - 20, g.x + 300 - w.clientWidth / u) : b.x - 70; w.scrollLeft = Math.max(0, x0 * u); }
 }
