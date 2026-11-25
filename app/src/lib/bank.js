@@ -1,41 +1,53 @@
-// bank: moved from app/public/js/bank.js unchanged except `export`. Its top-level let/var stay there (shared state the
-// classic files reassign); everything else here reads the app's globals by name as before, and dist/bank.js puts these
-// exports on the global object (lib/bank.global.js) so the classic files and the React screens still call them by name.
-// globals: each function is on the global object before any code here runs, each const right after its line, as in a classic script.
-Object.assign(globalThis, { bankLoad, autoSave, patternOf, ruleMonth, ruleFor, addRule, defAlways, flexable, flexDefaultAuto, flexDefault, txPairs, txIdx, billPaid, sinkFund, flexAct, chartItem, chartInc, incActual, incGot, pendCarry, autoFile, merchKeys, merchKey, lnkOpen, lnkCands, lnkPats, lnkSibs, lnkExclFor, lnkMatches, pairIssues, catOpen, catFilter, ruleHit, samePayee, monthMove, catMove, recurring, recAdd, lnkSibsFor, itemGone, itemsFrom, delFrom, ruleReapply });
+// bank: the code of what was app/public/js/bank.js (unchanged but for imports, `export`, the shared state's setters and
+// startBank(), which holds what used to run as the file loaded).
+// Shared state (other files change it with the set… functions; it was js/bank.js):
+import { bankBadge, catRender, lnkList } from '../named.jsx';
+import { notifyAlerts } from './alerts.js';
+import { INB, budStart, scopeStart } from './build.js';
+import { MO, S, TK, addM, basePlan, editPlan, esc, f2, lab, labS, mon, plan, r2, save, setAUTOSAVE, uid, $ } from './core.js';
+import { commit, rerender } from './events.js';
+import { GENERIC, allItems, dshort, txAssign, txLabel, txTargets, txUndo } from './linked-loans.js';
+import { setLP, toast } from './math.js';
+import { FS, SRV } from './server-sync.js';
+export let FLQ=''; export function setFLQ(v){return FLQ=v}
+export let PSET=new Set(); export function setPSET(v){return PSET=v}
+export let TXI=null; export function setTXI(v){return TXI=v}
+export let LK=null; export function setLK(v){return LK=v}
+export let CT=null; export function setCT(v){return CT=v}
+export let CR='month'; export function setCR(v){return CR=v}
 /* ---------- bank (Plaid) ---------- */
 
-export const BK={st:null,tx:[],loans:null,accts:null,err:'',show:40,busy:false};globalThis.BK=BK;
-export const bankFrom=()=>S.bankFrom||(TK+'-01');globalThis.bankFrom=bankFrom;
+export const BK={st:null,tx:[],loans:null,accts:null,err:'',show:40,busy:false};
+export const bankFrom=()=>S.bankFrom||(TK+'-01');
 export async function bankLoad(){if(!SRV)return;try{const[a,b,c,e]=await Promise.all([fetch('api/bank/status',{cache:'no-store'}),fetch('api/bank/transactions?from='+bankFrom(),{cache:'no-store'}),fetch('api/bank/loans',{cache:'no-store'}),fetch('api/bank/accounts',{cache:'no-store'})]);BK.st=await a.json();if(b.ok){BK.tx=(await b.json()).tx||[];PSET=new Set(BK.tx.filter(t=>t.pending).map(t=>t.id))}if(c.ok)BK.loans=(await c.json()).accounts||[];if(e.ok)BK.accts=(await e.json()).accounts||[];BK.err=''}catch(e){BK.err='Couldn’t reach the bank service on the server.'}
  autoSave();
  rerender();bankBadge();notifyAlerts()}
 // Files what it can and saves that as an auto-only change (see fsFlush).
-export function autoSave(){if(!autoFile())return false;if(!FS.dirty)FS.autoOnly=true;AUTOSAVE=true;save();AUTOSAVE=false;return true}
+export function autoSave(){if(!autoFile())return false;if(!FS.dirty)FS.autoOnly=true;setAUTOSAVE(true);save();setAUTOSAVE(false);return true}
 /* ---------- filing rules: tie a payment once, the rest file themselves ---------- */
 // Names carry changing reference numbers, so matching uses words only: digits and punctuation are dropped.
-export const normT=s=>String(s||'').toUpperCase().replace(/[^A-Z&' ]+/g,' ').split(/\s+/).filter(w=>w.length>1).join(' ');globalThis.normT=normT;
-export const normName=t=>(normT(t.merchant)+' '+normT(t.name)).trim();globalThis.normName=normName;
-export const STOPW=new Set(['POS','ACH','DEBIT','CREDIT','PURCHASE','RECURRING','ONLINE','CHECKCARD','WEB','PMT','TST','SQ','SP','PP','INST','THE','AUTH']);globalThis.STOPW=STOPW;
+export const normT=s=>String(s||'').toUpperCase().replace(/[^A-Z&' ]+/g,' ').split(/\s+/).filter(w=>w.length>1).join(' ');
+export const normName=t=>(normT(t.merchant)+' '+normT(t.name)).trim();
+export const STOPW=new Set(['POS','ACH','DEBIT','CREDIT','PURCHASE','RECURRING','ONLINE','CHECKCARD','WEB','PMT','TST','SQ','SP','PP','INST','THE','AUTH']);
 // Words that make a different kind of purchase at the same store (Costco vs Costco Gas).
-export const QUAL=new Set(['GAS','FUEL','PHARMACY','PHARM','RX','CAR','WASH','OPTICAL','PHOTO','TIRE','TIRES','BAKERY','LIQUOR','WINE','MKTPLACE','MARKETPLACE','PRIME','MUSIC','KINDLE','DIGITAL','EXPRESS','TRAVEL','AUTO','STATION','SERVICE','INSURANCE']);globalThis.QUAL=QUAL;
+export const QUAL=new Set(['GAS','FUEL','PHARMACY','PHARM','RX','CAR','WASH','OPTICAL','PHOTO','TIRE','TIRES','BAKERY','LIQUOR','WINE','MKTPLACE','MARKETPLACE','PRIME','MUSIC','KINDLE','DIGITAL','EXPRESS','TRAVEL','AUTO','STATION','SERVICE','INSURANCE']);
 export function patternOf(t){const w=normT(t.merchant||t.name).split(' ').filter(Boolean);while(w.length>1&&STOPW.has(w[0]))w.shift();let n=Math.min(3,w.length);if(w.slice(0,n).join(' ').length<8)n=Math.min(4,w.length);if(/^(TRANSFER|XFER|ZELLE|VENMO|PAYPAL)$/.test(w[0]))n=Math.min(5,w.length);let p=w.slice(0,n).join(' ');
  if(t.merchant){const nm=normT(t.name);if(nm.startsWith(p+' ')){const nx=nm.slice(p.length+1).split(' ')[0];if(QUAL.has(nx))p+=' '+nx}}return p}
-export const tdir=t=>t.amount<0?'in':'out';globalThis.tdir=tdir;
+export const tdir=t=>t.amount<0?'in':'out';
 // Names that cover many unrelated payments (payment apps, plain transfers). Links to these default to "around this amount".
-export const GENERICP=/^(VENMO|ZELLE|PAYPAL|CASH APP|SQUARE CASH|APPLE CASH|ONLINE TRANSFER|TRANSFER|CHECK|ATM|MOBILE DEPOSIT|DEPOSIT|WITHDRAWAL)\b/;globalThis.GENERICP=GENERICP;
-export const acctType=id=>{const a=(BK.accts||[]).find(x=>x.id===id);return a?a.type:''};globalThis.acctType=acctType;
+export const GENERICP=/^(VENMO|ZELLE|PAYPAL|CASH APP|SQUARE CASH|APPLE CASH|ONLINE TRANSFER|TRANSFER|CHECK|ATM|MOBILE DEPOSIT|DEPOSIT|WITHDRAWAL)\b/;
+export const acctType=id=>{const a=(BK.accts||[]).find(x=>x.id===id);return a?a.type:''};
 // Month a payment counts in under rule r: the month paid, unless the rule moves payments made in the last 5 days of a
 // month to the next month (shift 'next', rent paid early) or the first 5 days back a month (shift 'prev', paid late).
 export function ruleMonth(t,r){const k=t.date.slice(0,7),d=+t.date.slice(8,10),[y,m]=k.split('-').map(Number),last=new Date(y,m,0).getDate();
  if(r&&r.shift==='next'&&d>last-5)return addM(k,1);if(r&&r.shift==='prev'&&d<=5)return addM(k,-1);return k}
 export function ruleFor(t){let best=null;const nm=normName(t),a=Math.abs(t.amount);(S.rules||[]).forEach(r=>{if(r.dir!==tdir(t)||!r.p||!nm.includes(r.p))return;if(r.x&&r.x.some(x=>nm.includes(x)))return;if(r.min!=null&&a<r.min-0.005)return;if(r.max!=null&&a>r.max+0.005)return;if(!best||r.p.length>best.p.length)best=r});return best}
 export function addRule(p,dir,v,min,max,x){S.rules||(S.rules=[]);p=normT(p);let r=S.rules.find(y=>y.p===p&&y.dir===dir);if(!r){r={id:uid(),p,dir};S.rules.push(r)}r.v=v;if(x&&x.length)r.x=x;else delete r.x;if(min!=null){r.min=min;r.max=max}else{delete r.min;delete r.max}return r}
-export const rulesFor=v=>(S.rules||[]).filter(r=>r.v===v);globalThis.rulesFor=rulesFor;
+export const rulesFor=v=>(S.rules||[]).filter(r=>r.v===v);
 export function defAlways(v,k){if(!v||v==='skip'||v==='once')return false;if(v.startsWith('i:')){const x=allItems(k).find(x=>x.i.id===v.slice(2));return !!x&&!x.g.flex}return true}
 // A checking or savings payment and the same amount arriving on another connected card, loan or account within 5 days
 // is one transfer. Both sides are filed as a transfer, so a card or loan payment never counts as spending.
-export const isXferish=t=>/^(TRANSFER_|LOAN_PAYMENTS)/.test((t.pfc&&t.pfc[0])||'');globalThis.isXferish=isXferish;
+export const isXferish=t=>/^(TRANSFER_|LOAN_PAYMENTS)/.test((t.pfc&&t.pfc[0])||'');
 // What rolls into Flex when nothing else claims it: purchases from checking or a card, payment apps (Venmo,
 // PayPal, Zelle), and money back on a card (refunds lower Flex). Left for review: deposits into checking,
 // loan and card payments, and transfers between your own accounts.
@@ -56,7 +68,7 @@ export function txPairs(){const ins=BK.tx.filter(t=>t.amount<0&&!t.pending),used
 // Filed transactions by month and target, built from S.txd. Bill payments and income received come from here.
 export function txIdx(){if(TXI)return TXI;TXI={};Object.entries(S.txd||{}).forEach(([id,r])=>{if(!r||!r.v||!r.k)return;const a=TXI[r.k]||(TXI[r.k]={}),e=a[r.v]||(a[r.v]={amt:0,list:[]});e.amt=r2(e.amt+(+r.amt||0));e.list.push({id,d:r.d,n:r.n,amt:r.amt,auto:r.auto})});return TXI}
 export function billPaid(k,id){const e=txIdx()[k]?.['i:'+id];if(!e||!e.list.length)return null;const it=sinkIt(k,id);return it?{...e,amt:r2((+it.amt||0)/+it.freq),real:e.amt,sink:true}:e}
-export const sinkIt=(k,id)=>{for(const g of basePlan(k).groups)if(!g.flex)for(const i of g.items)if(i.id===id&&+i.freq>1)return i;return null};globalThis.sinkIt=sinkIt;
+export const sinkIt=(k,id)=>{for(const g of basePlan(k).groups)if(!g.flex)for(const i of g.items)if(i.id===id&&+i.freq>1)return i;return null};
 // A set-aside bill's fund at the end of month k: set-asides since the budget start less what was paid from it.
 export function sinkFund(id,k){let f=0;for(let m=budStart()||k,n=0;m<=k&&n<600;m=addM(m,1),n++){const it=sinkIt(m,id);if(!it)continue;f+=(+it.amt||0)/+it.freq;const e=txIdx()[m]?.['i:'+id];if(e)f-=e.amt}return r2(f)}
 // Income that counts for month k: what arrived for past months; for this month paychecks are still coming, so never less than planned.
@@ -78,7 +90,7 @@ export function incGot(k,id){const e=txIdx()[k]?.['inc:'+id];return e&&e.list.le
 export function pendCarry(){const byId=new Map(BK.tx.map(t=>[t.id,t]));let n=0;
  BK.tx.forEach(t=>{if(!t.ppid||t.pending)return;if(S.noAuto&&S.noAuto[t.ppid]){S.noAuto[t.id]=1;delete S.noAuto[t.ppid]}const o=S.txd[t.ppid];if(!o)return;txUndo(t.ppid);if(!o.auto&&!S.txd[t.id])txAssign(t,o.v,undefined,o.k);n++});
  Object.entries(S.txd).forEach(([id,r])=>{if(!r.pend)return;const t=byId.get(id);if(!t){if(r.d>=bankFrom()){txUndo(id);n++}return}if(t.pending)return;const o={...r};txUndo(id);txAssign(t,o.v,o.auto,o.k);n++});
- if(n){TXI=null;LP={}}return n}
+ if(n){TXI=null;setLP({})}return n}
 export function autoFile(){if(!SRV||!BK.tx.length||!BK.accts)return 0;S.txd||(S.txd={});let n=pendCarry();const f=bankFrom(),P=txPairs(),no=S.noAuto||{};
  const gone=S.txGone||{};BK.tx.forEach(t=>{if(t.date<f||S.txd[t.id]||no[t.id]||gone[t.id])return;
   if(P.has(t.id)){const o=P.get(t.id);if(S.txd[o]&&!['xfer','skip'].includes(S.txd[o].v)&&S.txd[o].auto!=='pair')return;
@@ -87,10 +99,10 @@ export function autoFile(){if(!SRV||!BK.tx.length||!BK.accts)return 0;S.txd||(S.
   // Anything else that's a plain purchase rolls into Flex spending. Transfers, loan and card payments and
   // payment apps (Plaid's TRANSFER_* / LOAN_PAYMENTS) stay in review, since they're often rent or money between accounts.
   if(!r&&flexable(t)){const fx=flexDefault(t.date.slice(0,7));if(fx){txAssign(t,'i:'+fx,'rest');n++}}});
- if(n){TXI=null;LP={}}return n}
+ if(n){TXI=null;setLP({})}return n}
 // Link dialog: pick one payment (grouped by name), confirm the matching text, file all of them.
 
-export const titleC=s=>s.split(' ').map(w=>w[0]+w.slice(1).toLowerCase()).join(' ');globalThis.titleC=titleC;
+export const titleC=s=>s.split(' ').map(w=>w[0]+w.slice(1).toLowerCase()).join(' ');
 // One row per merchant. A name without Plaid's merchant field joins the merchant it starts with
 // ("KROGER #123 ANYTOWN ST" → Kroger), longest first so Costco Gas stays apart from Costco.
 export function merchKeys(){const M=new Set();BK.tx.forEach(t=>{if(t.merchant)M.add(patternOf(t))});return [...M].sort((a,b)=>b.length-a.length)}
@@ -117,14 +129,14 @@ export function lnkCands(){const L=LK,words=normT(L.name).split(' ').filter(w=>w
  all.forEach(g=>{L.refs[g.p]??=r2(L.amt>0?g.near:Math.abs(g.t.amount));L.wide[g.p]=GENERICP.test(g.p)&&g.hi>g.lo*1.5});
  const on=all.filter(g=>L.sels.includes(g.p)),off=all.filter(g=>!L.sels.includes(g.p)&&g.hit).sort((a,b)=>b.sc-a.sc||b.last.localeCompare(a.last));
  return [...on,...off.slice(0,60)]}
-export const lnkSingle=()=>LK.sels.length===1;globalThis.lnkSingle=lnkSingle;
+export const lnkSingle=()=>LK.sels.length===1;
 // The text each rule matches: the edited text when one row is ticked, otherwise each ticked merchant.
 export function lnkPats(){if(lnkSingle()){const p=normT(LK.pat);return p?[p]:[]}return LK.sels.slice()}
 // More specific names that start with p (Costco → Costco Gas) and aren't ticked themselves.
 export function lnkSibs(p){const c={};if(!p)return[];BK.tx.forEach(t=>{if(tdir(t)!==LK.dir)return;const q=merchKey(t,LK.MK);if(q!==p&&q.startsWith(p+' ')&&!LK.sels.includes(q)&&normName(t).includes(p))c[q]=(c[q]||0)+1});return Object.entries(c)}
 export function lnkExclFor(p){return lnkSingle()&&LK.sibOn?[]:lnkSibs(p).map(([q])=>q)}
 // Goal transfer flags only list money moved out of checking or savings (Plaid's TRANSFER_OUT).
-export const goalTx=t=>acctType(t.account)==='depository'&&/^TRANSFER_OUT/.test((t.pfc&&t.pfc[0])||'');globalThis.goalTx=goalTx;
+export const goalTx=t=>acctType(t.account)==='depository'&&/^TRANSFER_OUT/.test((t.pfc&&t.pfc[0])||'');
 export function lnkMatches(){const P=lnkPats().map(p=>({p,x:lnkExclFor(p)})),one=lnkSingle(),ref=LK.ref;if(!P.length)return[];
  return BK.tx.filter(t=>{if(tdir(t)!==LK.dir)return false;if(LK.kind==='goal'&&!goalTx(t))return false;if(LK.dir==='in'&&acctType(t.account)!=='depository')return false;if(S.txd&&S.txd[t.id]&&S.txd[t.id].auto==='pair')return false;
   const nm=normName(t);if(!P.some(({p,x})=>nm.includes(p)&&!x.some(y=>nm.includes(y))))return false;return !(one&&LK.amtOn&&ref)||Math.abs(Math.abs(t.amount)-ref)<=ref*.25})}
@@ -142,14 +154,14 @@ export function catFilter(){const q=($('#tdq').value||'').trim().toLowerCase(),r
 export function ruleHit(r,t){if(r.dir!==tdir(t)||!r.p)return false;const nm=normName(t),a=Math.abs(t.amount);if(!nm.includes(r.p))return false;if(r.x&&r.x.some(x=>nm.includes(x)))return false;if(r.min!=null&&a<r.min-0.005)return false;if(r.max!=null&&a>r.max+0.005)return false;return true}
 // One transaction row in the pop-up, with Move (category + month).
 // Which rule filed a transaction, for the pop-up and Filed lists.
-export const ruleTag=id=>{const x=(S.rules||[]).find(y=>y.id===id);return x?`rule “${esc(titleC(x.p))}”`:'auto'};globalThis.ruleTag=ruleTag;
+export const ruleTag=id=>{const x=(S.rules||[]).find(y=>y.id===id);return x?`rule “${esc(titleC(x.p))}”`:'auto'};
 // Payments from the same payee that are filed somewhere else (or not at all): by this category's rules, or, with no
 // rules, the same merchants it already has at a similar amount.
 export function samePayee(v,inc,from){const R=rulesFor(v),mine=Object.keys(S.txd||{}).filter(id=>S.txd[id].v===v),MK=merchKeys(),dir=inc?'in':'out',keys=new Set(),amts=[];
  mine.forEach(id=>{const t=BK.tx.find(y=>y.id===id);if(t){keys.add(merchKey(t,MK));amts.push(Math.abs(t.amount))}});amts.sort((a,b)=>a-b);const med=amts[Math.floor(amts.length/2)]||0;
  return BK.tx.filter(t=>{if(t.date.slice(0,7)<from||tdir(t)!==dir)return false;const r=S.txd&&S.txd[t.id];if(r&&(r.v===v||r.auto==='pair'))return false;if((S.txGone||{})[t.id])return false;
   if(R.length)return R.some(x=>ruleHit(x,t));return keys.has(merchKey(t,MK))&&(!med||Math.abs(Math.abs(t.amount)-med)<=med*.25)}).sort((a,b)=>b.date.localeCompare(a.date))}
-export const txOf=(id,r)=>BK.tx.find(x=>x.id===id)||{id,date:r.d,amount:r.amt,name:r.n,merchant:'',account:''};globalThis.txOf=txOf;
+export const txOf=(id,r)=>BK.tx.find(x=>x.id===id)||{id,date:r.d,amount:r.amt,name:r.n,merchant:'',account:''};
 // Counts a filed transaction in another month, keeping its category. Chosen by hand, so it's no longer "auto".
 export function monthMove(id,k){const r=S.txd&&S.txd[id];if(!r||r.k===k)return;const v=r.v;txUndo(id);txAssign(txOf(id,r),v,undefined,k);
  toast(`${r.n} now counts in ${lab(k)}`);commit();catRender()}
@@ -157,8 +169,10 @@ export function catMove(id,v){const r=S.txd&&S.txd[id];if(!r||r.v===v)return;con
  txUndo(id);txAssign(t,v,undefined,r.k);if(sp&&S.txd[id])S.txd[id].sp=sp;toast(`Moved ${r.n} to ${txLabel({v,k:r.k})}`);commit();catRender()}
 // Recurring charges sitting in Flex (or unfiled) with no rule: same merchant in 3+ different months at a steady amount.
 // Everyday spending (food, gas, shopping, travel) only looks like a subscription when the amount barely changes.
-export const SPEND_CAT=/^(FOOD_AND_DRINK|TRANSPORTATION|GENERAL_MERCHANDISE|TRAVEL)/;globalThis.SPEND_CAT=SPEND_CAT;
-export function recurring(){if(!SRV||!BK.tx.length)return[];const MK=merchKeys(),G={},no=S.notBill||{},k6=addM(TK,-6);
+export const SPEND_CAT=/^(FOOD_AND_DRINK|TRANSPORTATION|GENERAL_MERCHANDISE|TRAVEL)/;
+// RECF: the parity check's stand-in for recurring() (a case that shows made-up bill suggestions); null otherwise.
+export let RECF=null;export function setRECF(f){return RECF=f}
+export function recurring(){if(RECF)return RECF();if(!SRV||!BK.tx.length)return[];const MK=merchKeys(),G={},no=S.notBill||{},k6=addM(TK,-6);
  BK.tx.forEach(t=>{if(t.amount<=0||t.date.slice(0,7)<k6||isXferish(t))return;const rr=ruleFor(t);if(rr&&txTargets(t.date.slice(0,7)).ok(rr.v))return;const r=S.txd&&S.txd[t.id];if(r){if(!r.v.startsWith('i:'))return;const x=allItems(r.k).find(y=>y.i.id===r.v.slice(2));if(x&&!x.g.flex)return}
   const p=merchKey(t,MK);if(no[p])return;(G[p]||(G[p]=[])).push(t)});
  return Object.entries(G).map(([p,L])=>{const ms=new Set(L.map(t=>t.date.slice(0,7))),A=L.map(t=>t.amount).sort((a,b)=>a-b),med=A[Math.floor(A.length/2)],D=L.map(t=>+t.date.slice(8)).sort((a,b)=>a-b);
@@ -184,3 +198,5 @@ OK removes it everywhere and sends its transactions back to Flex spending.
 Cancel keeps it in months before ${mon(S.cur)}.`)?f:S.cur}
 // Re-files what a rule filed on its own, after the rule's text, target or amounts change.
 export function ruleReapply(r){Object.entries(S.txd||{}).forEach(([tid,x])=>{if(x.auto===r.id)txUndo(tid)});autoFile()}
+
+export function startBank() { }   // nothing ran at load

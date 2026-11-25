@@ -1,8 +1,11 @@
-// csv-import: moved from app/public/js/csv-import.js unchanged except `export`. Its top-level let/var stay there (shared state the
-// classic files reassign); everything else here reads the app's globals by name as before, and dist/csv-import.js puts these
-// exports on the global object (lib/csv-import.global.js) so the classic files and the React screens still call them by name.
-// globals: each function is on the global object before any code here runs, each const right after its line, as in a classic script.
-Object.assign(globalThis, { cvSplit, cvNum, cvDate, cvLoadText, cvFile, cvRows, cvImport, cvDel });
+// csv-import: the code of what was app/public/js/csv-import.js (unchanged but for imports, `export`, the shared state's setters and
+// startCsvImport(), which holds what used to run as the file loaded).
+// Shared state (other files change it with the set… functions; it was js/csv-import.js):
+import { renderSettings } from '../named.jsx';
+import { BK, bankLoad } from './bank.js';
+import { RM, r2, $ } from './core.js';
+import { toast } from './math.js';
+export let CV={}; export function setCV(v){return CV=v}
 /* ---------- import transactions from a CSV file ---------- */
 // For accounts Plaid can't reach (or that you'd rather not connect). Settings → Connections → Import from a CSV file:
 // pick a file, check the columns and how money going out is shown, pick an account (or name a new one), Import.
@@ -45,7 +48,12 @@ export async function cvImport(){const{rows}=cvRows();if(!rows.length){toast('No
   CV={};toast(`Imported ${j.added} transaction${j.added===1?'':'s'}${j.skipped?`; ${j.skipped} were already there`:''}`);await bankLoad()}catch(e){toast('Couldn’t import: '+e.message)}}
 export async function cvDel(id){const a=cvAccts().find(x=>x.id===id);if(!a||!confirm(`Remove ${a.name} and its imported transactions?\n\nAnything already filed in the budget from it goes back to unfiled.`))return;
  try{const r=await fetch('api/bank/import/'+encodeURIComponent(id),{method:'DELETE'});if(!r.ok)throw new Error('HTTP '+r.status);toast(a.name+' removed');await bankLoad()}catch(e){toast('Couldn’t remove: '+e.message)}}
-export const cvAccts=()=>(((BK.st&&BK.st.items)||[]).find(it=>it.kind==='csv')||{accounts:[]}).accounts;globalThis.cvAccts=cvAccts;
+export const cvAccts=()=>(((BK.st&&BK.st.items)||[]).find(it=>it.kind==='csv')||{accounts:[]}).accounts;
+
+// What this file did as it loaded (listeners, settings read from localStorage, …): main.jsx runs it in the old
+// load order, after every module is defined.
+export function startCsvImport() {
 // The file picker and the column choices redraw the card; typing only updates CV (and the Import button).
 document.addEventListener('change',e=>{const t=e.target;if(t.id==='cvFile'&&t.files&&t.files[0]){cvFile(t.files[0]);t.value='';return}if(t.dataset&&t.dataset.cv){CV[t.dataset.cv]=t.value;renderSettings()}});
 document.addEventListener('input',e=>{const t=e.target;if(t.dataset&&t.dataset.cvt){CV[t.dataset.cvt]=t.value;const b=document.querySelector('[data-act="cvImport"]');if(b)b.disabled=!(cvRows().rows.length&&(CV.acct!=='new'||(CV.nname||'').trim()))}});
+}

@@ -4,6 +4,16 @@
 import { Fragment } from 'react';
 import { tx, onAct, onInp, drawNo } from '../bridge.js';
 import { CountUp, Clh, ActBtn } from '../ui.jsx';
+import { NTH, alertsNow } from '../lib/alerts.js';
+import { BK, PSET, billPaid, flexAct, flexDefault, incGot, recurring, rulesFor, sinkFund } from '../lib/bank.js';
+import { SB, setSB, soFarOf } from '../lib/budget.js';
+import { BUDV, budStart } from '../lib/build.js';
+import { cmpRows } from '../lib/compare.js';
+import { FQ, MN, MO, NOW, S, TK, addM, f0, f2, isDue, lab, mon, nextDue, ord, plan, r2 } from '../lib/core.js';
+import { gLinked } from '../lib/goal-accounts.js';
+import { allItems, dshort, inbox } from '../lib/linked-loans.js';
+import { OPEN, bankSrc, destName, exShare, goalOv, goalPlan, goalSaved, isShut, loanGone, loanPlan, loanXtra, row, savedIn, target, totals, unplannedA, xmOn, xsBuild } from '../lib/math.js';
+import { SRV } from '../lib/server-sync.js';
 
 // A button's data ({act, v, …}) → data-act, data-v, … props.
 const dataAttrs = o => Object.fromEntries(Object.entries(o).map(([k, v]) => ['data-' + k, v]));
@@ -86,7 +96,7 @@ export function ThisMonth() {
   const soFar = soFarOf(S.cur, T), xLo = S.loans.reduce((a, l) => { const r = S.cur < l.start ? null : row(l, S.cur); return a + (r && r.lg ? Math.max(0, r.pay - loanPlan(l, S.cur)) : 0); }, 0);
   // summary bar
   const arr = plan().income.reduce((a, i) => a + (i.once ? 0 : (incGot(S.cur, i.id)?.amt || 0)), 0), fut = S.cur > TK, up = unplannedA(S.cur), diff = (T.fixed + T.flexP) - (T.fixedA + T.flexA - up), xs = xsBuild()[S.cur];
-  SB = S.cur === TK ? [arr, soFar, Math.max(0, spentA - soFar), leftA] : fut ? [T.inc, planOut, xs ? xs.pool : T.save, left] : [T.incA, spentA, Math.abs(diff), leftA];
+  setSB(S.cur === TK ? [arr, soFar, Math.max(0, spentA - soFar), leftA] : fut ? [T.inc, planOut, xs ? xs.pool : T.save, left] : [T.incA, spentA, Math.abs(diff), leftA]);
   const t = (c, l, id, sub, j) => <div style={{ '--c': c }} key={id}><small>{l}</small><CountUp id={id} k={id} to={SB[j]} /><span>{sub}</span></div>;
   const sbar = S.cur === TK ? [t('var(--lime)', 'Income arrived', 'sInc', `of ${f0(T.incA)} expected this month`, 0), t('var(--coral)', 'Spent so far', 'sPlan', `of ${f0(planOut)} planned${xLo > 0.5 ? ` · incl. ${f0(xLo)} extra to loans` : ''}`, 1), t('var(--butter)', 'Still to come', 'sAct', 'planned, not paid yet', 2), t(leftA >= 0 ? 'var(--pink)' : 'var(--red)', 'Left over (projected)', 'sLeft', xmOn(S.cur) ? 'kept after your extra money rules' : 'if the rest goes to plan', 3)]
     : fut ? [t('var(--lime)', 'Income', 'sInc', 'planned', 0), t('var(--coral)', 'Planned out', 'sPlan', 'bills, spending, loans, savings', 1), t('var(--butter)', xs ? 'Extra money' : 'To goals', 'sAct', xs ? `goes to your rules · ${f0(xs.keep)} kept` : 'planned savings', 2), t(left >= 0 ? 'var(--pink)' : 'var(--red)', 'Left over (planned)', 'sLeft', left >= 0 ? 'not assigned to anything' : 'the plan spends more than it earns', 3)]

@@ -6,6 +6,8 @@ import { createRoot } from 'react-dom/client';
 import { flushSync } from 'react-dom';
 import { tx, onAct, onInp } from '../bridge.js';
 import { TxOpts } from '../ui.jsx';
+import { S } from '../lib/core.js';
+import { spLeft } from '../lib/linked-loans.js';
 
 function SpForm({ id, n }) {
   const r = S.txd[id], dir = r.amt < 0 ? 'in' : 'out', rows = [[r.v, Math.abs(r.amt)], ...Array.from({ length: n - 1 }, () => ['', ''])];

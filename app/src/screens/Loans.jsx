@@ -5,6 +5,13 @@
 import { Fragment, useLayoutEffect, useRef, useState } from 'react';
 import { tx, onAct, onInp, onChg, tick } from '../bridge.js';
 import { Gear, CountUp, Clh } from '../ui.jsx';
+import { BK, rulesFor, titleC } from '../lib/bank.js';
+import { NOW, S, TK, addM, f0, f2, fk, lab, labS, mdiff, mo, mon, ord, r2 } from '../lib/core.js';
+import { acctOf, subLab } from '../lib/linked-loans.js';
+import { LR, PS, PX, pxHow, pxNow, pxSim, wiCap } from '../lib/loans.js';
+import { OPEN, WI, balEnd, bankSrc, exShare, extraPaid, isShut, lastK, loanGone, loanPlan, loanUsual, lp, path, row, savedL, snowR, sooner, streak, stuck, sumI, xStart } from '../lib/math.js';
+import { SRV } from '../lib/server-sync.js';
+import { RANGES, debtNow } from '../lib/wealth.js';
 
 // Read-only fields filled in by the lender (was RO/FL).
 const ro = (l, f) => l.acct && l.auto && l.auto[f] ? { readOnly: true, title: 'Updated from your lender' } : {};

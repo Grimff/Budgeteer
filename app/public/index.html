@@ -20,45 +20,7 @@
 <!-- The page (header, tabs, sections, footer, dialogs) is drawn by React: app/src/frame.jsx. -->
 <div id="app" style="display:contents"></div>
 
-<!-- Scripts load in this order and share one global scope; see CLAUDE.md. -->
-<script src="js/core.js"></script>
-<script src="dist/core.js"></script>
-<script src="js/math.js"></script>
-<script src="dist/math.js"></script><!-- js/math.js's code, an ES module (app/src/lib/math.js) -->
-<script src="js/budget.js"></script>
-<script src="dist/budget.js"></script>
-<script src="js/loans.js"></script>
-<script src="dist/loans.js"></script>
-<script src="js/goals.js"></script>
-<script src="dist/goals.js"></script>
-<script src="js/history.js"></script>
-<script src="dist/history.js"></script>
-<script src="js/flow.js"></script>
-<script src="dist/flow.js"></script>
-<script src="js/events.js"></script>
-<script src="dist/events.js"></script>
-<script src="js/bank.js"></script>
-<script src="dist/bank.js"></script>
-<script src="js/build.js"></script>
-<script src="dist/build.js"></script>
-<script src="js/goal-accounts.js"></script>
-<script src="dist/goal-accounts.js"></script>
-<script src="js/compare.js"></script>
-<script src="dist/compare.js"></script>
-<script src="js/settings.js"></script>
-<script src="dist/settings.js"></script>
-<script src="js/wealth.js"></script>
-<script src="dist/wealth.js"></script>
-<script src="js/linked-loans.js"></script>
-<script src="dist/linked-loans.js"></script>
-<script src="js/alerts.js"></script>
-<script src="dist/alerts.js"></script>
-<script src="js/csv-import.js"></script>
-<script src="dist/csv-import.js"></script>
-<script src="dist/app.js"></script><!-- the React screens (app/src, built by tools/build.js) -->
-<script src="js/sample.js"></script>
-<script src="dist/sample.js"></script>
-<script src="js/server-sync.js"></script>
-<script src="dist/server-sync.js"></script>
+<!-- The whole app: app/src (main.jsx and what it imports), built into one file by tools/build.js. -->
+<script src="dist/app.js"></script>
 </body>
 </html>

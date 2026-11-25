@@ -3,6 +3,11 @@
 // which stay in flow.js / events.js (all delegated on document). hl and zset change classes and the viewBox on the
 // drawn svg, as before; each draw is a fresh root, so nothing here re-renders over them.
 import { draw, tx } from '../bridge.js';
+import { chartInc, chartItem } from '../lib/bank.js';
+import { C, S, TK, f0, plan, $ } from '../lib/core.js';
+import { SEL, Z, ZH, ZW, setK, setSEL, setZ, setZH, setZW, skClose } from '../lib/flow.js';
+import { goalPlan, loanPlan, row, savedIn } from '../lib/math.js';
+import { compareView, zbar } from '../named.jsx';
 
 function layout() {
   const p = plan(), act = S.flow === 'actual';
@@ -46,12 +51,12 @@ function Node({ n, i }) {
 }
 
 export function sankeyR() {
-  const el = $('#sk'); if (!el) return; el.classList.toggle('cmpv', S.flow === 'compare'); if (S.flow === 'compare') { K = null; return compareView(el); }
+  const el = $('#sk'); if (!el) return; el.classList.toggle('cmpv', S.flow === 'compare'); if (S.flow === 'compare') { setK(null); return compareView(el); }
   const L = layout();
   if (!L) { draw(el, <p className="mut" style={{ padding: '30px 0' }}>Add income and bills to see your money flow.</p>); return; }
   const { Ls, all, W, H, I, O, left, act } = L, ds = Ls.map(ribbon);
-  if (!Z || ZW !== W || ZH !== H) { ZW = W; ZH = H; Z = { x: 0, y: 0, w: W, h: H }; SEL = null; }
-  K = { L: Ls, all, W, H, I, O, left, act }; skClose();
+  if (!Z || ZW !== W || ZH !== H) { setZW(W); setZH(H); setZ({ x: 0, y: 0, w: W, h: H }); setSEL(null); }
+  setK({ L: Ls, all, W, H, I, O, left, act }); skClose();
   draw(el, <svg viewBox={`${Z.x} ${Z.y} ${Z.w} ${Z.h}`} role="img" aria-label="Money flow from income to groups to bills">{Ls.map((l, i) => <path key={'l' + i} className="lk" data-l={i} fill={l.c} d={ds[i]}></path>)}{all.map((n, i) => <Node key={'n' + i} n={n} i={i} />)}</svg>);
   zbar(SEL ? all.find(n => n.id === SEL) : null);
 }

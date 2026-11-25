@@ -2,6 +2,8 @@
 // skCard). The chart itself (sankey) and the placing of the tip and card (skPos, skPlace) stay in flow.js; the
 // numbers come from K, which sankey fills.
 import { draw, tx, onAct } from '../bridge.js';
+import { S, TK, f0, mon, $ } from '../lib/core.js';
+import { K, NOHOV, nodeKey, skAt, skHint, skPlace, skPos, skShare, skVs } from '../lib/flow.js';
 
 const Dot = ({ c }) => <i style={{ background: c }}></i>;
 const OpenBtn = ({ g }) => g && g.go ? <button className="btn g sm" data-act="budv" onClick={onAct('budv')} data-v="build">Edit in Build budget</button> : g && g.tab ? <button className="btn g sm" data-act="tab" onClick={onAct('tab')} data-t={g.tab}>Open {g.tab === 'loans' ? 'Loans' : 'Goals'}</button> : null;

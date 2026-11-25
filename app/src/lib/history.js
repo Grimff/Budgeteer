@@ -1,8 +1,11 @@
-// history: moved from app/public/js/history.js unchanged except `export`. Its top-level let/var stay there (shared state the
-// classic files reassign); everything else here reads the app's globals by name as before, and dist/history.js puts these
-// exports on the global object (lib/history.global.js) so the classic files and the React screens still call them by name.
-// globals: each function is on the global object before any code here runs, each const right after its line, as in a classic script.
-Object.assign(globalThis, { monthSum, histMonths });
+// history: the code of what was app/public/js/history.js (unchanged but for imports, `export`, the shared state's setters and
+// startHistory(), which holds what used to run as the file loaded).
+// Shared state (other files change it with the set… functions; it was js/history.js):
+import { billPaid, flexAct, incActual } from './bank.js';
+import { budStart } from './build.js';
+import { C, MO, S, TK, addM, plan } from './core.js';
+import { goalPlan, loanPlan, payEffect, row, savedIn, seenNone } from './math.js';
+export let HR=(()=>{try{return localStorage.getItem('pfb_hr')||'6'}catch(_){return '6'}})(); export function setHR(v){return HR=v}
 /* ---------- render: history ---------- */
 export function monthSum(k){const p=plan(k),m=MO(k),rows=[];let inc=0;p.income.forEach(i=>{inc+=incActual(k,i)});
  let spU=0;p.groups.forEach(g=>{if(g.loose&&!g.items.length)return;let pl=0,ac=0,est=false;g.items.forEach(i=>{const a=+i.amt||0;pl+=a;if(g.flex){const fa=flexAct(k,i.id);if(fa!=null){ac+=fa;if(a<=0.5)spU+=fa}else if(!seenNone(k,i)){ac+=a;est=true}}else{const pd=billPaid(k,i.id);ac+=pd?pd.amt:seenNone(k,i)?0:a;if(pd&&a<=0.5)spU+=pd.amt}});rows.push({name:g.name,c:g.color,pl,ac,est:g.flex&&est,flex:g.flex})});
@@ -15,3 +18,4 @@ export function monthSum(k){const p=plan(k),m=MO(k),rows=[];let inc=0;p.income.f
 export function histMonths(){let lo=TK;[...Object.keys(S.plans),...Object.keys(S.months)].forEach(k=>{if(k<lo)lo=k});{const bf=budStart();if(bf&&lo<bf)lo=bf<TK?bf:TK}if(S.histFrom&&S.histFrom>lo)lo=S.histFrom<TK?S.histFrom:TK;let hi=TK;Object.keys(S.months).forEach(k=>{const m=S.months[k];if(k>hi&&(Object.keys(m.act||{}).length||Object.keys(m.pay||{}).length||Object.keys(m.dep||{}).length))hi=k});
  const out=[];for(let k=lo,n=0;k<=hi&&n<240;k=addM(k,1),n++)out.push(k);return out}
 
+export function startHistory() { }   // nothing ran at load

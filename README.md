@@ -12,8 +12,9 @@ transactions come in automatically through [Plaid](https://plaid.com).
 budgeteer/
 ├── app/
 │   ├── server.js               tiny server (Node 18+), reads settings from .env
-│   ├── src/                    the React screens (built into public/dist/ by tools/build.js)
-│   └── public/                 the app: index.html, css/, js/ (one file per area), fonts/, icons/
+│   ├── src/                    the app's code: React screens and lib/ (one module per area), built into
+│   │                           public/dist/app.js by tools/build.js
+│   └── public/                 what the browser loads: index.html, css/, fonts/, icons/, dist/
 ├── brand/                      logo and icons
 ├── tools/                      npm test, checks and local test servers (see CLAUDE.md)
 ├── .env.example                copy to .env and add your Plaid keys

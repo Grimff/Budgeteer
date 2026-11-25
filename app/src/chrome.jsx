@@ -1,6 +1,8 @@
 // The save status (was fsUI): the banner under the header (#sync), the header pill (#spill) and the footer line (#saved). demo: the sample household's
 // wording (DEMO, a parameter so the parity check can compare both).
 import { draw, tx, onAct } from './bridge.js';
+import { DEMO, $ } from './lib/core.js';
+import { FS } from './lib/server-sync.js';
 
 
 function Sync({ demo }) {

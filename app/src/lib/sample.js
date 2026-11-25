@@ -1,14 +1,27 @@
-// sample: moved from app/public/js/sample.js unchanged except `export`. Its top-level let/var stay there (shared state the
-// classic files reassign); everything else here reads the app's globals by name as before, and dist/sample.js puts these
-// exports on the global object (lib/sample.global.js) so the classic files and the React screens still call them by name.
-// globals: each function is on the global object before any code here runs, each const right after its line, as in a classic script.
-Object.assign(globalThis, { demoRand, sampleData, demoFetch, selfTest });
+// sample: the code of what was app/public/js/sample.js (unchanged but for imports, `export`, the shared state's setters and
+// startSample(), which holds what used to run as the file loaded).
+// Shared state (other files change it with the set… functions; it was js/sample.js):
+import { reactParity, renderBudget, renderLoans } from '../named.jsx';
+import { NTH, alertsNow, ntHide } from './alerts.js';
+import { BK, billPaid, flexAct, incGot, normT } from './bank.js';
+import { BUDV, LOOSE, ORDN, fillAvg, orderApply, orderRead, setBSCOPE, setBUDV, setORDN } from './build.js';
+import { cmpRows } from './compare.js';
+import { C, DEMO, S, SELFTEST, TK, addM, clone, editPlan, esc, f0, f2, lab, labS, plan, r2, rtText, uid, $ } from './core.js';
+import { CV, cvDate, cvDel, cvImport, cvLoadText, cvNum, cvRows } from './csv-import.js';
+import { renderAll } from './events.js';
+import { nodeKey } from './flow.js';
+import { monthSum } from './history.js';
+import { allItems, inbox, linkLoan } from './linked-loans.js';
+import { goalEta, goalMon, goalSaved, path, setLP, totals, unplannedA } from './math.js';
+import { FS } from './server-sync.js';
+import { BKP, bkList, bkRestore, healthChecks } from './settings.js';
+import { debtNow } from './wealth.js';
+export let DEMOD=null; export function setDEMOD(v){return DEMOD=v}
 /* ---------- sample household (?demo) and self-test (?selftest) ---------- */
 // ?demo opens a made-up household that lives only in this tab: demoFetch answers every api/ call in the page (budget,
 // bank status, transactions, loans, accounts), and the browser copy uses its own keys (KEY ends in _demo), so your real
 // budget and bank data are never read or written. ?selftest loads the same household and checks the math and screens.
-export const REALFETCH=window.fetch.bind(window);globalThis.REALFETCH=REALFETCH;
-if(DEMO)window.fetch=(u,o)=>demoFetch(u,o);
+export const REALFETCH=window.fetch.bind(window);
 // Small seeded random numbers, so the sample household (and the self-test's expected numbers) are the same every run.
 export function demoRand(seed){let a=seed>>>0;return()=>{a=(a+0x6D2B79F5)>>>0;let t=a;t=Math.imul(t^(t>>>15),t|1);t^=t+Math.imul(t^(t>>>7),t|61);return((t^(t>>>14))>>>0)/4294967296}}
 export function sampleData(){const R=demoRand(20261122),amt=(a,b)=>r2(a+R()*(b-a)),start=addM(TK,-6),today=new Date().toISOString().slice(0,10),tx=[];let n=0;
@@ -97,7 +110,7 @@ export async function selfTest(){const T=[],ok=(c,name,detail='')=>T.push({ok:!!
  addEventListener('error',onErr);addEventListener('unhandledrejection',onErr);
  const D=DEMOD,past=addM(TK,-1),near=(a,b)=>Math.abs(a-b)<0.01,sumTx=(k,re,acct)=>r2(D.tx.filter(t=>t.date.startsWith(k)&&re.test(t.name)&&(!acct||t.account===acct)).reduce((a,t)=>a+t.amount,0));
  // The React screens must draw what the old screens drew (app/src/parity.js): checked on the sample as loaded and again at the end.
- const parity=when=>{if(window.reactParity)reactParity().forEach(r=>ok(r.ok,r.name+' · '+when,r.detail));else ok(false,'React screens loaded')};
+ const parity=when=>{if(typeof reactParity==='function')reactParity().forEach(r=>ok(r.ok,r.name+' · '+when,r.detail));else ok(false,'React screens loaded')};
  try{parity('sample as loaded');
   ok(BK.tx.length===D.tx.length&&BK.accts.length===5,'Sample bank data loaded',`${BK.tx.length} transactions, ${BK.accts.length} accounts`);
   ok(inbox().length===0,'Every sample transaction is filed',`${inbox().length} left to review`);
@@ -169,14 +182,14 @@ export async function selfTest(){const T=[],ok=(c,name,detail='')=>T.push({ok:!!
   S.cur=TK;ok(!alertsNow().some(a=>a.key===`over:${TK}:dining`),'No over-plan alert for a line with no plan');
   // Fill in from what you usually spend: the average of the last 3 months, rounded up to $5.
   const want=Math.ceil([1,2,3].map(n=>flexAct(addM(TK,-n),'dining')||0).reduce((a,b)=>a+b,0)/3/5)*5;
-  BSCOPE='all';fillAvg(true);ok(plan(TK).groups.flatMap(g=>g.items).find(i=>i.id==='dining').amt===want,'Fill in uses the 3-month average',f0(want));
+  setBSCOPE('all');fillAvg(true);ok(plan(TK).groups.flatMap(g=>g.items).find(i=>i.id==='dining').amt===want,'Fill in uses the 3-month average',f0(want));
   // Order: move Gas out of its group, put Flex spending first, reorder its items; spending totals don't change.
   orderApply(true,['flex','food'],{[LOOSE.flex]:['gas'],flex:['flex','dining'],food:['groc']});
   const fg=plan(TK).groups.filter(g=>g.flex),fp=plan(past).groups.filter(g=>g.flex),desc=G=>G.map(g=>(g.loose?'*':'')+g.id+':'+g.items.map(i=>i.id).join('/')).join(' ');
   ok(desc(fg)==='*loose-f:gas flex:flex/dining food:groc'&&desc(fp)===desc(fg),'Items and groups reorder and move out of a group (all months)',desc(fg));
   ok(near(totals(past).flexA,T0.flexA),'Moving items keeps what was spent');
   ok(nodeKey({id:'g'+LOOSE.flex+'~gas',solo:true})==='i:gas','An item not in a group opens its own pop-up from the money flow');
-  BUDV='build';renderBudget();const ug=document.querySelector('[data-act="grpUngroup"][data-g="food"]');if(ug)ug.click();BUDV='month';
+  setBUDV('build');renderBudget();const ug=document.querySelector('[data-act="grpUngroup"][data-g="food"]');if(ug)ug.click();setBUDV('month');
   ok(plan(TK).groups.find(g=>g.loose&&g.flex).items.some(i=>i.id==='groc')&&!plan(TK).groups.some(g=>g.id==='food'),'Ungroup moves a group’s items out of it');
   renderBudget();ok([...document.querySelectorAll('#T-budget .lsec small')].some(s=>s.textContent==='Not in a group'),'The Budget page shows items not in a group');
   // Daily copies: the list loads, and restoring one reloads the budget from the server.
@@ -189,24 +202,24 @@ export async function selfTest(){const T=[],ok=(c,name,detail='')=>T.push({ok:!!
   for(const t of['budget','loans','goals','wealth','history','bank','settings']){document.querySelector(`.tabs button[data-t="${t}"]`).click();const el=document.querySelector('#T-'+t);ok(!el.hidden&&el.innerHTML.length>200,`${t[0].toUpperCase()+t.slice(1)} tab draws`,`${el.innerHTML.length} characters`);
    ['budv','sview','bview','hrng','bfilt'].forEach(a=>clickAll(`#T-${t} [data-act="${a}"]`))}
   // A loan whose payment never covers its interest: the extra payment plan says Never instead of crashing.
-  {const keep=S.loans;S.loans=[...keep,{id:'stk',name:'Stuck',apr:30,bal:100000,min:50,due:0,start:TK,color:'#abc'}];LP={};let txt='',err='';try{renderLoans();txt=$('#T-loans').textContent}catch(e){err=e.message}S.loans=keep;LP={};renderAll();
+  {const keep=S.loans;S.loans=[...keep,{id:'stk',name:'Stuck',apr:30,bal:100000,min:50,due:0,start:TK,color:'#abc'}];setLP({});let txt='',err='';try{renderLoans();txt=$('#T-loans').textContent}catch(e){err=e.message}S.loans=keep;setLP({});renderAll();
    ok(!err&&/Never/.test(txt)&&/not paid off at this rate/.test(txt),'A loan that never gets paid off shows Never in the extra payment plan',err)}
   // Build's ⋮⋮ moves a row on the page by hand, then saves and the screen re-renders in place: the lists must show the
   // saved order (the .bgrps key ORDN gives React new lists after a hand move; without it React threw here).
-  {const ob=BUDV;BUDV='build';S.tab='budget';renderAll();const G=[...document.querySelectorAll('.bgrps[data-kind=fixed]>.bgrp')];let good=false,why='fewer than 2 groups';
-   if(G.length>1){const r=G[0].querySelector('.brow[data-iid]'),box=G[1].querySelector('.bitems'),id=r.dataset.iid;ORDN++;box.insertBefore(r,box.firstChild);const o=orderRead('fixed');orderApply(false,o.gO,o.iO);
+  {const ob=BUDV;setBUDV('build');S.tab='budget';renderAll();const G=[...document.querySelectorAll('.bgrps[data-kind=fixed]>.bgrp')];let good=false,why='fewer than 2 groups';
+   if(G.length>1){const r=G[0].querySelector('.brow[data-iid]'),box=G[1].querySelector('.bitems'),id=r.dataset.iid;setORDN(ORDN+1);box.insertBefore(r,box.firstChild);const o=orderRead('fixed');orderApply(false,o.gO,o.iO);
     const P=plan(S.cur).groups.filter(g=>!g.flex).map(g=>g.items.map(i=>i.id).join(',')).join('|'),D=[...document.querySelectorAll('.bgrps[data-kind=fixed]>.bgrp')].map(g=>[...g.querySelectorAll('.brow[data-iid]')].map(x=>x.dataset.iid).join(',')).join('|');
     good=P===D&&plan(S.cur).groups.filter(g=>!g.flex)[1].items[0].id===id;why=P+' vs '+D}
-   BUDV=ob;renderAll();ok(good,'A Build row moved to another group by hand redraws in the saved order',why)}
+   setBUDV(ob);renderAll();ok(good,'A Build row moved to another group by hand redraws in the saved order',why)}
   // Tabs follow the store (app/src/tabs.jsx): a change redraws the visible tab only, a hidden one keeps what it showed
   // (as when only the visible tab was drawn), and renderX draws its tab now even while hidden.
   if(window.__drawNo){const o=[S.tab,S.cur],L=$('#T-loans');S.tab='loans';S.cur=TK;renderAll();const l0=L.textContent;
-   S.tab='history';let n=__drawNo();S.cur=addM(TK,-1);renderAll();const one=__drawNo()-n,kept=L.textContent===l0;
-   n=__drawNo();renderLoans();const byName=__drawNo()-n===1&&L.textContent!==l0&&L.hidden;S.tab=o[0];S.cur=o[1];renderAll();
+   S.tab='history';let n=window.__drawNo();S.cur=addM(TK,-1);renderAll();const one=window.__drawNo()-n,kept=L.textContent===l0;
+   n=window.__drawNo();renderLoans();const byName=window.__drawNo()-n===1&&L.textContent!==l0&&L.hidden;S.tab=o[0];S.cur=o[1];renderAll();
    ok(one===1&&kept&&byName,'Only the visible tab follows a change; a tab drawn by name draws even while hidden',`draws per change ${one}, hidden kept ${kept}, by name ${byName}`)}
   // The store (app/src/store.js): every redraw moves its version on and the page frame follows; the frame stays mounted,
   // so a focused tab button keeps focus through a redraw.
-  if(window.__store){const v0=__store.version(),o=S.cur,tb=$('.tabs [data-t="'+S.tab+'"]');S.cur=addM(TK,-1);renderAll();
+  if(window.__store){const __store=window.__store,v0=__store.version(),o=S.cur,tb=$('.tabs [data-t="'+S.tab+'"]');S.cur=addM(TK,-1);renderAll();
    const moved=__store.version()>v0&&$('#mlab').textContent===lab(S.cur)&&!$('#tbtn').hidden;tb.focus();S.cur=o;renderAll();
    ok(moved&&$('#mlab').textContent===lab(o)&&$('#tbtn').hidden===(o===TK)&&document.activeElement===tb&&tb.isConnected,'The store: a redraw moves its version on, the frame follows, and its buttons stay put (focus kept)')}
   parity('after the other checks');
@@ -216,5 +229,12 @@ export async function selfTest(){const T=[],ok=(c,name,detail='')=>T.push({ok:!!
  const bad=T.filter(t=>!t.ok);document.title=bad.length?`SELFTEST FAIL ${bad.length}`:'SELFTEST PASS';
  const box=document.createElement('section');box.className='card selftest';box.innerHTML=`<h2>${bad.length?`Self-test: ${bad.length} of ${T.length} checks failed`:`Self-test passed: ${T.length} checks`}</h2><ul>${T.map(t=>`<li class="${t.ok?'ok':'bad'}">${t.ok?'✓':'×'} ${esc(t.name)}${t.detail?` <span class="dim">· ${esc(t.detail)}</span>`:''}</li>`).join('')}</ul><pre id="selftest-result" hidden>${esc(JSON.stringify({pass:!bad.length,total:T.length,failed:bad}))}</pre>`;
  document.body.prepend(box);window.SELFTEST_RESULT={pass:!bad.length,results:T};return window.SELFTEST_RESULT}   // not window.SELFTEST: that's the flag (core)
+   // after the rest of the script has run
+
+// What this file did as it loaded (listeners, settings read from localStorage, …): main.jsx runs it in the old
+// load order, after every module is defined.
+export function startSample() {
+if(DEMO)window.fetch=(u,o)=>demoFetch(u,o);
 // Start the self-test once the sample household has loaded (server copy adopted, bank data in, filing done).
-if(SELFTEST){const t0=Date.now(),wait=()=>{if(FS.state==='ok'&&BK.accts&&BK.tx.length&&DEMOD)return setTimeout(selfTest,300);if(Date.now()-t0<15000)setTimeout(wait,100);else{document.title='SELFTEST FAIL load';document.body.insertAdjacentHTML('afterbegin','<pre id="selftest-result">{"pass":false,"failed":[{"name":"Sample household never loaded"}]}</pre>')}};setTimeout(wait,0)}   // after the rest of the script has run
+if(SELFTEST){const t0=Date.now(),wait=()=>{if(FS.state==='ok'&&BK.accts&&BK.tx.length&&DEMOD)return setTimeout(selfTest,300);if(Date.now()-t0<15000)setTimeout(wait,100);else{document.title='SELFTEST FAIL load';document.body.insertAdjacentHTML('afterbegin','<pre id="selftest-result">{"pass":false,"failed":[{"name":"Sample household never loaded"}]}</pre>')}};setTimeout(wait,0)}
+}

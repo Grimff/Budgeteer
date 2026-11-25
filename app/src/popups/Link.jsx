@@ -4,6 +4,10 @@
 // lnkRule / lnkList by name; Save and Remove link stay there too.
 import { useLayoutEffect, useState } from 'react';
 import { draw, tx } from '../bridge.js';
+import { LK, bankFrom, lnkCands, lnkMatches, lnkSibs, lnkSingle, normT, titleC } from '../lib/bank.js';
+import { S, f0, f2, $ } from '../lib/core.js';
+import { dshort, txLabel } from '../lib/linked-loans.js';
+import { lnkRule } from '../named.jsx';
 
 function LnkPick() {
   const C = lnkCands();

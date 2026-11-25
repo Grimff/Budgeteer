@@ -1,6 +1,6 @@
 // The React screens. Loaded by index.html after the other js files (which it uses by name: S, plan, f0, …) and
 // before sample.js / server-sync.js, so the app starts with these screens in place.
-import { draw, setGlobal, drawNo } from './bridge.js';
+import { draw, drawNo } from './bridge.js';
 import { redraw, drawTabR } from './tabs.jsx';
 import { addParity, addPiece, runParity, paritySnap, monthsToTry, emptyHousehold, withS, at } from './parity.js';
 import { History } from './screens/History.jsx';
@@ -21,59 +21,47 @@ import { zbarR, skTipR, skCardR } from './flow/Card.jsx';
 import { sankeyR } from './flow/Sankey.jsx';
 import { fsUIR } from './chrome.jsx';
 import { frameMount, frameUIR, brandSetR, bankBadgeR } from './frame.jsx';
+import { appNamespace } from './debug.js';
 import * as store from './store.js';
+import { NOTIFY, NTH, alertsNow, setNOTIFY, startAlerts } from './lib/alerts.js';
+import { BK, CR, CT, FLQ, LK, PSET, RECF, acctType, lnkCands, lnkOpen, recurring, rulesFor, setCR, setCT, setFLQ, setLK, setRECF, startBank, txPairs } from './lib/bank.js';
+import { FDK, FR, WFS, setFDK, setFR, setWFS, startBudget } from './lib/budget.js';
+import { ALE, BSCOPE, BUDV, ensureLoose, setALE, setBSCOPE, setBUDV, startBuild } from './lib/build.js';
+import { FD, setFD, startCompare } from './lib/compare.js';
+import { DEMO, NOW, S, TK, addM, clone, plan, startCore, $ } from './lib/core.js';
+import { CV, cvLoadText, setCV, startCsvImport } from './lib/csv-import.js';
+import { renderAll, startEvents } from './lib/events.js';
+import { K, Z, depDialog, payDialog, setSEL, setZ, startFlow, SEL } from './lib/flow.js';
+import { startGoalAccounts } from './lib/goal-accounts.js';
+import { GR, setGR, startGoals } from './lib/goals.js';
+import { HR, startHistory, setHR } from './lib/history.js';
+import { BV, FLF, FLKIND, FLN, allItems, openBal, setBV, setFLF, setFLN, spLeft, startLinkedLoans } from './lib/linked-loans.js';
+import { LR, PS, PX, setLR, setPS, setPX, startLoans } from './lib/loans.js';
+import { BCL, OPEN, WI, loanGone, startMath } from './lib/math.js';
+import { startSample } from './lib/sample.js';
+import { FS, SRV, setSRV, startServerSync } from './lib/server-sync.js';
+import { BKP, RQ, SV, setBKP, setRQ, setSV, startSettings } from './lib/settings.js';
+import { RANGES, WR, setWR, startWealth, ymd } from './lib/wealth.js';
+import { compareView, dprev, fsUI, openD, pxLive, renderLoans, skCard, skTip, spAddPart, spForm, wiLive, zbar } from './named.jsx';
 
-// The page frame first: the scripts after this one (sample.js, server-sync.js) and every screen draw into it.
+// What each file did as it loaded, in the old load order (every module is defined by now): core … csv-import, then the
+// React frame and this file's own setup, then (at the end of this file) sample and server-sync, which starts the app.
+startCore(); startMath(); startBudget(); startLoans(); startGoals(); startHistory(); startFlow(); startEvents(); startBank(); startBuild(); startGoalAccounts(); startCompare(); startSettings(); startWealth(); startLinkedLoans(); startAlerts(); startCsvImport();
+
+// The page frame first: sample.js, server-sync.js and every screen draw into it.
 frameMount();
-if (DEMO) { window.__store = store; window.__drawNo = drawNo; window.__paritySnap = paritySnap; }   // the self-test's store and tab checks; snapshots
+if (DEMO) { window.__store = store; window.__drawNo = drawNo; window.__paritySnap = paritySnap; window.__app = appNamespace(); }   // self-test hooks; snapshots; __app (debug.js)
 
-// The tab screens are subscribed roots (tabs.jsx): renderAll's tab step only mounts a tab that has no root yet, and
-// renderX by name redraws that tab now.
-setGlobal('drawTab', drawTabR);
-setGlobal('renderHistory', () => redraw('history'));
-// Budget: This month is React; Build budget and Forecast are still drawn by renderBuild / renderForecast. The
-// money-flow chart is drawn into #sk by sankey() afterwards, as before.
-setGlobal('renderBudget', () => redraw('budget'));   // the view BUDV says; This month then sankey()
-// Forecast: the frame, then the body into #fcb (the what-if sliders, range and month buttons redraw only the body);
-// FSC: scroll the open schedule editor or the month detail into view after adding/opening.
-setGlobal('fcBody', () => { const el = $('#fcb'); if (!el) return; draw(el, <FcBody />); if (FSC) { FSC = false; const t = $('.fcle') || ($('.fcd') && FDK ? $('.fcd') : null); if (t) t.scrollIntoView({ block: 'nearest', behavior: RM ? 'auto' : 'smooth' }); } });
-// Pop-ups (phase 2): drawn into the parts of their dialogs in index.html.
-setGlobal('catRender', catRenderR);
-setGlobal('flowRender', flowRenderR);
-setGlobal('lnkList', lnkListR);
-setGlobal('lnkRule', lnkRuleR);
-setGlobal('openD', openDR);
-setGlobal('dprev', dprevR);
-setGlobal('spForm', spFormR);
-setGlobal('spAddPart', spAddPartR);
-setGlobal('compareView', compareViewR);
-setGlobal('zbar', zbarR);
-setGlobal('skTip', skTipR);
-setGlobal('skCard', skCardR);
-setGlobal('sankey', sankeyR);
-setGlobal('bankBadge', bankBadgeR);
-setGlobal('frameUI', frameUIR);
-setGlobal('brandSet', brandSetR);
-setGlobal('fsUI', fsUIR);
-setGlobal('renderBuild', () => redraw('budget', 'build'));
-setGlobal('renderForecast', () => redraw('budget', 'fc'));   // then fcBody()
-window.wfLive = wfLiveR;
-// bankBadge (the count on the Bank tab) ran at the end of the old renderBank once the bank was set up.
-setGlobal('renderBank', () => redraw('bank'));   // then bankBadge() when the bank is set up
-setGlobal('renderSettings', () => redraw('settings'));
-setGlobal('rulesFilter', rulesFilterR);
-setGlobal('renderLoans', () => redraw('loans'));
-setGlobal('pxLive', pxLiveR);
-setGlobal('wiLive', wiLiveR);
-setGlobal('renderGoals', () => redraw('goals'));
-setGlobal('renderWealth', () => redraw('wealth'));
+   // the view BUDV says; This month then sankey()
+   // then fcBody()
+   // then bankBadge() when the bank is set up
 
 // Parity cases: the same data drawn both ways (self-test only).
-const setHR = v => { const o = HR; HR = v; return () => { HR = o; }; };
+const hrCase = v => { const o = HR; setHR(v); return () => { setHR(o); }; };
 addParity({
   name: 'History', fn: 'renderHistory', el: '#T-history', live: true, cases: () => {
     const c = [];
-    for (const k of monthsToTry()) for (const r of ['6', '12', 'all']) c.push({ label: `${k} ${r}`, set: () => at(k, () => setHR(r)) });
+    for (const k of monthsToTry()) for (const r of ['6', '12', 'all']) c.push({ label: `${k} ${r}`, set: () => at(k, () => hrCase(r)) });
     c.push({ label: 'folds open', set: () => { OPEN.add('h-' + addM(TK, -1)); OPEN.add('h-' + addM(TK, -2)); return () => { OPEN.delete('h-' + addM(TK, -1)); OPEN.delete('h-' + addM(TK, -2)); }; } });
     c.push({ label: 'history start set', set: () => { const o = S.histFrom; S.histFrom = addM(TK, -2); return () => { S.histFrom = o; }; } });
     c.push({ label: 'empty household', set: () => withS(emptyHousehold()) });
@@ -89,8 +77,8 @@ addParity({
   name: 'Wealth', fn: 'renderWealth', el: '#T-wealth', live: true, cases: () => {
     const c = [], ks = monthsToTry();
     for (const k of ks) c.push({ label: k, set: () => at(k) });
-    for (const r of RANGES.map(x => x[0])) for (const k of [addM(TK, -1), TK, addM(TK, 1)]) c.push({ label: `${k} ${r}`, set: () => at(k, () => { const o = WR; WR = r; return () => { WR = o; }; }) });
-    c.push({ label: 'server unreachable', set: () => { const o = SRV; SRV = false; return () => { SRV = o; }; } });
+    for (const r of RANGES.map(x => x[0])) for (const k of [addM(TK, -1), TK, addM(TK, 1)]) c.push({ label: `${k} ${r}`, set: () => at(k, () => { const o = WR; setWR(r); return () => { setWR(o); }; }) });
+    c.push({ label: 'server unreachable', set: () => { const o = SRV; setSRV(false); return () => { setSRV(o); }; } });
     c.push({ label: 'loading', set: () => swap(BK, 'accts', null) });
     c.push({ label: 'bank error', set: () => both(swap(BK, 'accts', null), swap(BK, 'err', 'Couldn’t reach the bank service on the server.')) });
     c.push({ label: 'no keys', set: () => swap(BK, 'st', { ...BK.st, configured: false }) });
@@ -115,7 +103,7 @@ addParity({
   name: 'Goals', fn: 'renderGoals', el: '#T-goals', live: true, cases: () => {
     const c = [];
     for (const k of monthsToTry()) c.push({ label: k, set: () => at(k) });
-    for (const r of ['1y', '2y', '5y', 'all']) for (const k of [TK, addM(TK, 2)]) c.push({ label: `${k} ${r}`, set: () => at(k, () => { const o = GR; GR = r; return () => { GR = o; }; }) });
+    for (const r of ['1y', '2y', '5y', 'all']) for (const k of [TK, addM(TK, 2)]) c.push({ label: `${k} ${r}`, set: () => at(k, () => { const o = GR; setGR(r); return () => { setGR(o); }; }) });
     const shut = v => () => { const had = BCL.has('galloc'), had2 = BCL.has('!galloc'); BCL.delete('galloc'); BCL.delete('!galloc'); BCL.add(v ? 'galloc' : '!galloc'); return () => { BCL.delete('galloc'); BCL.delete('!galloc'); if (had) BCL.add('galloc'); if (had2) BCL.add('!galloc'); }; };
     c.push({ label: 'accounts card open', set: shut(false) });
     c.push({ label: 'accounts card shut', set: shut(true) });
@@ -126,7 +114,7 @@ addParity({
     }
     c.push({ label: 'split over 100%', set: () => both(shut(false)(), tweak(s => { const A = goalAccts(); s.alloc = {}; A.forEach(a => { s.alloc[a.id] = { mode: 'split', goals: s.goals.map(g => g.id), pct: Object.fromEntries(s.goals.map(g => [g.id, 75])) }; }); })()) });
     c.push({ label: 'one-month override', set: () => both(tweak(s => { const k = addM(TK, 1), m = s.months[k] || (s.months[k] = { act: {}, pay: {}, dep: {} }); m.gplan = {}; s.goals.forEach(g => { m.gplan[g.id] = 77; }); })(), at(addM(TK, 1))) });
-    c.push({ label: 'server unreachable', set: () => { const o = SRV; SRV = false; return () => { SRV = o; }; } });
+    c.push({ label: 'server unreachable', set: () => { const o = SRV; setSRV(false); return () => { setSRV(o); }; } });
     c.push({ label: 'bank loading', set: () => swap(BK, 'accts', null) });
     c.push({ label: 'no goals', set: tweak(s => { s.goals = []; s.alloc = {}; }) });
     c.push({ label: 'empty household', set: () => withS(emptyHousehold()) });
@@ -139,9 +127,9 @@ addParity({
     const shutK = (key, v) => () => { const a = BCL.has(key), b = BCL.has('!' + key); BCL.delete(key); BCL.delete('!' + key); BCL.add(v ? key : '!' + key); return () => { BCL.delete(key); BCL.delete('!' + key); if (a) BCL.add(key); if (b) BCL.add('!' + key); }; };
     const folds = () => { const L = ids(); L.forEach(i => OPEN.add(i)); return () => L.forEach(i => OPEN.delete(i)); };
     for (const k of monthsToTry()) c.push({ label: k, set: () => at(k, folds) });
-    for (const r of RANGES.map(x => x[0])) for (const k of [addM(TK, -3), TK, addM(TK, 2)]) c.push({ label: `${k} ${r}`, set: () => at(k, () => { const o = LR; LR = r; return () => { LR = o; }; }) });
-    c.push({ label: 'what-if moved, plan typed, smallest first', set: () => { const w = { ...WI }, o = [PX, PS]; S.loans.forEach(l => { WI[l.id] = 45; }); PX = 150; PS = 'bal'; const u = folds(); return () => { u(); Object.keys(WI).forEach(k => delete WI[k]); Object.assign(WI, w); [PX, PS] = o; }; } });
-    c.push({ label: 'plan typed 0', set: () => { const o = PX; PX = 0; return () => { PX = o; }; } });
+    for (const r of RANGES.map(x => x[0])) for (const k of [addM(TK, -3), TK, addM(TK, 2)]) c.push({ label: `${k} ${r}`, set: () => at(k, () => { const o = LR; setLR(r); return () => { setLR(o); }; }) });
+    c.push({ label: 'what-if moved, plan typed, smallest first', set: () => { const w = { ...WI }, o = [PX, PS]; S.loans.forEach(l => { WI[l.id] = 45; }); setPX(150); setPS('bal'); const u = folds(); return () => { u(); Object.keys(WI).forEach(k => delete WI[k]); Object.assign(WI, w); setPX(o[0]); setPS(o[1]); }; } });
+    c.push({ label: 'plan typed 0', set: () => { const o = PX; setPX(0); return () => { setPX(o); }; } });
     c.push({ label: 'lenders card open', set: shutK('lsetup', false) });
     c.push({ label: 'a linked loan', set: () => both(linkOne(), folds()) });
     c.push({ label: 'a linked loan, payments from your bank', set: () => both(linkOne(), tweak(s => { s.loans.forEach(l => { if (l.acct) l.paySrc = 'bank'; }); })(), folds()) });
@@ -153,7 +141,7 @@ addParity({
     c.push({ label: 'a loan paid off, paid-off card open', set: () => both(shutK('lpaid', false)(), tweak(s => { s.loans.push({ id: 'done1', name: 'Old card', apr: 20, bal: 300, min: 100, due: 5, start: addM(TK, -10), color: '#fff' }); })()) });
     c.push({ label: 'every loan paid off', set: tweak(s => { s.loans = [{ id: 'done1', name: 'Old card', apr: 20, bal: 300, min: 100, due: 5, start: addM(TK, -10), color: '#fff' }]; s.al = []; }) });
     c.push({ label: 'never paid off', set: tweak(s => { s.loans.push({ id: 'big1', name: 'Huge', apr: 30, bal: 100000, min: 50, due: 0, start: TK, color: '#abc' }); }) });
-    c.push({ label: 'never paid off, plan pays it', set: () => both(tweak(s => { s.loans.push({ id: 'big2', name: 'Big', apr: 20, bal: 5000, min: 50, due: 0, start: TK, color: '#abc' }); })(), (() => { const o = PX; PX = 500; return () => { PX = o; }; })()) });
+    c.push({ label: 'never paid off, plan pays it', set: () => both(tweak(s => { s.loans.push({ id: 'big2', name: 'Big', apr: 20, bal: 5000, min: 50, due: 0, start: TK, color: '#abc' }); })(), (() => { const o = PX; setPX(500); return () => { setPX(o); }; })()) });
     c.push({ label: 'starts later', set: () => both(folds(), tweak(s => { s.loans.push({ id: 'late1', name: 'Later', apr: 4, bal: 2000, min: 100, due: 1, start: addM(TK, 3), color: '#abc' }); })()) });
     const linkedIds = () => new Set(S.loans.map(l => l.acct).filter(Boolean));
     // a loan linked to the sample's student-loan account, as Track does (linkLoan)
@@ -163,15 +151,15 @@ addParity({
     c.push({ label: 'lender connected twice', set: () => both(linkOne(), shutK('lsetup', false)(), swap(BK, 'loans', [...(BK.loans || []), ...(BK.loans || []).filter(a => linkedIds().has(a.id)).map(a => ({ ...a, id: a.id + '-again' }))])) });
     for (const k of [addM(TK, -1), TK]) c.push({ label: k + ' linked payment not seen', set: () => both(folds(), tweak(s => { s.loans.push({ id: 'hand1', name: 'Hand loan', apr: 7, bal: 4000, min: 150, due: 1, start: addM(TK, -3), color: '#abc' }); s.rules = [...(s.rules || []), { id: 'rhand', p: 'HAND LENDER PAYMENT', dir: 'out', v: 'l:hand1' }]; })(), at(k)) });
     c.push({ label: 'loans from before tracking', set: tweak(s => { s.loans.forEach(l => { l.orig = l.bal * 1.4; l.origStart = addM(l.start, -24); }); }) });
-    c.push({ label: 'server unreachable', set: () => { const o = SRV; SRV = false; return () => { SRV = o; }; } });
+    c.push({ label: 'server unreachable', set: () => { const o = SRV; setSRV(false); return () => { setSRV(o); }; } });
     c.push({ label: 'no bank loans data', set: () => swap(BK, 'loans', null) });
     c.push({ label: 'empty household', set: () => withS(emptyHousehold()) });
     return c;
   },
 });
 const setVar = (get, set) => v => () => { const o = get(); set(v); return () => set(o); };
-const sv = setVar(() => SV, v => { SV = v; }), rq = setVar(() => RQ, v => { RQ = v; }), bkp = setVar(() => BKP, v => { BKP = v; }), nt = setVar(() => NOTIFY, v => { NOTIFY = v; });
-const cvSet = (text, more) => () => { const o = CV; CV = {}; cvLoadText(text, 'my bank & co.csv'); if (more) Object.assign(CV, more); return () => { CV = o; }; };
+const sv = setVar(() => SV, v => { setSV(v); }), rq = setVar(() => RQ, v => { setRQ(v); }), bkp = setVar(() => BKP, v => { setBKP(v); }), nt = setVar(() => NOTIFY, v => { setNOTIFY(v); });
+const cvSet = (text, more) => () => { const o = CV; setCV({}); cvLoadText(text, 'my bank & co.csv'); if (more) Object.assign(CV, more); return () => { setCV(o); }; };
 const CSV = 'Date,Description,Amount,Credit\n01/05/2026,COFFEE & CO,-4.50,\n01/06/2026,PAYROLL,,1200.00\n13/45/2026,BAD DATE,-1,\n01/07/2026,ZERO,0,\n';
 addParity({
   name: 'Settings', fn: 'renderSettings', el: '#T-settings', live: true, cases: () => {
@@ -204,7 +192,7 @@ addParity({
     c.push({ label: 'household named, catch-all set', set: () => both(sv('general')(), tweak(s => { s.hh = { name: 'The <Smiths> & co', sub: '' }; const g = plan().groups.find(g => g.items.length); if (g) s.catchAll = g.items[0].id; })()) });
     c.push({ label: 'catch-all to review', set: () => both(sv('general')(), tweak(s => { s.catchAll = 'review'; })()) });
     c.push({ label: 'catch-all removed item', set: () => both(sv('general')(), tweak(s => { s.catchAll = 'gone'; })()) });
-    for (const v of ['general', 'rules', 'connections', 'data']) c.push({ label: v + ' server unreachable', set: () => both(sv(v)(), (() => { const o = SRV; SRV = false; return () => { SRV = o; }; })()) });
+    for (const v of ['general', 'rules', 'connections', 'data']) c.push({ label: v + ' server unreachable', set: () => both(sv(v)(), (() => { const o = SRV; setSRV(false); return () => { setSRV(o); }; })()) });
     c.push({ label: 'connections loading', set: () => both(sv('connections')(), swap(BK, 'st', null)) });
     c.push({ label: 'connections error', set: () => both(sv('connections')(), swap(BK, 'st', null), swap(BK, 'err', 'Couldn’t reach the bank service on the server.')) });
     c.push({ label: 'connections no keys', set: () => both(sv('connections')(), swap(BK, 'st', { ...BK.st, configured: false })) });
@@ -228,7 +216,7 @@ addPiece({
   name: 'Phone alerts card', node: () => <NtCard demo={false} />,
   cases: () => [null, { configured: false }, { configured: true, target: 'ntfy.sh/our-topic & <x>' }, { configured: true }].map(n => ({ label: JSON.stringify(n), set: nt(n) })),
 });
-const bv = setVar(() => BV, v => { BV = v; }), flf = setVar(() => FLF, v => { FLF = v; }), flq = setVar(() => FLQ, v => { FLQ = v; }), fln = setVar(() => FLN, v => { FLN = v; });
+const bv = setVar(() => BV, v => { setBV(v); }), flf = setVar(() => FLF, v => { setFLF(v); }), flq = setVar(() => FLQ, v => { setFLQ(v); }), fln = setVar(() => FLN, v => { setFLN(v); });
 // Some transactions back in To review (unfiled), some pending, some moved to another month.
 const unfile = n => tweak(s => { Object.keys(s.txd || {}).filter(id => !s.txd[id].sp && s.txd[id].v !== 'split').slice(0, n).forEach(id => delete s.txd[id]); });
 addParity({
@@ -250,12 +238,12 @@ addParity({
     c.push({ label: 'no keys', set: () => swap(BK, 'st', { ...BK.st, configured: false }) });
     c.push({ label: 'loading', set: () => swap(BK, 'st', null) });
     c.push({ label: 'bank error', set: () => both(swap(BK, 'st', null), swap(BK, 'err', 'Couldn’t reach the bank service on the server.')) });
-    c.push({ label: 'server unreachable', set: () => { const o = SRV; SRV = false; return () => { SRV = o; }; } });
+    c.push({ label: 'server unreachable', set: () => { const o = SRV; setSRV(false); return () => { setSRV(o); }; } });
     c.push({ label: 'empty household', set: () => withS(emptyHousehold()) });
     return c;
   },
 });
-const budv = setVar(() => BUDV, v => { BUDV = v; }), flow = setVar(() => S.flow, v => { S.flow = v; });
+const budv = setVar(() => BUDV, v => { setBUDV(v); }), flow = setVar(() => S.flow, v => { S.flow = v; });
 addParity({
   name: 'Budget (This month)', fn: 'renderBudget', el: '#T-budget', live: true, cases: () => {
     const c = [];
@@ -279,8 +267,8 @@ addParity({
     c.push({ label: 'pending payments, hand purchases', set: () => both(tweak(s => { const m = s.months[TK] || (s.months[TK] = { act: {}, pay: {}, dep: {} }); const it = plan(TK).groups.find(g => g.flex); m.rc = [{ id: 'rc1', store: 'Corner & <shop>', amt: 12.5, item: it && it.items[0] && it.items[0].id, date: TK + '-05' }, { id: 'rc2', amt: 3, item: 'gone' }, { id: 'rc3', store: 'Bank one', amt: 9, bank: true }]; })(), (() => { const ids = Object.keys(S.txd || {}).filter(id => S.txd[id].k === TK); ids.forEach(i => PSET.add(i)); OPEN.add('rcl'); return () => { ids.forEach(i => PSET.delete(i)); OPEN.delete('rcl'); }; })()) });
     c.push({ label: 'linked loan', set: () => (tweak(s => { const a = (BK.loans || []).find(x => x.type === 'loan'); if (a) s.loans.push({ id: 'lk1', name: 'Linked loan', apr: 5, bal: openBal(a), min: 200, due: 10, start: TK, color: '#8fc9ff', acct: a.id, anch: { k: TK, eob: openBal(a) } }); s.loans.push({ id: 'h2', name: 'Hand & loan', apr: 3, bal: 900, min: 100, due: 0, start: addM(TK, -2), color: '#abc' }); }))() });
     c.push({ label: 'hand loan with a late linked payment', set: tweak(s => { s.loans.push({ id: 'h3', name: 'Late loan', apr: 4, bal: 2000, min: 150, due: 1, start: addM(TK, -2), color: '#abc' }); s.rules = [...(s.rules || []), { id: 'rh3', p: 'LATE LENDER PAY', dir: 'out', v: 'l:h3' }]; }) });
-    c.push({ label: 'no bank (inputs)', set: () => { const o = SRV; SRV = false; return () => { SRV = o; }; } });
-    c.push({ label: 'no bank, last month', set: () => both((() => { const o = SRV; SRV = false; return () => { SRV = o; }; })(), at(addM(TK, -1))) });
+    c.push({ label: 'no bank (inputs)', set: () => { const o = SRV; setSRV(false); return () => { setSRV(o); }; } });
+    c.push({ label: 'no bank, last month', set: () => both((() => { const o = SRV; setSRV(false); return () => { setSRV(o); }; })(), at(addM(TK, -1))) });
     c.push({ label: 'empty household', set: () => withS(emptyHousehold()) });
     c.push({ label: 'empty household, future', set: () => both(withS(emptyHousehold()), at(addM(TK, 2))) });
     return c;
@@ -291,7 +279,7 @@ addPiece({
   name: 'Purchases list', node: () => <RcList m={{ rc: [{ id: 'a', store: 'Shop & <co>', amt: 12.5, item: (allItems(S.cur)[0] || { i: {} }).i.id, date: S.cur + '-03' }, { id: 'b', amt: 4, item: 'gone', bank: true, txid: 'p1' }, { id: 'c', store: 'X', amt: 1, bank: true, txid: 'p2', date: S.cur + '-09' }] }} />,
   cases: () => [{ label: 'closed' }, { label: 'open, one pending', set: () => { OPEN.add('rcl'); PSET.add('p1'); return () => { OPEN.delete('rcl'); PSET.delete('p1'); }; } }],
 });
-const fr = setVar(() => FR, v => { FR = v; }), wfs = setVar(() => WFS, v => { WFS = v; }), ale = setVar(() => ALE, v => { ALE = v; }), fdk = setVar(() => FDK, v => { FDK = v; });
+const fr = setVar(() => FR, v => { setFR(v); }), wfs = setVar(() => WFS, v => { setWFS(v); }), ale = setVar(() => ALE, v => { setALE(v); }), fdk = setVar(() => FDK, v => { setFDK(v); });
 // A schedule with every kind of item: set amounts, left-over shares, a snowball on some loans, kept, a stop month.
 const sched = tweak(s => { const g = s.goals, l = s.loans.filter(x => !loanGone(x, TK)); s.al = [
   ...g.map((x, i) => ({ id: 'sg' + i, to: 'g:' + x.id, src: 'plan', mode: '$', v: 150 + i * 50, from: TK, until: i ? addM(TK, 9) : '', loans: [] })),
@@ -317,7 +305,7 @@ addParity({
     return c;
   },
 });
-const bscope = setVar(() => BSCOPE, v => { BSCOPE = v; });
+const bscope = setVar(() => BSCOPE, v => { setBSCOPE(v); });
 const steps = shut => () => { const K = ['b1', 'b2', 'b3', 'b4', 'b5', 'b6', 'bx'], had = K.map(k => [BCL.has(k), BCL.has('!' + k)]); K.forEach(k => { BCL.delete(k); BCL.delete('!' + k); BCL.add(shut ? k : '!' + k); }); return () => K.forEach((k, i) => { BCL.delete(k); BCL.delete('!' + k); if (had[i][0]) BCL.add(k); if (had[i][1]) BCL.add('!' + k); }); };
 addParity({
   name: 'Budget (Build)', fn: 'renderBuild', el: '#T-budget', live: true, cases: () => {
@@ -336,18 +324,18 @@ addParity({
       Object.values(s.plans).forEach(p => { const g = p.groups.find(g => !g.flex && !g.loose); if (g) g.items.push({ id: 'lateb', name: 'Late bill', amt: 60, due: 1 }); p.groups.push({ id: 'subs', name: 'Subscriptions', color: '#abc', flex: false, items: [] }); p.income.forEach(i => { i.amt = (+i.amt || 0) * 3; }); });
       s.rules = [...(s.rules || []), { id: 'rlate', p: 'LATE BILL CO', dir: 'out', v: 'i:lateb' }]; s.bankFrom = '2020-01-01'; s.notBill = {}; })()) });
     // suggestions as recurring() finds them (the sample files everything, so it finds none on its own)
-    const fakeRec = () => { const o = window.recurring; window.recurring = () => [{ p: 'streamco', label: 'StreamCo & <Plus>', amt: 15.99, day: 3, months: 4 }, { p: 'gymx', label: 'Gym X', amt: 40, day: 21, months: 6 }]; return () => { window.recurring = o; }; };
+    const fakeRec = () => { const o = RECF; setRECF(() => [{ p: 'streamco', label: 'StreamCo & <Plus>', amt: 15.99, day: 3, months: 4 }, { p: 'gymx', label: 'Gym X', amt: 40, day: 21, months: 6 }]); return () => { setRECF(o); }; };
     c.push({ label: 'bill suggestions, subscriptions group', set: () => both(steps(false)(), fakeRec(), tweak(s => { Object.values(s.plans).forEach(p => p.groups.push({ id: 'subs', name: 'Subscriptions', color: '#abc', flex: false, items: [] })); s.notBill = { old: 1 }; })()) });
     c.push({ label: 'bill suggestions, no subscriptions group', set: () => both(steps(false)(), fakeRec()) });
     c.push({ label: 'next month', set: () => both(steps(false)(), at(addM(TK, 1))) });
-    c.push({ label: 'no bank', set: () => both(steps(false)(), (() => { const o = SRV; SRV = false; return () => { SRV = o; }; })()) });
+    c.push({ label: 'no bank', set: () => both(steps(false)(), (() => { const o = SRV; setSRV(false); return () => { setSRV(o); }; })()) });
     c.push({ label: 'empty household', set: () => both(steps(false)(), withS(emptyHousehold())) });
     return c;
   },
 });
 // Every line the pop-up can open: income, bills and spending, loans, goals (and groups for the trends dialog).
 const allLines = (k = S.cur) => [...plan(k).income.map(i => 'inc:' + i.id), ...plan(k).groups.flatMap(g => g.items.map(i => 'i:' + i.id)), ...S.loans.map(l => 'l:' + l.id), ...S.goals.map(g => 'g:' + g.id)];
-const ct = setVar(() => CT, v => { CT = v; }), cr = setVar(() => CR, v => { CR = v; }), fd = setVar(() => FD, v => { FD = v; });
+const ct = setVar(() => CT, v => { setCT(v); }), cr = setVar(() => CR, v => { setCR(v); }), fd = setVar(() => FD, v => { setFD(v); });
 const tdq = v => () => { const e = $('#tdq'), o = e.value; e.value = v; return () => { e.value = o; }; };
 addParity({
   name: 'Line pop-up', fn: 'catRender', el: '#tdlg form', dialog: '#tdlg', cases: () => {
@@ -376,7 +364,7 @@ addParity({
 });
 // The link dialog for every kind of line, as lnkOpen leaves it (showModal skipped: parity opens it), then with the
 // candidate ticks, text, amount and search changed the way its own listeners change LK.
-const lkOpen = (kind, id, fn) => () => { const d = $('#ldlg'), o = LK, q = $('#lq').value; d.showModal = () => {}; try { lnkOpen(kind, id); } finally { delete d.showModal; } if (LK && fn) fn(LK); return () => { LK = o; $('#lq').value = q; }; };
+const lkOpen = (kind, id, fn) => () => { const d = $('#ldlg'), o = LK, q = $('#lq').value; d.showModal = () => {}; try { lnkOpen(kind, id); } finally { delete d.showModal; } if (LK && fn) fn(LK); return () => { setLK(o); $('#lq').value = q; }; };
 const lkLines = () => { const p = plan(), C = []; p.income.forEach(i => C.push(['inc', i.id])); p.groups.forEach(g => g.items.forEach(i => C.push([g.flex ? 'flex' : 'bill', i.id]))); S.loans.forEach(l => C.push(['loan', l.id])); S.goals.forEach(g => C.push(['goal', g.id])); return C; };
 const lkTick = n => L => { const C = lnkCands(); L.sels = C.slice(0, n).map(g => g.p); L.sibOn = false; if (L.sels.length === 1) { const s = L.sels[0]; L.pat = s; L.ref = L.refs[s] || 0; L.amtOn = !!L.wide[s]; } else { L.pat = ''; L.amtOn = false; L.ref = 0; } };
 addParity({
@@ -464,8 +452,8 @@ addParity({
 // future month, and over budget. sankey (still the old one) fills K first; the Budget tab is shown so #sk exists.
 const skSet = (flow, k, tw) => () => {
   const o = { tab: S.tab, budv: BUDV, flow: S.flow }, u = [tw ? tw() : null, at(k)];
-  S.tab = 'budget'; BUDV = 'month'; S.flow = flow; renderAll();
-  return () => { u.reverse().forEach(f => f && f()); S.tab = o.tab; BUDV = o.budv; S.flow = o.flow; };
+  S.tab = 'budget'; setBUDV('month'); S.flow = flow; renderAll();
+  return () => { u.reverse().forEach(f => f && f()); S.tab = o.tab; setBUDV(o.budv); S.flow = o.flow; };
 };
 const skViews = () => [['plan', TK], ['actual', TK], ['actual', addM(TK, -1)], ['plan', addM(TK, 2)], ['plan', TK, tweak(s => { Object.values(s.plans).forEach(p => p.income.forEach(i => { i.amt = 100; })); })]];
 const ev = { clientX: 200, clientY: 200 };
@@ -500,7 +488,7 @@ addParity({
     for (const k of monthsToTry()) for (const f of ['plan', 'actual', 'compare']) c.push({ label: `${f} ${k}`, set: skSet(f, k) });
     for (const [f, k, tw] of skViews().slice(4)) c.push({ label: 'over budget ' + f, set: skSet(f, k, tw) });
     c.push({ label: 'odd names, loose items', set: skSet('plan', TK, tweak(s => { Object.values(s.plans).forEach(p => { p.income.forEach(i => { i.name += ' & <i>'; }); p.groups.forEach((g, n) => { g.name = '"' + g.name + '" <g>'; if (n === 1) { g.loose = true; } }); }); })) });
-    c.push({ label: 'zoomed in', set: () => { const u = skSet('plan', TK)(), o = { Z, SEL }; Z = { ...Z, x: 120.5, y: 40, w: Z.w / 2, h: Z.h / 2 }; SEL = K.all.find(n => n.ci === 2).id; return () => { Z = o.Z; SEL = o.SEL; u(); }; } });
+    c.push({ label: 'zoomed in', set: () => { const u = skSet('plan', TK)(), o = { Z, SEL }; setZ({ ...Z, x: 120.5, y: 40, w: Z.w / 2, h: Z.h / 2 }); setSEL(K.all.find(n => n.ci === 2).id); return () => { setZ(o.Z); setSEL(o.SEL); u(); }; } });
     // $10 over budget: income cut by what was left plus $10
     const by10 = () => { const u = skSet('plan', TK)(), d = K.I - K.O; u(); return tweak(s => { Object.values(s.plans).forEach(p => { if (p.income[0]) p.income[0].amt = (+p.income[0].amt || 0) - d - 10; }); })(); };
     c.push({ label: '$10 over budget', set: skSet('plan', TK, by10) });
@@ -523,9 +511,9 @@ addParity({
   // Each case draws the tab with other values, then does what the px / wi input handler does on that side: old =
   // PX/WI, the #wo- text and the old pxLive/wiLive writing into the page; new = PX/WI and the tick (wiLive draws #wo-).
   name: 'Loans live text', fn: 'pxLive', el: '#T-loans', cases: () => {
-    const c = [], pv = (x, s) => () => { const o = [PX, PS]; PX = x; PS = s; return () => { PX = o[0]; PS = o[1]; }; };
+    const c = [], pv = (x, s) => () => { const o = [PX, PS]; setPX(x); setPS(s); return () => { setPX(o[0]); setPS(o[1]); }; };
     const keepWI = () => { const o = { ...WI }; return () => { for (const k of Object.keys(WI)) delete WI[k]; Object.assign(WI, o); }; };
-    const px = () => { const x = PX; PX = x === 0 ? 50 : 0; renderLoans(); PX = x; pxLive(); };
+    const px = () => { const x = PX; setPX(x === 0 ? 50 : 0); renderLoans(); setPX(x); pxLive(); };
     const wi = (l, w) => { const i = $('#wi-' + l.id); if (!i) return; i.value = w; WI[l.id] = +i.value; wiLive(l, +i.value); };
     const wis = (ls, w) => { ls.forEach(l => { WI[l.id] = 0; }); renderLoans(); ls.forEach(l => wi(l, w)); };
     for (const x of [0, 25, 300, 5000, null]) for (const s of ['rate', 'bal']) c.push({ label: `plan ${x} ${s}`, set: () => both(loansTab(), pv(x, s)()), call: px });
@@ -534,4 +522,6 @@ addParity({
     return c;
   },
 });
-window.reactParity = runParity;
+
+// Last, as their files loaded last: the sample household (sample mode) and the server sync, which starts the app.
+startSample(); startServerSync();

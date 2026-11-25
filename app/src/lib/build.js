@@ -1,15 +1,23 @@
-// build: moved from app/public/js/build.js unchanged except `export`. Its top-level let/var stay there (shared state the
-// classic files reassign); everything else here reads the app's globals by name as before, and dist/build.js puts these
-// exports on the global object (lib/build.global.js) so the classic files and the React screens still call them by name.
-// globals: each function is on the global object before any code here runs, each const right after its line, as in a classic script.
-Object.assign(globalThis, { budStart, firstMonth, pastGaps, fillPast, recurringIn, recInAdd, topStores, topFile, ensureLoose, usualAmt, fillAvg, orderApply, orderRead, dragEnd });
+// build: the code of what was app/public/js/build.js (unchanged but for imports, `export`, the shared state's setters and
+// startBuild(), which holds what used to run as the file loaded).
+// Shared state (other files change it with the set… functions; it was js/build.js):
+import { renderBuild } from '../named.jsx';
+import { BK, acctType, addRule, autoFile, bankFrom, billPaid, flexAct, lnkSibsFor, merchKey, merchKeys, normT, ruleFor, setTXI, titleC } from './bank.js';
+import { C, S, TK, addM, basePlan, clone, editPlan, f0, labS, plan, r2, uid } from './core.js';
+import { commit } from './events.js';
+import { histMonths } from './history.js';
+import { txLabel, txTargets, txUndo } from './linked-loans.js';
+import { hasPlan, setLP, toast } from './math.js';
+import { SRV } from './server-sync.js';
+export let BUDV='month',BSCOPE='all',INB=false; export function setBUDV(v){return BUDV=v} export function setBSCOPE(v){return BSCOPE=v} export function setINB(v){return INB=v}
+export let ALE=null; export function setALE(v){return ALE=v}
+export let DRG=null,ORDN=0; export function setDRG(v){return DRG=v} export function setORDN(v){return ORDN=v}
 /* ---------- Build your budget: edit the budget for all months (or from this month on) ---------- */
-try{BUDV=localStorage.getItem('pfb_budv')||'month';BSCOPE=localStorage.getItem('pfb_bscope')||'all'}catch(_){}
 // First month the budget covers: earliest of History's first month, the review-start month and the first plan version.
 export function budStart(){let bf=S.bankFrom?S.bankFrom.slice(0,7):'';if(bf&&SRV&&BK.tx&&BK.tx.length){let m=BK.tx[0].date;for(const t of BK.tx)if(t.date<m)m=t.date;if(m.slice(0,7)>bf)bf=m.slice(0,7)}return bf}
 export function firstMonth(){const bf=budStart();if(bf)return bf<TK?bf:TK;const c=[...Object.keys(S.plans),bankFrom().slice(0,7),histMonths()[0]].filter(Boolean).sort();return c[0]&&c[0]<TK?c[0]:TK}
 // Month a Build-view edit starts from. Edits made outside Build keep starting at the viewed month.
-export const scopeStart=()=>BSCOPE==='all'?firstMonth():S.cur;globalThis.scopeStart=scopeStart;
+export const scopeStart=()=>BSCOPE==='all'?firstMonth():S.cur;
 // Items, groups and income in the newest plan version that some earlier month is missing.
 export function pastGaps(){const ks=Object.keys(S.plans).sort(),last=ks[ks.length-1],L=S.plans[last],f0m=firstMonth(),vs=[...new Set([f0m,...ks])].filter(k=>k<last&&k>=f0m).sort(),miss=new Set();
  vs.forEach(k=>{const p=S.plans[k]||basePlan(k),ids=new Set([...p.income.map(i=>i.id),...p.groups.flatMap(g=>[g.id,...g.items.map(i=>i.id)])]);
@@ -18,7 +26,7 @@ export function fillPast(){const {vs,L,n:items}=pastGaps();let n=0;
  vs.forEach(k=>{if(!S.plans[k])S.plans[k]=clone(basePlan(k));const p=S.plans[k],has=id=>p.income.some(i=>i.id===id)||p.groups.some(g=>g.id===id||g.items.some(i=>i.id===id));
   L.income.forEach(i=>{if(!has(i.id)){p.income.push(clone(i));n++}});
   L.groups.forEach(g=>{let pg=p.groups.find(x=>x.id===g.id);if(!pg){pg={...clone(g),items:[]};p.groups.push(pg)}g.items.forEach(i=>{if(!has(i.id)){pg.items.push(clone(i));n++}})})});
- LP={};TXI=null;const f=autoFile();toast(`Filled in ${items} item${items===1?'':'s'} back to ${labS(firstMonth())}${f?`. ${f} transaction${f===1?'':'s'} filed`:''}`);commit()}
+ setLP({});setTXI(null);const f=autoFile();toast(`Filled in ${items} item${items===1?'':'s'} back to ${labS(firstMonth())}${f?`. ${f} transaction${f===1?'':'s'} filed`:''}`);commit()}
 // Steady deposits into checking that aren't tied to an income source yet.
 export function recurringIn(){if(!SRV||!BK.tx.length)return[];const MK=merchKeys(),G={},no=S.notInc||{},k6=addM(TK,-6);
  BK.tx.forEach(t=>{if(t.amount>=0||t.date.slice(0,7)<k6||acctType(t.account)!=='depository'||((t.pfc||[])[0]||'')!=='INCOME')return;const r=S.txd&&S.txd[t.id];if(r&&(r.v.startsWith('inc:')||r.v==='xfer'))return;
@@ -34,14 +42,14 @@ export function topFile(p){const sel=document.querySelector(`select[data-tops="$
  BK.tx.forEach(t=>{const r=S.txd&&S.txd[t.id];if(r&&r.auto==='rest'&&ruleFor(t)&&ruleFor(t).v===v)txUndo(t.id)});const f=autoFile();toast(`${titleC(p)} now files to ${txLabel({v,k:TK})}${f?` (${f} moved)`:''}`);commit()}
 // Schedule editor, shared by Build step 6 and the Forecast. ALE = the allocation open for editing.
 
-export const alDesc=a=>a.to==='snow'?`${a.src==='plan'?f0(a.v)+' a month':a.mode==='%'?a.v+'% of what’s left':f0(a.v)+' a month of what’s left'} · ${a.how==='bal'?'smallest balance':'highest rate'} first · ${a.loans&&a.loans.length?a.loans.map(id=>(S.loans.find(l=>l.id===id)||{}).name).filter(Boolean).join(', '):'all loans'}${a.roll!==false?' + freed payments':''}`:a.src==='plan'?`${f0(a.v)} a month`:a.mode==='%'?`${a.v}% of what’s left`:`${f0(a.v)} a month of what’s left`;globalThis.alDesc=alDesc;
-export const alWhen=a=>`${labS(a.from)} → ${a.until?labS(a.until):a.to==='keep'?'no end':a.to.startsWith('g:')?'until reached':'until paid off'}`;globalThis.alWhen=alWhen;
-export const alCol=a=>a.to.startsWith('g:')?(S.goals.find(g=>'g:'+g.id===a.to)||{}).color||'var(--lilac)':a.to.startsWith('l:')?(S.loans.find(l=>'l:'+l.id===a.to)||{}).color||'var(--sky)':a.to==='snow'?'var(--sky)':'var(--lime)';globalThis.alCol=alCol;
+export const alDesc=a=>a.to==='snow'?`${a.src==='plan'?f0(a.v)+' a month':a.mode==='%'?a.v+'% of what’s left':f0(a.v)+' a month of what’s left'} · ${a.how==='bal'?'smallest balance':'highest rate'} first · ${a.loans&&a.loans.length?a.loans.map(id=>(S.loans.find(l=>l.id===id)||{}).name).filter(Boolean).join(', '):'all loans'}${a.roll!==false?' + freed payments':''}`:a.src==='plan'?`${f0(a.v)} a month`:a.mode==='%'?`${a.v}% of what’s left`:`${f0(a.v)} a month of what’s left`;
+export const alWhen=a=>`${labS(a.from)} → ${a.until?labS(a.until):a.to==='keep'?'no end':a.to.startsWith('g:')?'until reached':'until paid off'}`;
+export const alCol=a=>a.to.startsWith('g:')?(S.goals.find(g=>'g:'+g.id===a.to)||{}).color||'var(--lilac)':a.to.startsWith('l:')?(S.loans.find(l=>'l:'+l.id===a.to)||{}).color||'var(--sky)':a.to==='snow'?'var(--sky)':'var(--lime)';
 // ---------- order of items and groups, items outside groups ----------
 // The loose group holds a kind's items that aren't in a group: one for bills, one for spending, made when first needed
 // (ensureLoose) and listed first. It's an ordinary group to everything else (totals, filing, pop-ups); the Budget page
 // shows it as "Not in a group" and the money flow shows each of its items on its own.
-export const LOOSE={fixed:'loose-b',flex:'loose-f'},isLoose=id=>id===LOOSE.fixed||id===LOOSE.flex;globalThis.LOOSE=LOOSE;globalThis.isLoose=isLoose;
+export const LOOSE={fixed:'loose-b',flex:'loose-f'},isLoose=id=>id===LOOSE.fixed||id===LOOSE.flex;
 export function ensureLoose(p,fx){let L=p.groups.find(g=>g.loose&&!!g.flex===!!fx);if(!L){L={id:fx?LOOSE.flex:LOOSE.fixed,name:fx?'Spending':'Bills',color:fx?C.lilac:C.butter,flex:!!fx,loose:true,items:[]};p.groups.unshift(L)}return L}
 // What an item usually takes: the average of its last 3 months with spending (or payments), from bank data or
 // amounts typed by hand. Set-aside bills are left out. Spending rounds up to $5, bills to the dollar.
@@ -64,6 +72,12 @@ export function orderRead(kind){const gO=[...document.querySelectorAll(`.bgrps[d
 // ORDN counts rows moved by hand (drag or arrow keys); Build's .bgrps lists use it as their key, so the redraw that
 // follows a move (save or cancel) gets new lists instead of React reconciling over nodes it didn't place.
 
+export function dragEnd(save){const D=DRG;if(!D)return;DRG=null;D.el.classList.remove('drg');document.body.classList.remove('dragging');if(!D.moved)return;if(!save)return renderBuild();const o=orderRead(D.kind);orderApply(D.kind==='flex',o.gO,o.iO)}
+
+// What this file did as it loaded (listeners, settings read from localStorage, …): main.jsx runs it in the old
+// load order, after every module is defined.
+export function startBuild() {
+try{BUDV=localStorage.getItem('pfb_budv')||'month';BSCOPE=localStorage.getItem('pfb_bscope')||'all'}catch(_){}
 document.addEventListener('pointerdown',e=>{const h=e.target.closest('.grip');if(!h||e.button>0)return;const el=h.dataset.drag==='i'?h.closest('.brow'):h.closest('.bgrp'),box=h.dataset.drag==='i'?el.closest('.bitems'):el.closest('.bgrps');if(!el||!box)return;
  e.preventDefault();DRG={t:h.dataset.drag,el,kind:box.dataset.kind,y0:e.clientY,moved:false,h};h.setPointerCapture(e.pointerId)});
 document.addEventListener('pointermove',e=>{if(!DRG)return;const D=DRG;if(!D.moved){if(Math.abs(e.clientY-D.y0)<4)return;D.moved=true;D.el.classList.add('drg');document.body.classList.add('dragging')}
@@ -72,8 +86,9 @@ document.addEventListener('pointermove',e=>{if(!DRG)return;const D=DRG;if(!D.mov
  if(D.t==='i'){const box=u.closest(`.bitems[data-kind="${D.kind}"]`)||(u.closest('.bgrp')&&u.closest('.bgrp').querySelector(`:scope>.bitems[data-kind="${D.kind}"]`));if(!box)return;const r=u.closest('.brow[data-iid]');
   if(r&&r!==D.el&&box.contains(r)){const m=r.getBoundingClientRect();ORDN++;box.insertBefore(D.el,e.clientY<m.top+m.height/2?r:r.nextSibling)}else if(!r&&D.el.parentNode!==box){ORDN++;box.appendChild(D.el)}}
  else{const g=u.closest('.bgrps>.bgrp');if(g&&g!==D.el&&g.parentNode===D.el.parentNode){const m=g.getBoundingClientRect();ORDN++;D.el.parentNode.insertBefore(D.el,e.clientY<m.top+m.height/2?g:g.nextSibling)}}});
-export function dragEnd(save){const D=DRG;if(!D)return;DRG=null;D.el.classList.remove('drg');document.body.classList.remove('dragging');if(!D.moved)return;if(!save)return renderBuild();const o=orderRead(D.kind);orderApply(D.kind==='flex',o.gO,o.iO)}
-document.addEventListener('pointerup',()=>dragEnd(true));document.addEventListener('pointercancel',()=>dragEnd(false));
+document.addEventListener('pointerup',()=>dragEnd(true));
+document.addEventListener('pointercancel',()=>dragEnd(false));
 // Keyboard: ↑/↓ on a focused ⋮⋮ moves it one place (an item stays in its group).
 document.addEventListener('keydown',e=>{const h=e.target.closest&&e.target.closest('.grip');if(!h||(e.key!=='ArrowUp'&&e.key!=='ArrowDown'))return;e.preventDefault();const up=e.key==='ArrowUp',el=h.dataset.drag==='i'?h.closest('.brow'):h.closest('.bgrp'),sib=up?el.previousElementSibling:el.nextElementSibling;
  if(!sib||!sib.matches(h.dataset.drag==='i'?'.brow[data-iid]':'.bgrp'))return;ORDN++;el.parentNode.insertBefore(el,up?sib:sib.nextSibling);const kind=(el.closest('.bitems')||el.closest('.bgrps')).dataset.kind,o=orderRead(kind),id=h.dataset.id;orderApply(kind==='flex',o.gO,o.iO);const g=document.querySelector(`.grip[data-id="${id}"]`);if(g)g.focus()});
+}

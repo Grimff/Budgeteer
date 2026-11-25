@@ -7,6 +7,16 @@ import { tx, onAct, onChg, tick } from '../bridge.js';
 const RT = tick();
 export const rulesFilterR = RT.bump;
 import { TxOpts, CatchSel, ActBtn, Rich } from '../ui.jsx';
+import { NOTIFY } from '../lib/alerts.js';
+import { BK, bankFrom, flexDefault, ruleFor, titleC } from '../lib/bank.js';
+import { soFarOf } from '../lib/budget.js';
+import { DEMO, S, TK, f0, f2, lab, labS, mon, plan } from '../lib/core.js';
+import { CV, cvAccts, cvRows } from '../lib/csv-import.js';
+import { dshort, txLabel, txTargets } from '../lib/linked-loans.js';
+import { OPEN, balEnd, bankSrc, extraPaid, goalPlan, goalSaved, linkedSaved, loanGone, manualSaved, row, savedIn, savedL, totals } from '../lib/math.js';
+import { FS, SRV } from '../lib/server-sync.js';
+import { BKP, RQ, SV, SYNC_OPTS, bkLabel, healthChecks, hhName, hhSub, syncWord, whenS } from '../lib/settings.js';
+import { acctsOf, debtNow, sumBal } from '../lib/wealth.js';
 
 const card16 = { marginBottom: '16px' }, note14 = { fontSize: '14px', margin: '4px 0 12px' };
 

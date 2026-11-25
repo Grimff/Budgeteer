@@ -72,11 +72,7 @@ export function resync(root) {
 // React escapes the rest itself.
 export const tx = s => String(s ?? '').replace(/�/g, '');
 
-// Functions the classic files call by name that are written here in React (renderBudget, catRender, sankey, fsUI…):
-// setGlobal puts them on the global object, so every caller (renderAll, click handlers, other screens) reaches them.
-// The old string-building versions they replaced are gone; the files that call them load before this bundle but only
-// call them from functions that run later (server-sync.js's fsUI() at load comes after it).
-export function setGlobal(name, fn) { window[name] = fn; }
+
 
 // Click handlers on elements (phase 3). onAct('x') runs ACT.x (actions.js) with the element's data-* values, the element
 // and the native click, setting INB (inside Build budget) as the old delegated listener did.
@@ -85,7 +81,7 @@ export const onAct = name => e => {
   // only the innermost element with an action handles a click (a Delete button inside a row that opens), as the
   // old switch did with closest('[data-act]'); the click still reaches document (clicking elsewhere closes the flow card)
   if (e.nativeEvent.rx) return;
-  const b = e.currentTarget; e.nativeEvent.rx = true; INB = !!b.closest('[data-build]');
+  const b = e.currentTarget; e.nativeEvent.rx = true; setINB(!!b.closest('[data-build]'));
   // a click outside the money-flow card closes it before the action runs (the action may redraw the card)
   if (!b.closest('#skc') && !b.closest('dialog') && $('#skc:not([hidden])')) skClose();
   e.nativeEvent.skDone = true;
@@ -97,14 +93,17 @@ export const onAct = name => e => {
 // to the field's data-* values, in the old listeners' order (ORDER_INP / ORDER_CHG in actions.js). The amount-formatting
 // input listener in events.js still runs for every field.
 import { INP, CHG, ORDER_INP, ORDER_CHG } from './actions.js';
+import { setINB } from './lib/build.js';
+import { skClose } from './lib/flow.js';
+import { $ } from './lib/core.js';
 export const onInp = e => {
   const t = e.currentTarget, d = t.dataset, h = ORDER_INP.find(([, f]) => f(d, t));
-  INB = !!t.closest('[data-build]');
+  setINB(!!t.closest('[data-build]'));
   if (h) INP[h[0]](t, d, e.nativeEvent);
 };
 const chg = e => {
   const t = e.currentTarget, d = t.dataset, h = ORDER_CHG.find(([, f]) => f(d, t));
-  INB = !!t.closest('[data-build]');
+  setINB(!!t.closest('[data-build]'));
   if (h) CHG[h[0]](t, d, e);
 };
 export const onChg = el => { if (el && !el._chg) { el._chg = true; el.addEventListener('change', chg); } };

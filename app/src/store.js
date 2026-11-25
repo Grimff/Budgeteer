@@ -6,6 +6,7 @@
 // afterFlush(f): runs f after every changed(), once React is done (tabs.jsx: resync and each screen's after-draw step).
 import { useSyncExternalStore } from 'react';
 import { flushSync } from 'react-dom';
+import { S } from './lib/core.js';
 
 let V = 0, FV = 0, after = () => { };
 const subs = new Set(), fsubs = new Set();

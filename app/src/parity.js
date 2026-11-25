@@ -5,6 +5,13 @@
 //  2. the text as the browser shows it (innerText, all folds opened), which catches a missing space between inline
 //     elements that 1 can't see.
 import { draw, liveReset } from './bridge.js';
+import * as NAMED from './named.jsx';
+import { setTXI } from './lib/bank.js';
+import { S, TK, addM, seedGoals, seedLoans, seedPlan, setS } from './lib/core.js';
+import { renderAll } from './lib/events.js';
+import { setALC } from './lib/goal-accounts.js';
+import { loanSync } from './lib/linked-loans.js';
+import { PV, setGP, setLP, setXS } from './lib/math.js';
 
 const SCREENS = [];
 // screen: {name, fn: 'renderX', el: '#T-x', also?: ['renderY'], dialog?: '#dlg' (opened while measured), call?(),
@@ -73,7 +80,7 @@ function diff(A, B) {
   return '';
 }
 // The caches renderAll clears before every draw.
-export function fresh() { LP = {}; GP = {}; XS = null; TXI = null; ALC = {}; loanSync(); }
+export function fresh() { setLP({}); setGP({}); setXS(null); setTXI(null); setALC({}); loanSync(); }
 
 // A piece of a screen that a whole-screen case can't reach (e.g. hidden in sample mode): its component drawn into a
 // scratch tab for each case, in the snapshot record (paritySnap). piece: {name, node(): element, cases(): [{label, set?}]}
@@ -93,7 +100,7 @@ export function runParity() {
         undo = c.set && c.set();
         const el = document.querySelector(sc.el);
         // count-ups (cu) remember what they showed last; both draws start from the same memory
-        const pv = { ...PV }, call = c.call || sc.call || (() => window[sc.fn]());
+        const pv = { ...PV }, call = c.call || sc.call || (() => NAMED[sc.fn]());
         liveReset(el); fresh(); call(); fresh1.push({ c, B: snap(el), pv });
       } catch (e) { fails.push(c.label + ' crashed: ' + (e.stack || e.message)); }
       finally { try { if (undo) undo(); } catch (_) { } }
@@ -104,14 +111,14 @@ export function runParity() {
       try {
         undo = c.set && c.set(); const el = document.querySelector(sc.el);
         for (const k of Object.keys(PV)) delete PV[k]; Object.assign(PV, pv);
-        fresh(); (c.call || sc.call || (() => window[sc.fn]()))();
+        fresh(); (c.call || sc.call || (() => NAMED[sc.fn]()))();
         const d = diff(B, snap(el)); if (d) rf.push(c.label + ' ' + d);
       } catch (e) { rf.push(c.label + ' crashed: ' + (e.stack || e.message)); }
       finally { try { if (undo) undo(); } catch (_) { } }
     }
     out.push({ ok: !rf.length && fresh1.length > 0, name: `React ${sc.name} screen re-rendered in place through every case matches a fresh draw (${fresh1.length} cases)`, detail: rf.length ? rf.length + ' differ: ' + rf.slice(0, 3).join(' ‖ ') : '' });
   }
-  S = keep.S; S.cur = keep.cur;
+  setS(keep.S); S.cur = keep.cur;
   fresh(); renderAll();
   return out;
 }
@@ -125,7 +132,7 @@ export function paritySnap() {
     try {
       undo = c.set && c.set();
       const el = document.querySelector(sc.el), dlg = sc.dialog && document.querySelector(sc.dialog), shut = dlg && !dlg.open; if (shut) dlg.show();
-      try { liveReset(el); fresh(); (c.call || sc.call || (() => window[sc.fn]()))(); put(sc.name + ' | ' + c.label, JSON.stringify(snap(el))); }
+      try { liveReset(el); fresh(); (c.call || sc.call || (() => NAMED[sc.fn]()))(); put(sc.name + ' | ' + c.label, JSON.stringify(snap(el))); }
       finally { if (shut) dlg.close(); }
     } catch (e) { put(sc.name + ' | ' + c.label, 'crashed: ' + (e.stack || e.message)); }
     finally { try { if (undo) undo(); } catch (_) { } }
@@ -140,7 +147,7 @@ export function paritySnap() {
     }
     el.remove();
   }
-  S = keep.S; S.cur = keep.cur; fresh(); renderAll();
+  setS(keep.S); S.cur = keep.cur; fresh(); renderAll();
   return out;
 }
 
@@ -156,6 +163,6 @@ export function monthsToTry() {
 // A household with nothing set up yet (the first visit).
 export const emptyHousehold = () => ({ plans: { [TK]: seedPlan() }, loans: seedLoans(), goals: seedGoals(), months: {}, cur: TK, tab: S.tab, flow: 'plan' });
 // Run with S replaced; returns the undo.
-export function withS(obj) { const old = S; S = obj; return () => { S = old; }; }
+export function withS(obj) { const old = S; setS(obj); return () => { setS(old); }; }
 // Set S.cur (and anything else) for one case; returns the undo.
 export function at(k, more) { const old = S.cur; S.cur = k; const u = more && more(); return () => { if (u) u(); S.cur = old; }; }

@@ -3,6 +3,13 @@
 import { useLayoutEffect, useRef, useState } from 'react';
 import { tx, onAct, onInp, onChg } from '../bridge.js';
 import { Gear, CountUp, Ring, Clh, NmA } from '../ui.jsx';
+import { BK, rulesFor, titleC } from '../lib/bank.js';
+import { MO, S, TK, addM, f0, f2, lab, labS, mdiff, mo, mon, r2 } from '../lib/core.js';
+import { allocAt, gLinked } from '../lib/goal-accounts.js';
+import { GR } from '../lib/goals.js';
+import { OPEN, essentials, gAccts, goalEta, goalMon, goalNeed, goalOv, goalPlan, goalProj, goalSaved, invInfo, isInv, isShut, linkedChange, linkedSaved, manualSaved, savedIn, target, xStart } from '../lib/math.js';
+import { SRV } from '../lib/server-sync.js';
+import { sg, subI } from '../lib/wealth.js';
 
 const acctOpt = a => `${tx(a.institution)} · ${tx(a.official || a.name)}${a.mask ? ' ••' + tx(a.mask) : ''} · ${tx(subI(a.subtype))} (${f0(+a.bal || 0)})`;
 

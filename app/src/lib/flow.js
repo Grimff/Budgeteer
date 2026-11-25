@@ -1,8 +1,14 @@
-// flow: moved from app/public/js/flow.js unchanged except `export`. Its top-level let/var stay there (shared state the
-// classic files reassign); everything else here reads the app's globals by name as before, and dist/flow.js puts these
-// exports on the global object (lib/flow.global.js) so the classic files and the React screens still call them by name.
-// globals: each function is on the global object before any code here runs, each const right after its line, as in a classic script.
-Object.assign(globalThis, { hl, zset, zz, zfit, nodeKey, zfocus, skShare, skVs, skHint, skClose, skOpen, skAt, payDialog, depDialog, confetti });
+// flow: the code of what was app/public/js/flow.js (unchanged but for imports, `export`, the shared state's setters and
+// startFlow(), which holds what used to run as the file loaded).
+// Shared state (other files change it with the set… functions; it was js/flow.js):
+import { openD, skCard, skTip, zbar } from '../named.jsx';
+import { catOpen } from './bank.js';
+import { C, MO, MOW, RM, S, TK, addM, f0, f2, lab, labS, mo, plan, r2, $ } from './core.js';
+import { gLinked } from './goal-accounts.js';
+import { goalMon, goalPlan, goalSaved, payEffect, row, target, toast, totals } from './math.js';
+export let K=null,Z=null,ZW=0,ZH=0,SEL=null,PN=null,zt; export function setK(v){return K=v} export function setZ(v){return Z=v} export function setZW(v){return ZW=v} export function setZH(v){return ZH=v} export function setSEL(v){return SEL=v} export function setPN(v){return PN=v} export function setzt(v){return zt=v}
+export let SKD=false; export function setSKD(v){return SKD=v}
+export let DLG=null; export function setDLG(v){return DLG=v}
 /* ---------- money flow (sankey) ---------- */
 
 export function hl(i,li){const s=$('#sk svg');if(!s)return;if(li!=null){s.classList.add('hlt');s.querySelectorAll('.lk').forEach(p=>p.classList.toggle('on',+p.dataset.l===li));return}if(i==null){s.classList.remove('hlt');return}const n=K.all[i];s.classList.add('hlt');s.querySelectorAll('.lk').forEach(p=>{const l=K.L[p.dataset.l];p.classList.toggle('on',l.s===n||l.t===n||(n.ci===3&&l.t.id===n.p&&l.s.id==='b'))})}
@@ -22,26 +28,17 @@ export function zfocus(n){const g=n.ci===3?K.all.find(x=>x.id===n.p):n.ci===2?n:
 // Budget, Left over or Over budget opens a card with its breakdown, each line opening its own pop-up.
 
 export const skPos=(el,x,y,below)=>{const w=$('.skw');if(!w||!el)return;const r=w.getBoundingClientRect(),ew=el.offsetWidth,eh=el.offsetHeight;let L=x-r.left+w.scrollLeft+16,T=y-r.top+(below?16:-eh/2);
- if(L+ew>w.scrollLeft+w.clientWidth-6)L=x-r.left+w.scrollLeft-ew-16;L=Math.max(w.scrollLeft+6,Math.min(L,w.scrollLeft+w.clientWidth-ew-6));T=Math.max(6,Math.min(T,w.clientHeight-eh-6));el.style.left=L+'px';el.style.top=T+'px'};globalThis.skPos=skPos;
+ if(L+ew>w.scrollLeft+w.clientWidth-6)L=x-r.left+w.scrollLeft-ew-16;L=Math.max(w.scrollLeft+6,Math.min(L,w.scrollLeft+w.clientWidth-ew-6));T=Math.max(6,Math.min(T,w.clientHeight-eh-6));el.style.left=L+'px';el.style.top=T+'px'};
 export function skShare(v,base){return base>0?Math.round(v/base*100)+'%':''}
 export function skVs(n){if(n.pv==null||S.cur>TK)return '';const w=S.cur<TK?'actual':'so far';return K.act?`${f0(n.pv)} planned`:`${f0(n.av)} ${w}`}
 export function skHint(n){const k=nodeKey(n);return k&&!k.startsWith('grp:')?'Click for transactions':'Click for the breakdown'}
-export const NOHOV=matchMedia('(hover: none)');globalThis.NOHOV=NOHOV;
-export const skPlace=(el,b)=>{const w=$('.skw');if(!w||!el||!b)return;const r=w.getBoundingClientRect(),ew=el.offsetWidth,eh=el.offsetHeight,o=r.left-w.scrollLeft,vis=[w.scrollLeft+6,w.scrollLeft+w.clientWidth-ew-6];let L=b.r-o+12;if(L>vis[1])L=b.l-o-ew-12;L=Math.max(vis[0],Math.min(vis[1],L));el.style.left=L+'px';el.style.top=Math.max(6,Math.min(b.y-r.top-40,w.clientHeight-eh-6))+'px'};globalThis.skPlace=skPlace;
+export const NOHOV=matchMedia('(hover: none)');
+export const skPlace=(el,b)=>{const w=$('.skw');if(!w||!el||!b)return;const r=w.getBoundingClientRect(),ew=el.offsetWidth,eh=el.offsetHeight,o=r.left-w.scrollLeft,vis=[w.scrollLeft+6,w.scrollLeft+w.clientWidth-ew-6];let L=b.r-o+12;if(L>vis[1])L=b.l-o-ew-12;L=Math.max(vis[0],Math.min(vis[1],L));el.style.left=L+'px';el.style.top=Math.max(6,Math.min(b.y-r.top-40,w.clientHeight-eh-6))+'px'};
 export function skClose(){const c=$('#skc');if(c){c.hidden=true;c.innerHTML=''}const s=$('#sk svg');s&&s.querySelectorAll('.nd.sel').forEach(x=>x.classList.remove('sel'))}
 export function skOpen(n,at){const k=nodeKey(n);$('#skt')&&($('#skt').hidden=true);if(k&&!k.startsWith('grp:')){skClose();return catOpen(k)}skCard(n,at)}
 export function skAt(n){const g=$(`#sk .nd[data-n="${K.all.indexOf(n)}"] .hit`);if(!g)return null;const r=g.getBoundingClientRect();return{l:r.left,r:r.right,y:r.top+r.height/2}}
-addEventListener('scroll',()=>{const t=$('#skt');t&&(t.hidden=true)},{capture:true,passive:true});
-document.addEventListener('mousemove',e=>{const t=$('#skt');if(t&&!t.hidden&&e.target.closest('#sk'))skPos(t,e.clientX,e.clientY)});
-document.addEventListener('keydown',e=>{if((e.key==='Enter'||e.key===' ')&&e.target.matches&&e.target.matches('#sk .nd')&&K){e.preventDefault();const n=K.all[+e.target.dataset.n];skOpen(n,skAt(n));return}if(e.key==='Escape'&&$('#skc:not([hidden])')&&!document.querySelector('dialog[open]')){skClose()}});
-document.addEventListener('mouseover',e=>{if(!K)return;const n=e.target.closest('#sk .nd'),l=n?null:e.target.closest('#sk .lk');hl(n?+n.dataset.n:null,l?+l.dataset.l:null);skTip(n?K.all[+n.dataset.n]:null,l?K.L[+l.dataset.l]:null,e)});
-document.addEventListener('wheel',e=>{const sk=e.target.closest('#sk');if(!sk||!(e.ctrlKey||e.metaKey)||!Z)return;e.preventDefault();const r=sk.querySelector('svg').getBoundingClientRect();zz(e.deltaY<0?.86:1.16,Z.x+(e.clientX-r.left)*Z.w/r.width,Z.y+(e.clientY-r.top)*Z.h/r.height,0)},{passive:false});
-document.addEventListener('pointerdown',e=>{const sk=e.target.closest('#sk');if(!sk||e.target.closest('.nd')||!Z||Z.w>=ZW-1)return;PN={x:e.clientX,y:e.clientY,z:{...Z},el:sk,mv:false};SKD=false;sk.classList.add('grab')});
-document.addEventListener('pointermove',e=>{if(!PN)return;if(Math.abs(e.clientX-PN.x)+Math.abs(e.clientY-PN.y)>5)PN.mv=true;const r=PN.el.querySelector('svg').getBoundingClientRect(),k=PN.z.w/r.width;zset({x:Math.max(0,Math.min(ZW-Z.w,PN.z.x-(e.clientX-PN.x)*k)),y:Math.max(0,Math.min(ZH-Z.h,PN.z.y-(e.clientY-PN.y)*k))})});
-addEventListener('pointerup',()=>{if(PN){SKD=PN.mv;PN.el.classList.remove('grab');PN=null}});
 
 /* ---------- dialog ---------- */
-
 
 export function payDialog(id,extraLeft){const l=S.loans.find(x=>x.id===id)||S.loans[0];if(!l)return;const k=S.cur;if(k<l.start){toast(`${l.name} tracking starts ${labS(l.start)}`);return}
  const r=row(l,k);if(!r){toast(l.name+' is paid off');return}if(r.auto){toast(`${l.name} payments come from ${l.link?l.link.inst:'your bank'} automatically`);return}const mn=Math.min(l.min,r.open+r.int),cur=r.lg?r.pay:mn,left=totals().left;
@@ -61,3 +58,16 @@ export function depDialog(id,amt){const g=S.goals.find(x=>x.id===id)||S.goals[0]
 export function confetti(){if(RM)return;const cv=$('#fx'),x=cv.getContext('2d'),dpr=devicePixelRatio||1;cv.width=innerWidth*dpr;cv.height=innerHeight*dpr;x.scale(dpr,dpr);
  const cols=[C.pink,C.lime,C.butter,C.coral,C.lilac,C.aqua,C.sky],P=Array.from({length:150},()=>({x:innerWidth/2+(Math.random()-.5)*160,y:innerHeight*.35,vx:(Math.random()-.5)*14,vy:-Math.random()*13-4,r:Math.random()*Math.PI,vr:(Math.random()-.5)*.35,w:6+Math.random()*7,h:4+Math.random()*6,c:cols[Math.random()*cols.length|0]}));
  const t0=performance.now();(function f(t){x.clearRect(0,0,innerWidth,innerHeight);const age=t-t0;P.forEach(p=>{p.vy+=.38;p.vx*=.99;p.x+=p.vx;p.y+=p.vy;p.r+=p.vr;x.save();x.globalAlpha=Math.max(0,1-age/2200);x.translate(p.x,p.y);x.rotate(p.r);x.fillStyle=p.c;x.fillRect(-p.w/2,-p.h/2,p.w,p.h);x.restore()});if(age<2200)requestAnimationFrame(f);else x.clearRect(0,0,innerWidth,innerHeight)})(t0)}
+
+// What this file did as it loaded (listeners, settings read from localStorage, …): main.jsx runs it in the old
+// load order, after every module is defined.
+export function startFlow() {
+addEventListener('scroll',()=>{const t=$('#skt');t&&(t.hidden=true)},{capture:true,passive:true});
+document.addEventListener('mousemove',e=>{const t=$('#skt');if(t&&!t.hidden&&e.target.closest('#sk'))skPos(t,e.clientX,e.clientY)});
+document.addEventListener('keydown',e=>{if((e.key==='Enter'||e.key===' ')&&e.target.matches&&e.target.matches('#sk .nd')&&K){e.preventDefault();const n=K.all[+e.target.dataset.n];skOpen(n,skAt(n));return}if(e.key==='Escape'&&$('#skc:not([hidden])')&&!document.querySelector('dialog[open]')){skClose()}});
+document.addEventListener('mouseover',e=>{if(!K)return;const n=e.target.closest('#sk .nd'),l=n?null:e.target.closest('#sk .lk');hl(n?+n.dataset.n:null,l?+l.dataset.l:null);skTip(n?K.all[+n.dataset.n]:null,l?K.L[+l.dataset.l]:null,e)});
+document.addEventListener('wheel',e=>{const sk=e.target.closest('#sk');if(!sk||!(e.ctrlKey||e.metaKey)||!Z)return;e.preventDefault();const r=sk.querySelector('svg').getBoundingClientRect();zz(e.deltaY<0?.86:1.16,Z.x+(e.clientX-r.left)*Z.w/r.width,Z.y+(e.clientY-r.top)*Z.h/r.height,0)},{passive:false});
+document.addEventListener('pointerdown',e=>{const sk=e.target.closest('#sk');if(!sk||e.target.closest('.nd')||!Z||Z.w>=ZW-1)return;PN={x:e.clientX,y:e.clientY,z:{...Z},el:sk,mv:false};SKD=false;sk.classList.add('grab')});
+document.addEventListener('pointermove',e=>{if(!PN)return;if(Math.abs(e.clientX-PN.x)+Math.abs(e.clientY-PN.y)>5)PN.mv=true;const r=PN.el.querySelector('svg').getBoundingClientRect(),k=PN.z.w/r.width;zset({x:Math.max(0,Math.min(ZW-Z.w,PN.z.x-(e.clientX-PN.x)*k)),y:Math.max(0,Math.min(ZH-Z.h,PN.z.y-(e.clientY-PN.y)*k))})});
+addEventListener('pointerup',()=>{if(PN){SKD=PN.mv;PN.el.classList.remove('grab');PN=null}});
+}

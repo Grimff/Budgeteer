@@ -5,6 +5,10 @@ import { useLayoutEffect, useRef, useState } from 'react';
 import { tx, onAct, onInp, drawNo, tick } from '../bridge.js';
 import { BudSwitch } from './Budget.jsx';
 import { AlForm, AlAdds, AlList } from '../schedule.jsx';
+import { FDK, FR, WFS, fcRun, setFCT, setFDK } from '../lib/budget.js';
+import { ALE, alCol, alDesc, alWhen } from '../lib/build.js';
+import { S, TK, addM, f0, fk, lab, labS, mdiff, mo, mon } from '../lib/core.js';
+import { alAt, destName, goalEta, goalSaved, lastK, loanGone, lp, target, xsBuild } from '../lib/math.js';
 
 // The what-if outputs (#wfo-) follow a tick: the slider's handler sets WFS and calls wfLive (= wfLiveR).
 const WT = tick();
@@ -69,7 +73,7 @@ function FcChart({ R, M }) {
   const step = Math.ceil(N / Math.max(1, Math.floor((W - pl - pr) / 52)));
   const at = e => { const b = e.currentTarget.getBoundingClientRect(); return Math.max(0, Math.min(N - 1, Math.round(((e.clientX - b.left) / b.width * W - pl) / (W - pl - pr) * (N - 1)))); };
   const x = X(hov ?? si);
-  return <><div id="fch" ref={ref}><div className="fleg"><span><i style={{ background: 'var(--sky)' }}></i>Total owed</span><span><i style={{ background: 'var(--lilac)' }}></i>Saved toward goals</span></div><svg viewBox={`0 0 ${W} ${H}`} id="fsv" role="img" aria-label="Debt and savings by month" style={{ cursor: 'pointer' }} onPointerMove={e => setHov(at(e))} onPointerLeave={() => setHov(null)} onClick={e => { const i = at(e); FDK = R[i].k; setSi(i); }}>
+  return <><div id="fch" ref={ref}><div className="fleg"><span><i style={{ background: 'var(--sky)' }}></i>Total owed</span><span><i style={{ background: 'var(--lilac)' }}></i>Saved toward goals</span></div><svg viewBox={`0 0 ${W} ${H}`} id="fsv" role="img" aria-label="Debt and savings by month" style={{ cursor: 'pointer' }} onPointerMove={e => setHov(at(e))} onPointerLeave={() => setHov(null)} onClick={e => { const i = at(e); setFDK(R[i].k); setSi(i); }}>
     {[0, .5, 1].map(f => [
       <line key={'l' + f} x1={pl} x2={W - pr} y1={Y(top / 1.08 * f)} y2={Y(top / 1.08 * f)} stroke="var(--line)" />,
       <text key={'t' + f} x={pl - 8} y={Y(top / 1.08 * f) + 5} textAnchor="end" fill="var(--dim)" fontSize="13">{fk(top / 1.08 * f)}</text>])}
@@ -84,8 +88,8 @@ export function FcBody() {
   const on = WFS.inc || WFS.cost || WFS.extra, base = on ? fcRun({ inc: 0, cost: 0, extra: 0 }) : null, cur = fcRun({ ...WFS }), R = cur.rows, N = R.length;
   const bm = base ? Object.fromEntries(base.M.map(m => [m.id, m.k])) : {}, mv = m => { if (!base || !bm[m.id] || bm[m.id] === m.k) return null; const d = mdiff(m.k, bm[m.id]); return d > 0 ? <> <span className="up">{mo(d)} sooner</span></> : <> <span className="neg">{mo(-d)} later</span></>; };
   const yr = R.slice(0, 12), kept = yr.reduce((a, r) => a + r.left, 0) / yr.length, over = R.filter(r => r.left < -0.5), ng = cur.M.find(m => m.g);
-  if (!FDK || !R.some(r => r.k === FDK)) FDK = R[0].k;   // the month shown under the chart (as the old fcBody did)
-  FCT = R;
+  if (!FDK || !R.some(r => r.k === FDK)) setFDK(R[0].k);   // the month shown under the chart (as the old fcBody did)
+  setFCT(R);
   return <>
     <div className="fck" style={{ '--i': 1 }}><div><small>Debt free</small><b>{cur.df ? labS(cur.df) : '—'}</b><span>{cur.df ? mo(mdiff(TK, cur.df)) + ' from now' : 'no loans'}{base && base.df && cur.df && base.df !== cur.df ? ` · was ${labS(base.df)}` : ''}</span></div>{' '}
       <div><small>Next goal</small><b>{ng ? labS(ng.k) : '—'}</b><span>{ng ? tx(ng.g.name) : S.goals.some(g => target(g) > 0) ? 'schedule savings to see dates' : 'add a goal target'}</span></div>{' '}

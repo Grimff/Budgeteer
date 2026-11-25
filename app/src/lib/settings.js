@@ -1,25 +1,33 @@
-// settings: moved from app/public/js/settings.js unchanged except `export`. Its top-level let/var stay there (shared state the
-// classic files reassign); everything else here reads the app's globals by name as before, and dist/settings.js puts these
-// exports on the global object (lib/settings.global.js) so the classic files and the React screens still call them by name.
-// globals: each function is on the global object before any code here runs, each const right after its line, as in a classic script.
-Object.assign(globalThis, { bkList, bkRestore, syncWord, healthChecks });
+// settings: the code of what was app/public/js/settings.js (unchanged but for imports, `export`, the shared state's setters and
+// startSettings(), which holds what used to run as the file loaded).
+// Shared state (other files change it with the set… functions; it was js/settings.js):
+import { renderSettings, rulesFilter } from '../named.jsx';
+import { BK, autoSave, bankFrom, billPaid, incGot, pairIssues, titleC } from './bank.js';
+import { budStart } from './build.js';
+import { S, TK, addM, f0, f2, isDue, labS, mon, plan, $ } from './core.js';
+import { rerender } from './events.js';
+import { histMonths, monthSum } from './history.js';
+import { dshort, inbox } from './linked-loans.js';
+import { row, toast, totals, xsBuild } from './math.js';
+import { FS, PEND, SRV, adopt, sharedData, srvGet } from './server-sync.js';
+import { debtNow } from './wealth.js';
+export let SV='general',RQ=''; export function setSV(v){return SV=v} export function setRQ(v){return RQ=v}
+export let BKP=null; export function setBKP(v){return BKP=v}
 /* ---------- settings: household name, budget options, filing rules, bank connections ---------- */
-try{SV=localStorage.getItem('pfb_sview')||'general'}catch(_){}
 // Household name in the top left and the browser tab (S.hh{name,sub}, shared by both people).
-export const hhName=()=>((S.hh||{}).name||'').trim()||'Budgeteer',hhSub=()=>(S.hh||{}).sub??'Household budget';globalThis.hhName=hhName;globalThis.hhSub=hhSub;
-export const SYNC_OPTS=[[1,'Every hour'],[2,'Every 2 hours'],[3,'Every 3 hours'],[6,'Every 6 hours'],[12,'Twice a day'],[24,'Once a day'],[0,'Only when we tap Sync now']];globalThis.SYNC_OPTS=SYNC_OPTS;
+export const hhName=()=>((S.hh||{}).name||'').trim()||'Budgeteer',hhSub=()=>(S.hh||{}).sub??'Household budget';
+export const SYNC_OPTS=[[1,'Every hour'],[2,'Every 2 hours'],[3,'Every 3 hours'],[6,'Every 6 hours'],[12,'Twice a day'],[24,'Once a day'],[0,'Only when we tap Sync now']];
 // Daily copies on the server (Settings → General → Backups). BKP: null = not loaded yet, 'wait' = loading, or the list.
 
-export const bkLabel=b=>b.kind==='daily'?new Date(b.at+'T12:00:00').toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric',year:'numeric'})+' (as the day began)':'Before the restore on '+new Date(b.at).toLocaleString('en-US',{month:'short',day:'numeric',hour:'numeric',minute:'2-digit'});globalThis.bkLabel=bkLabel;
+export const bkLabel=b=>b.kind==='daily'?new Date(b.at+'T12:00:00').toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric',year:'numeric'})+' (as the day began)':'Before the restore on '+new Date(b.at).toLocaleString('en-US',{month:'short',day:'numeric',hour:'numeric',minute:'2-digit'});
 export async function bkList(){BKP='wait';renderSettings();try{const r=await fetch('api/backups',{cache:'no-store'});if(!r.ok)throw new Error('HTTP '+r.status);BKP=(await r.json()).backups||[]}catch(e){BKP=null;toast('Couldn’t load the daily copies: '+e.message)}renderSettings()}
 // Restoring replaces the budget on the server (the server keeps what was there as a copy), then loads it here.
 export async function bkRestore(id){const b=(Array.isArray(BKP)?BKP:[]).find(x=>x.id===id);if(!b||!confirm(`Replace the budget with the copy from ${bkLabel(b)}?\n\nThe budget as it is now is kept as a copy, so you can switch back.`))return;
  try{const r=await fetch('api/backups/restore',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id})}),j=await r.json().catch(()=>({}));if(!r.ok)throw new Error(j.error||'HTTP '+r.status);
   clearTimeout(FS.t);const d=await srvGet();if(d){adopt(d);FS.dirty=false;try{localStorage.removeItem(PEND)}catch(_){}autoSave();rerender()}toast('Budget restored from '+bkLabel(b));bkList()}
  catch(e){toast('Couldn’t restore: '+e.message)}}
-export const whenS=d=>new Date(d).toLocaleString('en-US',{month:'short',day:'numeric',hour:'numeric',minute:'2-digit'});globalThis.whenS=whenS;
+export const whenS=d=>new Date(d).toLocaleString('en-US',{month:'short',day:'numeric',hour:'numeric',minute:'2-digit'});
 export function syncWord(rf){if(!rf)return 'Transactions sync every few hours';const o=SYNC_OPTS.find(x=>x[0]===rf.hours);return rf.hours?`Checks ${o?o[1].toLowerCase():'every '+rf.hours+' hours'}${rf.open?' and when the app is opened':''}`:(rf.open?'Checks when the app is opened or you tap Sync now':'Checks only when you tap Sync now')}
-document.addEventListener('input',e=>{if(e.target.id==='rulesq'){RQ=e.target.value;rulesFilter()}});
 // Health check (Settings → Data & math): proves the tabs agree and points at data that would make the budget wrong.
 // Each check: {lv:'ok'|'warn'|'bad', t:title, d:detail, a:optional button}.
 // Each check: {lv: ok|warn|bad, t: title, d: message, a?: buttons}. d is text or a list of text and {b: bold text}; a
@@ -60,4 +68,11 @@ export function healthChecks(){const H=[],add=(lv,t,d,a)=>H.push(a&&a.length?{lv
  // 9. Goal accounts split sensibly
  const over=Object.entries(S.alloc||{}).filter(([,e])=>e.mode==='split'&&Object.values(e.pct||{}).reduce((a,b)=>a+(+b||0),0)>100.01);if(Object.keys(S.alloc||{}).length)add(over.length?'bad':'ok','Savings accounts shared between goals',over.length?`${over.length} account${over.length===1?' splits':'s split'} more than 100% between goals`:'Every account’s split adds up to 100% or less');
  return H}
+
+// What this file did as it loaded (listeners, settings read from localStorage, …): main.jsx runs it in the old
+// load order, after every module is defined.
+export function startSettings() {
+try{SV=localStorage.getItem('pfb_sview')||'general'}catch(_){}
+document.addEventListener('input',e=>{if(e.target.id==='rulesq'){RQ=e.target.value;rulesFilter()}});
 document.addEventListener('toggle',e=>{if(e.target.id==='rawd'&&e.target.open)$('#rawpre').textContent=JSON.stringify(sharedData(),null,1)},true);
+}

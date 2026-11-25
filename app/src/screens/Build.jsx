@@ -5,6 +5,13 @@ import { tx, onAct, onInp, onChg } from '../bridge.js';
 import { Clh, TxOpts, CatchSel } from '../ui.jsx';
 import { BudSwitch } from './Budget.jsx';
 import { AlList } from '../schedule.jsx';
+import { bankFrom, billPaid, incGot, recurring, rulesFor, sinkFund, titleC } from '../lib/bank.js';
+import { BSCOPE, LOOSE, ORDN, budStart, firstMonth, pastGaps, recurringIn, topStores, usualAmt } from '../lib/build.js';
+import { MN, NOW, S, TK, addM, f0, f2, isDue, lab, labS, mon, ord, plan } from '../lib/core.js';
+import { gLinked } from '../lib/goal-accounts.js';
+import { dshort } from '../lib/linked-loans.js';
+import { OPEN, bankSrc, goalMon, goalOv, hasPlan, isShut, loanGone, loanUsual, loanXo, xStart, xsBuild } from '../lib/math.js';
+import { SRV } from '../lib/server-sync.js';
 
 const sm125 = { display: 'block', fontWeight: 400, fontSize: '12.5px' };
 const Step = ({ n, t }) => <><span className="bstep">{n}</span>{t}</>;

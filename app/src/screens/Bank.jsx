@@ -2,6 +2,11 @@
 // suggestTx, pairIssues, …) stays in bank.js. The Move panel's buttons and selects keep their data-* hooks.
 import { tx, onAct, onInp, onChg, drawNo } from '../bridge.js';
 import { Gear, TxOpts } from '../ui.jsx';
+import { BK, FLQ, PSET, defAlways, flexDefault, pairIssues, tdir, titleC } from '../lib/bank.js';
+import { S, TK, addM, f2, lab, mon } from '../lib/core.js';
+import { BV, FLF, FLKIND, FLN, dshort, fileKind, inbox, pfcName, suggestTx, txLabel } from '../lib/linked-loans.js';
+import { OPEN } from '../lib/math.js';
+import { SRV } from '../lib/server-sync.js';
 
 // The "Pending" tag after a name (was PND).
 export const Pnd = ({ id }) => PSET.has(id) ? <> <span className="pnd">Pending</span></> : null;

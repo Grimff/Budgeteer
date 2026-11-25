@@ -3,6 +3,12 @@
 import { useLayoutEffect, useRef, useState } from 'react';
 import { tx, onAct } from '../bridge.js';
 import { Gear, CountUp, NmA } from '../ui.jsx';
+import { BK } from '../lib/bank.js';
+import { C, NOW, S, f0, f2, fk } from '../lib/core.js';
+import { dshort } from '../lib/linked-loans.js';
+import { OPEN } from '../lib/math.js';
+import { SRV } from '../lib/server-sync.js';
+import { RANGES, WR, acctsOf, debtNow, invSeries, monthEnd0, perf, rangeFrom, sg, subI, sumBal, valueOn, ymd } from '../lib/wealth.js';
 const bigN = { font: "700 24px 'Inter Display',Inter,sans-serif" };
 
 // Investment value over time. Draws at the width the box has once it's on the page (measured before the first paint,

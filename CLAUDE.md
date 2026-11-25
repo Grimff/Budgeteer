@@ -5,31 +5,32 @@ Docker (`docker compose up -d --build`) on port 8095. Bank data comes from Plaid
 
 ## Deploy
 
-- `app/public/` – the front end; the only CDN is Plaid Link (`cdn.plaid.com`), loaded on demand. `index.html` (markup
-  only) loads `css/app.css` (with `fonts/` Inter woff files), `icons/`, and **scripts in the order listed**: for each
-  of core, math, budget, loans, goals, history, flow, events, bank, build, goal-accounts, compare, settings, wealth,
-  linked-loans, alerts, csv-import, sample, server-sync, its `js/<name>.js` (only that file's shared let/var) then
-  `dist/<name>.js` (its code, built from the ES module `app/src/lib/<name>.js`); the React screens' `dist/app.js`
-  after csv-import. They share one global scope, exactly like the single script they were split from: each module
-  puts its functions on the global object before any of its code runs and each const right after its line, as a
-  classic script would. Code that runs at load must not call a function from a later file; calls inside functions
-  and handlers are fine. server-sync is last and starts the app (`renderAll` + `fsInit`). A new js/lib file must be
-  added to index.html (check.js fails otherwise).
-- **React screens** (`app/src/`, the move to React in progress): JSX built by `tools/build.js` (esbuild; `npm install`
-  once; `npm run build`/`watch`; `npm start`, `npm test`, realtest and livetest build first) into
-  `app/public/dist/app.js` (git-ignored), which index.html loads as one more classic script after csv-import.js and
-  before sample.js (check.js enforces the place). The bundle reads the shared globals by name like every other file.
+- `app/public/` – the front end; the only CDN is Plaid Link (`cdn.plaid.com`, its `Plaid` global is the one global
+  the code uses), loaded on demand. `index.html` (markup only) loads `css/app.css` (with `fonts/` Inter woff files),
+  `icons/`, and one script, `dist/app.js` (git-ignored): the whole app, built by `tools/build.js` (esbuild; `npm install`
+  once; `npm run build`/`watch`; `npm start`, `npm test`, realtest and livetest build first) from `app/src/main.jsx`
+  and everything it imports. check.js enforces that index.html loads only that.
+- **The code (`app/src/`)** is ES modules with explicit imports; nothing is shared through globals.
+  - `lib/<name>.js`: the app's logic, what the old js/<name>.js files held (core, math, budget, loans, goals, history,
+    flow, events, bank, build, goal-accounts, compare, settings, wealth, linked-loans, alerts, csv-import, sample,
+    server-sync). `screens/`, `popups/`, `flow/`, `frame.jsx`, `schedule.jsx`, `ui.jsx`: React. `actions.js`: click and
+    field handlers. `bridge.js`, `store.js`, `tabs.jsx`: drawing and the store. `named.jsx`: the functions written in
+    React that other code calls by name (renderX, catRender, sankey, fsUI…). `parity.js`: the re-render check.
+    `debug.js`: `window.__app`. `main.jsx`: the entry.
+  - **Shared state** (a module's `export let`, e.g. the caches LP/GP/XS that renderAll resets, BUDV, SV, S): other
+    modules read it through the import (live) and change it only with its setter, `set<Name>(v)` (`export function
+    setLP(v){return LP=v}` next to the `let`); an ES module can't assign another module's variable.
+  - **Load order:** what a file did as it loaded (listeners, settings read from localStorage, the app's start) is its
+    `start<Name>()` (end of each lib file), which main.jsx calls in the old order: core … csv-import, then the React
+    frame and main.jsx's own setup, then sample and server-sync (which starts the app: `renderAll` + `fsInit`). A
+    module's top level only defines things (functions, and consts from literals or its own earlier consts), so the
+    order the bundle evaluates modules in doesn't matter. New code that must run at load goes in its file's start<Name>.
+  - **Sample mode** sets `window.__app` (debug.js): every module's names (shared variables settable), for the console
+    or a test script (`with (__app) { … }`); `__store`, `__drawNo`, `__paritySnap` for the self-test. The app never reads
+    them. The self-test's results are `window.SELFTEST_RESULT`.
+  - The parity check's stand-in for `recurring()` (a case with made-up bill suggestions) is bank.js's `RECF`/`setRECF`
+    (it used to replace `window.recurring`).
   See "Moving to React" below.
-- **The app's code is ES modules** (step 4 of the move to React): `app/src/lib/<name>.js` is what `js/<name>.js` held,
-  unchanged except `export` on each top-level function and const and the lines that put them on the global object
-  (`// globals:` at the top, `globalThis.X=X;` after each const). `js/<name>.js` keeps only its top-level let/var
-  (shared state other files reassign, e.g. the caches LP/GP/XS that renderAll resets: a module's own variable can't
-  be reassigned from outside). tools/build.js builds `lib/<name>.global.js` into `dist/<name>.js`, loaded right after
-  it (check.js enforces the place). **Edit code in app/src/lib, not js/.** New shared state that other files reassign
-  goes in js/<name>.js as a `let`; a new function or const goes in the module with `export` and a global line. A
-  moved const is now a window property (a classic const wasn't): don't reuse its name as a `window.X` property (the
-  self-test's results are `window.SELFTEST_RESULT`, since `SELFTEST` is core's flag), and don't use a name the window
-  already has.
 - `app/server.js` – Node 18+, no npm dependencies. Reads `.env` (project folder or cwd) at start;
   real environment variables win. Relative `DATA_DIR` is resolved from the project folder.
 - **Settings and secrets:** `.env` (git-ignored; template `.env.example`) holds `PLAID_CLIENT_ID`, `PLAID_SECRET`,
@@ -66,11 +67,13 @@ server against a real `data/` folder while testing; use `tools/realtest.js`.
   duplicate click actions (a second `case'x':` never runs; v6 shipped with the schedule's `alDel`/`alMode`
   shadowed by the Goals accounts card's, so Remove did nothing), buttons with no handler, repeated
   data-k/data-c/data-live keys, and change handlers after `if(!d.c)return;`. Name new actions with a prefix no
-  other feature uses (schedule = `sc*`, accounts card = `al*`). check.js reads the js files in index.html order and
-  also checks each file parses alone and starts with `'use strict';`. Use the Write tool for JSON/launch files.
+  other feature uses (schedule = `sc*`, accounts card = `al*`). check.js parses every file in app/src
+  (with esbuild) and checks index.html loads only dist/app.js. A name used without being imported is an error only when
+  that code runs (in sample mode too: nothing is on window), so add the import with the code; `npm test`'s self-test
+  runs every screen, dialog and view. Use the Write tool for JSON/launch files.
 - **`npm test`** before every push (check its exit code, not a piped tail): check.js, `tools/test-server.js` (server vs a fake Plaid, twice), and the in-app
   self-test in headless Chrome (`--dump-dom` of `/?selftest`; skipped with a note if no Chrome/Chromium/Edge).
-- **Sample household / self-test** (`js/sample.js`): `?demo` installs `demoFetch` over `window.fetch`, answering every
+- **Sample household / self-test** (`app/src/lib/sample.js`): `?demo` installs `demoFetch` over `window.fetch`, answering every
   `api/` call in the page from `sampleData()` (seeded, 7 months, 5 accounts, rules that file everything), and uses
   `KEY+'_demo'` for localStorage, so real data is never read or written. `?selftest` = demo + `selfTest()` (35+
   checks: totals against the raw sample transactions, transfers, set-asides, loans, goals, health checks, saving, every
@@ -212,15 +215,18 @@ works (and `npm test` passes) after every step.
   hidden tab (`__drawNo` in sample mode). Fields stay uncontrolled (defaultValue + resync): the amount formatter,
   select-on-focus and rerender's restore of typed text and caret work on them as before; controlled fields would mean
   a draft per field rebuilding all of that, for no visible change, so that step was dropped.
-- **Step 4 (in progress): the js/ files into ES modules** (see Deploy: app/src/lib, dist/<name>.js). Checked with a
+- **Step 4 (done): the js/ files into ES modules, one bundle** (see Deploy). Checked with a
   snapshot of the sample household before and after (every tab and view's text for every month, totals, loan paths,
   goal projections, the schedule simulation, health checks: identical; a planted $1 slip changes 30 entries).
   The old draw functions (the 31 names main.jsx used to swap, `replaceScreen`/`LEGACY`) and the 52 string helpers only
   they used are deleted (old dead code kept: `confetti`, never called since the first version); the React versions
   are defined by name with `setGlobal`. That came first because a module can't hold a function that's swapped by name.
-  Then every js/ file moved the same way (19 modules); the record of all 1088 parity cases, the snapshot and the
-  click-through of every tab were identical. Next: explicit imports between the modules instead of globals, one
-  bundle.
+  Then every js/ file moved the same way (19 modules, each still putting its names on the global object), and then
+  to explicit imports and one bundle: each js/ file's let/var became its module's `export let` with a setter, the 184
+  assignments from other files became setter calls (scope-aware: a local of the same name is left alone), what ran at
+  load became start<Name>(), main.jsx's setGlobal definitions became named.jsx, and an import was added for every
+  name a file used without declaring (found by TypeScript's "cannot find name", browser globals known). Each step:
+  the record of all 1088 parity cases, the snapshot and the click-through of every tab identical.
 
 ## Server API (`server.js`)
 
@@ -394,12 +400,12 @@ works (and `npm test` passes) after every step.
 
 ## Screens
 
-- **Needs a look** (`js/alerts.js`, `AlertsCard` above the setup checklist, current month only): `alertsNow()` = banks
+- **Needs a look** (`lib/alerts.js`, `AlertsCard` above the setup checklist, current month only): `alertsNow()` = banks
   with errors, linked bills (have a rule) not paid by their due day or due within 3 days (`isDue`, `billPaid`), flex
   items over plan (`flexAct`), transactions to sort (`inbox`). Keys carry the month; **Hide** (`ntHide`) stores keys
   in localStorage `pfb_alerts_hidden`. `notifyAlerts()` runs after each `bankLoad` and posts them to `/api/notify`
   (skipped in sample mode). Settings → Connections → Phone alerts (`NtCard`, `ntTest`).
-- **CSV import screen** (`js/csv-import.js`, `CsvCard` in Settings → Connections, also shown without Plaid keys):
+- **CSV import screen** (`lib/csv-import.js`, `CsvCard` in Settings → Connections, also shown without Plaid keys):
   `cvSplit` (quotes, CRLF, BOM, `,`/`;`/tab), `cvNum` (parentheses, currency, decimal comma), `cvDate`
   (`ymd`/`mdy`/`dmy`), `cvLoadText` guesses columns, `cvRows` builds Plaid-signed rows, `cvImport`/`cvDel`. State in
   `CV` (not saved); selects use `data-cv` and inputs `data-cvt` with their own listeners (not the main change listener).

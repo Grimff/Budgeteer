@@ -11,6 +11,12 @@ import { flushSync } from 'react-dom';
 import { tx, onAct } from './bridge.js';
 import { FRAME_ON } from './actions.js';
 import { useBudget, useFrame, changed, frameChanged } from './store.js';
+import { BK } from './lib/bank.js';
+import { $$, S, TK, lab, $ } from './lib/core.js';
+import { moveInd } from './lib/events.js';
+import { inbox } from './lib/linked-loans.js';
+import { SRV } from './lib/server-sync.js';
+import { hhName, hhSub } from './lib/settings.js';
 
 // The frame elements' own listeners (FRAME_ON), attached natively once per element.
 const REFS = {};

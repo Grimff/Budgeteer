@@ -2,6 +2,8 @@
 // so far against the plan, worst first. cmpRows (the numbers) stays in compare.js; the Budget tab and the monthly
 // review use it too.
 import { draw, tx, onAct } from '../bridge.js';
+import { cmpRows } from '../lib/compare.js';
+import { S, TK, f0 } from '../lib/core.js';
 
 // "good" lines (loans, savings) are fine above plan; spending lines are not.
 function cmpSt(r, k) {

@@ -1,5 +1,8 @@
 // History tab (was renderHistory in js/history.js). monthSum/histMonths/HR stay in history.js.
 import { tx, onAct } from '../bridge.js';
+import { S, TK, f0, f2, fk, lab, mon, $ } from '../lib/core.js';
+import { HR, histMonths, monthSum } from '../lib/history.js';
+import { OPEN } from '../lib/math.js';
 
 const mshort = k => new Date(+k.slice(0, 4), +k.slice(5) - 1, 1).toLocaleDateString('en-US', { month: 'short' });
 const dash = (v, plus, minus) => Math.abs(v) < 0.5 ? '—' : (v > 0 ? plus : minus) + f0(Math.abs(v));

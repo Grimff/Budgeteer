@@ -1,17 +1,17 @@
-// alerts: moved from app/public/js/alerts.js unchanged except `export`. Its top-level let/var stay there (shared state the
-// classic files reassign); everything else here reads the app's globals by name as before, and dist/alerts.js puts these
-// exports on the global object (lib/alerts.global.js) so the classic files and the React screens still call them by name.
-// globals: each function is on the global object before any code here runs, each const right after its line, as in a classic script.
-Object.assign(globalThis, { alertsNow, ntHide, notifyAlerts, ntTest });
+// alerts: the code of what was app/public/js/alerts.js (unchanged but for imports, `export`, the shared state's setters and
+// startAlerts(), which holds what used to run as the file loaded).
+// Shared state (other files change it with the set… functions; it was js/alerts.js):
+import { renderBudget } from '../named.jsx';
+import { BK, billPaid, flexAct, rulesFor } from './bank.js';
+import { DEMO, TK, addM, f0, isDue, ord, plan } from './core.js';
+import { inbox } from './linked-loans.js';
+import { toast } from './math.js';
+import { SRV } from './server-sync.js';
+export let NTH={}; export function setNTH(v){return NTH=v}
+export let NOTIFY=null; export function setNOTIFY(v){return NOTIFY=v}
 /* ---------- alerts: what needs a look this month ---------- */
-// alertsNow() lists, for the current month: bank connections that need signing in again, linked bills not seen in the
-// bank by their due day (or due within 3 days), spending categories over plan, and transactions waiting to be sorted.
-// Each alert has a key (with the month in it) used to hide it in this browser (NTH) and to send it to a phone once
-// (notifyAlerts → server /api/notify, which skips keys it already sent). Bills only alert once linked to a payment,
-// since an unlinked bill never shows as paid.
-try{NTH=JSON.parse(localStorage.getItem('pfb_alerts_hidden')||'{}')||{}}catch(_){}
 // a: the alert's button, {act, label, ...data-* values} like a health check's (hcBtns draws it).
-export const ntOpen=i=>({act:'catTx',v:'i:'+i.id,label:'Open'});globalThis.ntOpen=ntOpen;
+export const ntOpen=i=>({act:'catTx',v:'i:'+i.id,label:'Open'});
 export function alertsNow(){if(!SRV||!BK.st||!BK.st.configured)return[];const k=TK,A=[],day=new Date().getDate(),p=plan(k);
  (BK.st.items||[]).filter(it=>it.error).forEach(it=>A.push({key:`conn:${it.item_id}:${it.error.code||''}`,lv:'bad',t:`${it.institution.name} needs you to sign in again`,d:it.error.message||'Its bank sync stopped.',a:{act:'sview',v:'connections',label:'Open Connections'}}));
  p.groups.filter(g=>!g.flex).forEach(g=>g.items.forEach(i=>{const due=+i.due,amt=i.base??i.amt;if(!due||i.once||!rulesFor('i:'+i.id).length||!isDue(i,k)||billPaid(k,i.id))return;
@@ -27,3 +27,14 @@ export function ntHide(key){NTH[key]=1;const m=TK;Object.keys(NTH).forEach(x=>{c
 export async function notifyAlerts(){if(!SRV||DEMO)return;try{if(!NOTIFY){const r=await fetch('api/notify',{cache:'no-store'});NOTIFY=r.ok?await r.json():{configured:false}}if(!NOTIFY.configured)return;
  const A=alertsNow().map(a=>({key:a.key,title:a.t,message:a.d}));if(A.length)await fetch('api/notify',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({alerts:A})})}catch(_){}}
 export async function ntTest(){try{const r=await fetch('api/notify/test',{method:'POST'}),j=await r.json().catch(()=>({}));toast(r.ok?'Test alert sent. Check your phone.':'Couldn’t send: '+(j.error||'HTTP '+r.status))}catch(e){toast('Couldn’t send: '+e.message)}}
+
+// What this file did as it loaded (listeners, settings read from localStorage, …): main.jsx runs it in the old
+// load order, after every module is defined.
+export function startAlerts() {
+// alertsNow() lists, for the current month: bank connections that need signing in again, linked bills not seen in the
+// bank by their due day (or due within 3 days), spending categories over plan, and transactions waiting to be sorted.
+// Each alert has a key (with the month in it) used to hide it in this browser (NTH) and to send it to a phone once
+// (notifyAlerts → server /api/notify, which skips keys it already sent). Bills only alert once linked to a payment,
+// since an unlinked bill never shows as paid.
+try{NTH=JSON.parse(localStorage.getItem('pfb_alerts_hidden')||'{}')||{}}catch(_){}
+}

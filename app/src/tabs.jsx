@@ -18,6 +18,11 @@ import { Bank } from './screens/Bank.jsx';
 import { ThisMonth } from './screens/Budget.jsx';
 import { Forecast } from './screens/Forecast.jsx';
 import { Build } from './screens/Build.jsx';
+import { BK } from './lib/bank.js';
+import { BUDV } from './lib/build.js';
+import { S } from './lib/core.js';
+import { SRV } from './lib/server-sync.js';
+import { bankBadge, fcBody, sankey } from './named.jsx';
 
 const TABS = ['budget', 'loans', 'goals', 'wealth', 'history', 'bank', 'settings'];
 const TT = Object.fromEntries(TABS.map(t => [t, tick()]));   // per tab: redraw asked by name

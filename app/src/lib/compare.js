@@ -1,8 +1,11 @@
-// compare: moved from app/public/js/compare.js unchanged except `export`. Its top-level let/var stay there (shared state the
-// classic files reassign); everything else here reads the app's globals by name as before, and dist/compare.js puts these
-// exports on the global object (lib/compare.global.js) so the classic files and the React screens still call them by name.
-// globals: each function is on the global object before any code here runs, each const right after its line, as in a classic script.
-Object.assign(globalThis, { cmpRows, flowOpen });
+// compare: the code of what was app/public/js/compare.js (unchanged but for imports, `export`, the shared state's setters and
+// startCompare(), which holds what used to run as the file loaded).
+// Shared state (other files change it with the set… functions; it was js/compare.js):
+import { flowRender } from '../named.jsx';
+import { billPaid, flexAct } from './bank.js';
+import { C, S, isDue, plan, $ } from './core.js';
+import { goalPlan, loanPlan, row, savedIn } from './math.js';
+export let FD=null; export function setFD(v){return FD=v}
 /* ---------- Compare view and flow details ---------- */
 // Every budget line this month: planned vs what really happened so far. pend = not paid yet (not a saving).
 export function cmpRows(k=S.cur){const p=plan(k),rows=[];
@@ -14,3 +17,5 @@ export function cmpRows(k=S.cur){const p=plan(k),rows=[];
 // Details for one budget line, a whole group, or an income source: totals, a 6-month history, and stores.
 
 export function flowOpen(key){FD=key;flowRender();$('#fdlg').showModal()}
+
+export function startCompare() { }   // nothing ran at load

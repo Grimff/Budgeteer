@@ -1,5 +1,0 @@
-'use strict';
-// alerts's shared state: top-level let/var other files read or reassign. Its code is the ES module app/src/lib/alerts.js,
-// loaded right after this file as dist/alerts.js (tools/build.js), which puts its functions and constants on the global object.
-let NTH={};
-let NOTIFY=null;

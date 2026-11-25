@@ -1,6 +1,9 @@
 // The schedule editor (was alForm, alAdds, alList in js/build.js), used by Build budget step 6 and the Forecast.
 // alDesc/alWhen/alCol/destName stay in build.js and math.js. Its inputs keep data-al / data-k="alv" for events.js.
 import { tx, onAct, onInp, onChg } from './bridge.js';
+import { ALE, alCol, alDesc, alWhen } from './lib/build.js';
+import { S, TK } from './lib/core.js';
+import { destName, loanGone } from './lib/math.js';
 
 export function AlForm({ a }) {
   const cur = a.to === 'snow' ? 'snow' : a.to;

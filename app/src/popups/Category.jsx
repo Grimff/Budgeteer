@@ -5,6 +5,13 @@
 import { draw, tx, onAct, onChg } from '../bridge.js';
 import { TxOpts } from '../ui.jsx';
 import { Pnd, ruleTagT } from '../screens/Bank.jsx';
+import { BK, CR, CT, catFilter, flexAct, merchKey, merchKeys, normT, ruleTag, rulesFor, samePayee, titleC } from '../lib/bank.js';
+import { firstMonth } from '../lib/build.js';
+import { FD } from '../lib/compare.js';
+import { S, addM, f0, f2, fk, lab, mon, plan, $ } from '../lib/core.js';
+import { gLinked } from '../lib/goal-accounts.js';
+import { allItems, dshort, txLabel } from '../lib/linked-loans.js';
+import { bankSrc, goalPlan, goalSaved, linkedSaved, loanPlan, row } from '../lib/math.js';
 
 // ---------- trends (flowRender) ----------
 // Everything the trends view shows for one line or group (key: i:/inc:/l:/g:/grp:), for month S.cur.
