@@ -12,7 +12,7 @@ import { renderAll } from './events.js';
 import { nodeKey } from './flow.js';
 import { monthSum } from './history.js';
 import { allItems, inbox, linkLoan, BV, setBV, txUndo, txAssign } from './linked-loans.js';
-import { goalEta, goalMon, goalSaved, path, setLP, totals, unplannedA, linkedChange, goalShare, savedWork, invInfo } from './math.js';
+import { goalEta, goalMon, goalSaved, path, setLP, totals, unplannedA, linkedChange, goalShare, savedWork, invInfo, savedIn, linkedSaved } from './math.js';
 import { FS } from './server-sync.js';
 import { BKP, bkList, bkRestore, healthChecks, SV, setSV, hcDot } from './settings.js';
 import { debtNow } from './wealth.js';
@@ -188,6 +188,12 @@ export async function selfTest(){const T=[],ok=(c,name,detail='')=>T.push({ok:!!
    const sh=goalShare('brok','trip',TK),v=linkedChange(g,TK),W=savedWork(g,TK),inf=invInfo(g,TK);
    txUndo('st-x2');T.forEach(t=>BK.tx.splice(BK.tx.indexOf(t),1));a.flows=fl0;if(al0)S.alloc.brok=al0;else delete S.alloc.brok;setALC({});setLP({});setTXI(null);
    ok(Math.abs(v-r2(sh*250))<0.01&&W.some(w=>w.sub&&w.sub.filter(x=>x.on).length===1)&&Math.abs(inf.payroll-r2(sh*1428))<0.02,'A 401(k) counts money moved in from checking as saving, not payroll or a same-amount purchase',`${v} (share ${sh.toFixed(2)}), payroll ${inf.payroll}`)}
+  // A checking account linked to a goal counts as nothing: not progress, not saving (a payday isn't money saved)
+  { const c=BK.accts.find(x=>x.type==='depository'&&/checking/.test(x.subtype||'')),g=S.goals.find(x=>x.id==='trip'),s0=savedIn(g,TK),p0=linkedSaved(g,TK);
+   S.alloc[c.id]={mode:'order',goals:['trip'],pct:{},rest:'last'};setALC({});setLP({});const s1=savedIn(g,TK),p1=linkedSaved(g,TK),w=savedWork(g,TK).find(x=>/checking account, not counted/.test(x.t));
+   S.tab='goals';renderAll();const flag=/doesn’t count toward goals/.test($('#T-goals').textContent),pick=[...document.querySelectorAll('#T-goals select[data-gacct] option, #T-goals select[data-alacct] option')].some(o=>o.value===c.id);
+   delete S.alloc[c.id];setALC({});setLP({});S.tab='budget';renderAll();
+   ok(s1===s0&&p1===p0&&!!w&&flag&&!pick,'A checking account linked to a goal adds nothing to it and is flagged',`saved ${s0}→${s1}, progress ${p0}→${p1}, flagged ${flag}, offered ${pick}`)}
   // Rent for next month paid late this month counts in next month (not twice in this one); a filing made before that
   // rule existed is moved on the next filing pass; a hand filing is never moved.
   { const rt=BK.tx.find(t=>t.date.slice(0,7)===TK&&/OAKWOOD/.test(t.name)),last=new Date(+TK.slice(0,4),+TK.slice(5,7),0).getDate(),id='st-early';

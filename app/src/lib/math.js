@@ -81,6 +81,10 @@ export function linkedSaved(g,k=S.cur){return allocAt(k).out[g.id]||0}
 // An investment account (the server already hands these over as 'investment'; this also catches 'brokerage' and a
 // retirement account filed under another type). Its market change is never saving: only money moved in from checking.
 const INV_RE=/401|403|457|\bira\b|roth|pension|retire|brokerage|annuity|stock plan|keogh|profit sharing|mutual fund|tfsa|rrsp/i;
+// A checking (or similar everyday) account: its balance rises with each paycheck and falls with each bill, so it never
+// counts toward a goal, neither as progress nor as saving. A checking account linked to Retirement made a payday look
+// like $1,400 saved. The goal pickers leave these out; one linked before is flagged on the Goals page.
+export const isChecking=a=>!!a&&a.type==='depository'&&/checking|paypal|prepaid|cash management|ebt/i.test(a.subtype||'');
 export const isInv=a=>!!a&&(a.type==='investment'||a.type==='brokerage'||(!['depository','credit','loan'].includes(a.type)&&[a.subtype,a.name,a.official].some(x=>INV_RE.test(x||''))));
 // A contribution "from home" matches a checking/savings payment of the same amount within 5 days (a Roth IRA transfer).
 // One with no match came straight from a paycheck (401(k)/403(b)) and never was take-home pay.
@@ -104,6 +108,7 @@ export function savedWork(g,k=S.cur){const W=[],dep=+(MO(k).dep[g.id]||0);if(Mat
   if(isInv(a)){const sh=goalShare(aid,g.id,k),m=homeMatch(a),F=(a.flows||[]).filter(f=>f.date&&f.date.slice(0,7)===k);
    W.push({t:`${a.name}: investment account, counts only money moved in from checking`+(sh<0.999?` (this goal's share ${Math.round(sh*100)}%)`:''),amt:r2(sh*flowsIn(a,k,true)),sub:F.map(f=>{const t=m.get(f),gf=t&&((S.txd[t.id]||{}).v||'').startsWith('g:');return{d:f.date,amt:+f.amt,why:t?(gf?`from checking (${t.merchant||t.name}, ${t.date}), already a deposit above`:`from checking: ${t.merchant||t.name}, ${t.date}`):(+f.amt>0?'not from checking (payroll or employer): not counted':'money out: not counted'),on:!!t&&!gf}}),
     note:F.length?'':'No deposits or withdrawals this month; its change in value is market movement and isn’t counted.'})}
+  else if(isChecking(a))W.push({t:`${a.name}: checking account, not counted`,amt:0,note:'Its balance goes up with each paycheck and down with each bill, so it isn\u2019t saving. Take it off this goal under Goals → Accounts for goals.'});
   else{const a1=(allocAt(k).by[aid]||{})[g.id]||0,a0=(allocPrev(k).by[aid]||{})[g.id]||0;W.push({t:`${a.name}: ${a.type==='depository'?'bank account':a.type||'account'}, counts this goal's share of its change in balance`,amt:r2(a1-a0),note:`${f2(a0)} at the end of last month → ${f2(a1)} now`})}});
  return W}
 // This goal's share of an account in month k (0..1), from how the account's balance is divided.
