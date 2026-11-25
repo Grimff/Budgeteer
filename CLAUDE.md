@@ -261,7 +261,11 @@ server against a real `data/` folder while testing; use `tools/realtest.js`.
   `investment` any `brokerage` account or retirement account filed under another type, e.g. `other`/`401k`, and fetches
   its holdings and flows; before, such a 401(k) counted its market gains as saving): progress uses the
   balance share, but "saved this month" (`linkedChange`) counts only contributions from take-home
-  pay (`fromHome`); payroll contributions and market change show on the goal card (`invInfo`).
+  pay (`homeMatch`: each deposit needs its own checking payment of the same amount 0–5 days before / 1 after that is a
+  transfer out, not filed to a bill, purchase, income or loan; one filed to a goal is already that goal's deposit and
+  isn't counted again; before, any same-amount checking transaction within 5 days counted); payroll contributions and
+  market change show on the goal card (`invInfo`). Data & math → Goal math → "Saved in <month>, line by line"
+  (`savedWork`) shows where each goal's actual comes from, deposit by deposit.
 - `txd{txId:{v,k,amt,d,n,auto?,pair?,extra?}}` – filed bank transactions. `v`: `i:item`,
   `inc:income`, `once` (one-time income), `l:loan`, `g:goal`, `xfer`, `skip`. `k` = month it counts
   in. `auto`: rule id, `'pair'` or `'rest'` (catch-all).

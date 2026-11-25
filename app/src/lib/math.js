@@ -1,9 +1,9 @@
 // math: the code of what was app/public/js/math.js (unchanged but for imports, `export`, the shared state's setters and
 // startMath(), which holds what used to run as the file loaded).
 // Shared state (other files change it with the set… functions; it was js/math.js):
-import { BK, acctType, billPaid, flexAct, incActual, incGot, rulesFor } from './bank.js';
+import { BK, acctType, billPaid, flexAct, incActual, incGot, rulesFor, txIdx, isXferish } from './bank.js';
 import { budStart } from './build.js';
-import { MO, MOW, RM, S, TK, addM, f0, mdiff, plan, r2, uid, $ } from './core.js';
+import { MO, MOW, RM, S, TK, addM, f0, mdiff, plan, r2, uid, $, f2 } from './core.js';
 import { allocAt, allocPrev, gLinked } from './goal-accounts.js';
 import { SRV } from './server-sync.js';
 export let LP={}; export function setLP(v){return LP=v}
@@ -84,8 +84,28 @@ const INV_RE=/401|403|457|\bira\b|roth|pension|retire|brokerage|annuity|stock pl
 export const isInv=a=>!!a&&(a.type==='investment'||a.type==='brokerage'||(!['depository','credit','loan'].includes(a.type)&&[a.subtype,a.name,a.official].some(x=>INV_RE.test(x||''))));
 // A contribution "from home" matches a checking/savings payment of the same amount within 5 days (a Roth IRA transfer).
 // One with no match came straight from a paycheck (401(k)/403(b)) and never was take-home pay.
-export function fromHome(f){const day=d=>Date.parse(d)/864e5;return BK.tx.some(t=>acctType(t.account)==='depository'&&Math.abs(t.amount-f.amt)<0.01&&Math.abs(day(t.date)-day(f.date))<=5)}
-export function flowsIn(a,k,home){return r2((a.flows||[]).filter(f=>f.date&&f.date.slice(0,7)===k&&(home==null||fromHome(f)===home)).reduce((x,f)=>x+(+f.amt||0),0))}
+// Which deposits into an investment account came from your checking account (and so count as saving): each needs a
+// checking payment of its own, same amount, 0–5 days before it (or 1 after), that is a transfer out: not a bill, a
+// purchase or anything filed to a budget line. (Before, any checking transaction of the same amount within 5 days
+// either way counted.) Payroll contributions have none; market change is never a deposit. Cached until filings change.
+const HOME_RE=/401|403|457|\bira\b|roth|retire|invest|brokerage|contribut|transfer|xfer/i;let HM=null;
+export function homeMatch(a){const ti=txIdx();if(!HM||HM.ti!==ti||HM.tx!==BK.tx)HM={ti,tx:BK.tx,m:{}};if(HM.m[a.id])return HM.m[a.id];
+ const day=d=>Date.parse(d)/864e5,used=new Set(),out=new Map(),inst=((a.institution||'').split(/\s+/)[0]||'').toLowerCase();
+ const ok=t=>{const r=S.txd&&S.txd[t.id];if(r&&/^(i:|inc:|l:|once|split)/.test(r.v||''))return false;const nm=(t.merchant||'')+' '+(t.name||'');return isXferish(t)||!!(r&&(r.v==='xfer'||(r.v||'').startsWith('g:')))||HOME_RE.test(nm)||(inst.length>2&&nm.toLowerCase().includes(inst))};
+ const C=BK.tx.filter(t=>t.amount>0&&!t.pending&&acctType(t.account)==='depository'&&ok(t));
+ (a.flows||[]).filter(f=>+f.amt>0&&f.date).sort((x,y)=>x.date.localeCompare(y.date)).forEach(f=>{const t=C.find(t=>!used.has(t.id)&&Math.abs(t.amount-f.amt)<0.01&&day(f.date)-day(t.date)>=-1&&day(f.date)-day(t.date)<=5);if(t){used.add(t.id);out.set(f,t)}});
+ return HM.m[a.id]=out}
+// home: true = moved in from checking (a payment filed to a goal is already a deposit there, so it isn't counted again),
+// false = everything else (payroll), null = all.
+export function flowsIn(a,k,home){const m=isInv(a)?homeMatch(a):new Map();return r2((a.flows||[]).filter(f=>{if(!f.date||f.date.slice(0,7)!==k)return false;if(home==null)return true;const t=m.get(f),isH=!!t&&!((S.txd[t.id]||{}).v||'').startsWith('g:');return home?isH:!t}).reduce((x,f)=>x+(+f.amt||0),0))}
+// How a goal's saving in month k is made up (Settings → Data & math): deposits by hand, then each linked account.
+export function savedWork(g,k=S.cur){const W=[],dep=+(MO(k).dep[g.id]||0);if(Math.abs(dep)>0.004)W.push({t:'Deposits filed or entered by hand',amt:r2(dep)});
+ if(gLinked(g))Object.entries(S.alloc||{}).forEach(([aid,e])=>{if(!(e.goals||[]).includes(g.id))return;const a=(BK.accts||[]).find(y=>y.id===aid);if(!a)return;
+  if(isInv(a)){const sh=goalShare(aid,g.id,k),m=homeMatch(a),F=(a.flows||[]).filter(f=>f.date&&f.date.slice(0,7)===k);
+   W.push({t:`${a.name}: investment account, counts only money moved in from checking`+(sh<0.999?` (this goal's share ${Math.round(sh*100)}%)`:''),amt:r2(sh*flowsIn(a,k,true)),sub:F.map(f=>{const t=m.get(f),gf=t&&((S.txd[t.id]||{}).v||'').startsWith('g:');return{d:f.date,amt:+f.amt,why:t?(gf?`from checking (${t.merchant||t.name}, ${t.date}), already a deposit above`:`from checking: ${t.merchant||t.name}, ${t.date}`):(+f.amt>0?'not from checking (payroll or employer): not counted':'money out: not counted'),on:!!t&&!gf}}),
+    note:F.length?'':'No deposits or withdrawals this month; its change in value is market movement and isn’t counted.'})}
+  else{const a1=(allocAt(k).by[aid]||{})[g.id]||0,a0=(allocPrev(k).by[aid]||{})[g.id]||0;W.push({t:`${a.name}: ${a.type==='depository'?'bank account':a.type||'account'}, counts this goal's share of its change in balance`,amt:r2(a1-a0),note:`${f2(a0)} at the end of last month → ${f2(a1)} now`})}});
+ return W}
 // This goal's share of an account in month k (0..1), from how the account's balance is divided.
 export function goalShare(aid,gid,k){const a=(BK.accts||[]).find(x=>x.id===aid),B=a?acctAt(a,k):0,v=(allocAt(k).by[aid]||{})[gid]||0;return B>0?v/B:0}
 // Change in this goal's linked accounts during month k that counts as saving (Budget totals, "saved this month"):

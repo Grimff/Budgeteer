@@ -13,7 +13,7 @@ import { soFarOf } from '../lib/budget.js';
 import { DEMO, S, TK, f0, f2, lab, labS, mon, plan } from '../lib/core.js';
 import { CV, cvAccts, cvRows } from '../lib/csv-import.js';
 import { dshort, txLabel, txTargets } from '../lib/linked-loans.js';
-import { OPEN, balEnd, bankSrc, extraPaid, goalPlan, goalSaved, linkedSaved, loanGone, manualSaved, row, savedIn, savedL, totals } from '../lib/math.js';
+import { OPEN, balEnd, bankSrc, extraPaid, goalPlan, goalSaved, linkedSaved, loanGone, manualSaved, row, savedIn, savedL, totals, savedWork } from '../lib/math.js';
 import { FS, SRV } from '../lib/server-sync.js';
 import { BKP, RQ, SV, SYNC_OPTS, bkLabel, healthChecks, hhName, hhSub, syncWord, whenS } from '../lib/settings.js';
 import { acctsOf, debtNow, sumBal } from '../lib/wealth.js';
@@ -124,7 +124,11 @@ function DataView() {
     const G = S.goals;
     out.push(<section key="gm" className="card" style={card16}><h2>Goal math · {tx(lab(k))}</h2><p className="mut" style={note14}>Saved = set aside by hand (starting amount + monthly deposits) + your share of linked accounts.</p>{' '}
       {tb([tr(['Goal', 'By hand', '+ Linked accounts', '= Saved', 'Target', 'In ' + lm.slice(0, 3) + ' (plan / actual)'], 'th'), ...G.map(g => tr([<b>{tx(g.name)}</b>, f2(manualSaved(g, k)), f2(linkedSaved(g, k)), f2(goalSaved(g, k)), g.target ? f2(+g.target) : '—', `${f0(goalPlan(g, k))} / ${f0(savedIn(g, k))}`])),
-        tr(['Total', f2(G.reduce((a, g) => a + manualSaved(g, k), 0)), f2(G.reduce((a, g) => a + linkedSaved(g, k), 0)), f2(G.reduce((a, g) => a + goalSaved(g, k), 0)), '', `${f0(T.save)} / ${f0(T.saveA)}`], 'tot')], 'num')}</section>);
+        tr(['Total', f2(G.reduce((a, g) => a + manualSaved(g, k), 0)), f2(G.reduce((a, g) => a + linkedSaved(g, k), 0)), f2(G.reduce((a, g) => a + goalSaved(g, k), 0)), '', `${f0(T.save)} / ${f0(T.saveA)}`], 'tot')], 'num')}{' '}
+      <h3 style={{ margin: '18px 0 4px' }}>Saved in {tx(lm)}, line by line</h3><p className="mut" style={note14}>Where each goal's “actual” above comes from. This is the saving the Budget counts this month.</p>
+      {G.map(g => { const W = savedWork(g, k); return W.length ? <div className="gwk" key={g.id}><div className="gwh"><b>{tx(g.name)}</b><b>{f2(savedIn(g, k))}</b></div>
+        {W.map((w, i) => <div className="gwr" key={i}><div className="gwl"><span>{tx(w.t)}</span><b>{f2(w.amt)}</b></div>{w.note ? <small className="dim">{tx(w.note)}</small> : null}
+          {(w.sub || []).map((x, j) => <div className={'gws' + (x.on ? ' on' : '')} key={j}><span>{x.d}</span><span>{f2(x.amt)}</span><span>{tx(x.why)}</span></div>)}</div>)}</div> : null; })}</section>);
   }
 
   if (SRV && BK.accts) {

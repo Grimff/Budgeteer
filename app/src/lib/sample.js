@@ -3,7 +3,7 @@
 // Shared state (other files change it with the set… functions; it was js/sample.js):
 import { reactParity, renderBudget, renderLoans } from '../named.jsx';
 import { NTH, alertsNow, ntHide } from './alerts.js';
-import { BK, billPaid, flexAct, incGot, normT, CT, autoFile, setTXI, setPSET, PSET } from './bank.js';
+import { BK, billPaid, flexAct, incGot, normT, CT, autoFile, setTXI, setPSET, PSET, acctType } from './bank.js';
 import { BUDV, LOOSE, ORDN, fillAvg, orderApply, orderRead, setBSCOPE, setBUDV, setORDN } from './build.js';
 import { cmpRows } from './compare.js';
 import { C, DEMO, S, SELFTEST, TK, addM, clone, editPlan, esc, f0, f2, lab, labS, plan, r2, rtText, uid, $, nextDue, HADL, setHADL } from './core.js';
@@ -12,7 +12,7 @@ import { renderAll } from './events.js';
 import { nodeKey } from './flow.js';
 import { monthSum } from './history.js';
 import { allItems, inbox, linkLoan, BV, setBV, txUndo, txAssign } from './linked-loans.js';
-import { goalEta, goalMon, goalSaved, path, setLP, totals, unplannedA, linkedChange } from './math.js';
+import { goalEta, goalMon, goalSaved, path, setLP, totals, unplannedA, linkedChange, goalShare, savedWork, invInfo } from './math.js';
 import { FS } from './server-sync.js';
 import { BKP, bkList, bkRestore, healthChecks, SV, setSV, hcDot } from './settings.js';
 import { debtNow } from './wealth.js';
@@ -179,6 +179,15 @@ export async function selfTest(){const T=[],ok=(c,name,detail='')=>T.push({ok:!!
    const r=[v('investment','401k','Retirement Account'),v('brokerage','','Retirement Account'),v('other','401k','Account'),v('other','','Company Retirement Plan'),v('other','savings','Plain account')];
    [a.type,a.subtype,a.name]=t0;if(al0)S.alloc.brok=al0;else delete S.alloc.brok;setALC({});setLP({});
    ok(r[0]===r[1]&&r[0]===r[2]&&r[0]===r[3]&&r[4]!==r[0],'A 401(k)’s market change is never counted as saving, whatever type the bank gives it',r.join(' / '))}
+  // A 401(k)'s saving this month: a transfer from checking counts; a payroll contribution, and a same-amount purchase
+  // that happens to sit next to one, don't.
+  { const a=BK.accts.find(x=>x.id==='brok'),g=S.goals.find(x=>x.id==='trip'),al0=S.alloc.brok,fl0=a.flows,chk=BK.tx.find(t=>acctType(t.account)==='depository'&&t.amount>0),d=TK+'-10',d8=TK+'-08';
+   const T=[{...chk,id:'st-x1',date:d8,amount:250,name:'ONLINE TRANSFER TO RETIREMENT',merchant:'',pfc:['TRANSFER_OUT','TRANSFER_OUT_INVESTMENT_AND_RETIREMENT_FUNDS'],pending:false},{...chk,id:'st-x2',date:d8,amount:714,name:'CORNER HARDWARE',merchant:'',pfc:['GENERAL_MERCHANDISE','GENERAL_MERCHANDISE_OTHER'],pending:false}];
+   T.forEach(t=>delete t.ppid);BK.tx.push(...T);txAssign(T[1],'i:groc');a.flows=[{date:d,amt:250,name:'Contribution'},{date:d,amt:714,name:'Contribution'},{date:d,amt:714,name:'Contribution'}];
+   S.alloc.brok={mode:'order',goals:['trip'],pct:{},rest:'last'};setALC({});setLP({});setTXI(null);
+   const sh=goalShare('brok','trip',TK),v=linkedChange(g,TK),W=savedWork(g,TK),inf=invInfo(g,TK);
+   txUndo('st-x2');T.forEach(t=>BK.tx.splice(BK.tx.indexOf(t),1));a.flows=fl0;if(al0)S.alloc.brok=al0;else delete S.alloc.brok;setALC({});setLP({});setTXI(null);
+   ok(Math.abs(v-r2(sh*250))<0.01&&W.some(w=>w.sub&&w.sub.filter(x=>x.on).length===1)&&Math.abs(inf.payroll-r2(sh*1428))<0.02,'A 401(k) counts money moved in from checking as saving, not payroll or a same-amount purchase',`${v} (share ${sh.toFixed(2)}), payroll ${inf.payroll}`)}
   // Rent for next month paid late this month counts in next month (not twice in this one); a filing made before that
   // rule existed is moved on the next filing pass; a hand filing is never moved.
   { const rt=BK.tx.find(t=>t.date.slice(0,7)===TK&&/OAKWOOD/.test(t.name)),last=new Date(+TK.slice(0,4),+TK.slice(5,7),0).getDate(),id='st-early';
