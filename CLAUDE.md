@@ -452,7 +452,7 @@ server against a real `data/` folder while testing; use `tools/realtest.js`.
 - Clickable things must look clickable: `.lnk` is a soft pill (tinted with its own text colour),
   `details.more>summary` is an outlined pill with a chevron, `.btn.g` has an outline, `button.pill` has a
   thin border. Don't put `.lnk` mid-sentence where a plain button would do.
-- Header: one line above 1240px; below that the tabs get their own row (≤760px adds the phone rules).
+- Header: one line above 1360px (at 1240 the This month and Synced pills pushed the month off screen); below that the tabs get their own row (≤760px adds the phone rules).
   The money-flow chart's min width is 840/860px (scrolls inside its card on phones).
 - Collapsible cards: `<section class="card cl">` + `clh(key, shut, title, summary)` header
   (`data-act="bcol"`). State per browser in `BCL` (`pfb_bcl`): `isShut(key, default)`,
@@ -460,7 +460,8 @@ server against a real `data/` folder while testing; use `tools/realtest.js`.
   from your bank" (`lsetup`, open by default only when something needs action) and Goals →
   "Accounts for goals" (`galloc`, closed by default; `alGo` opens it).
 - Phones (≤760px): the tab row scrolls sideways (`moveInd` keeps the current tab in view); `.phead`
-  wraps its buttons under the title.
+  wraps its buttons under the title. The month shows as "Nov 2026" (`#mlab` `data-s` via `::after`; the full name stays
+  in its text).
   The phone rules from the layout pass are together at the end of app.css ("phone layout pass"): Bank → Filed and
   the pop-up's transaction rows put Move/Undo under the amount; `.bki` rows (Loans from your bank, Connections) give
   the name its own line; Build bill rows are name/amount/× then **Due** day (`.bdue`, a label that is
